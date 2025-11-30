@@ -95,7 +95,7 @@ body.preloading{ overflow: hidden; }
                             }
                             canvas {
                                 background-color: #181818;
-                                background-image: url('/Virtual-compass-cadet.lv/img/CADET.LV.png');
+                                background-image: url('/img/CADET.LV.png');
                                 background-repeat: no-repeat;
                                 background-attachment: fixed;
                                 background-size: 70% 30%;

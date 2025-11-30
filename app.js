@@ -275,12 +275,12 @@ function checkWindowSize() {
                         // Dinamiskās pogas konfigurācija: katrai pogai sākuma un alternatīvie attēli
 						const buttonImageMap = {
 							"toggleRotationMode": {
-								defaultSrc: "/Virtual-compass-cadet.lv/img/ROTATE_COMPASS_BASE.png",
-								alternateSrc: "/Virtual-compass-cadet.lv/img/ROTATE_COMPASS_SCALE.png"
+								defaultSrc: "img/ROTATE_COMPASS_BASE.png",
+								alternateSrc: "img/ROTATE_COMPASS_SCALE.png"
 							},
 							"lockRotationMode": {
-								defaultSrc: "/Virtual-compass-cadet.lv/img/COMPASS_ROTATE_UNLOCK.png",
-								alternateSrc: "/Virtual-compass-cadet.lv/img/COMPASS_ROTATE_LOCK.png"
+								defaultSrc: "img/COMPASS_ROTATE_UNLOCK.png",
+								alternateSrc: "img/COMPASS_ROTATE_LOCK.png"
 							}
 						};
 
@@ -2574,7 +2574,7 @@ body.print-mode #printNorthTR .n{
 function buildPrintFooterLgIa(scaleVal, title){
   const elv = (n)=> (''+n).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
   const mapAttrib  = collectAttributionText() || 'Dati: kartes pakalpojums';
-  const toolAttrib = '© CADET.LV Interaktīvais kompass — janiseglis.github.io/Virtual-compass-cadet.lv';
+  const toolAttrib = '© CADET.LV Interaktīvais kompass — janiseglis.github.io/virtual-compass';
   const gridText   = getActiveGridLabel(); // UTM vai LKS (skat. funkciju zemāk)
 
   const els = [];
@@ -5262,7 +5262,7 @@ on(byId('rotateCompass90'), 'click', function (ev) {
     b90.id = 'rotateTo90';
     b90.className = 'popup-button';
     const img90 = document.createElement('img');
-    img90.src = '/Virtual-compass-cadet.lv/img/GRID_VIEW_1_OPTION.png';
+    img90.src = '/img/GRID_VIEW_1_OPTION.png';
     img90.alt = 'Rotēt 90°';
     b90.appendChild(img90);
     row.appendChild(b90);
@@ -5272,7 +5272,7 @@ on(byId('rotateCompass90'), 'click', function (ev) {
     b_90.id = 'rotateToNegative90';
     b_90.className = 'popup-button';
     const img_90 = document.createElement('img');
-    img_90.src = '/Virtual-compass-cadet.lv/img/GRID_VIEW_2_OPTION.png';
+    img_90.src = '/img/GRID_VIEW_2_OPTION.png';
     img_90.alt = 'Rotēt -90°';
     b_90.appendChild(img_90);
     row.appendChild(b_90);
@@ -5430,8 +5430,8 @@ const ok = Math.abs(left - init.left) < 1 &&
 								const fullscreenIcon = document.getElementById('fullscreenIcon');
 								const fullscreenPopup = document.getElementById('fullscreenPopup');
   if (!toggleFullscreenButton || !fullscreenIcon || !fullscreenPopup) return;
-								const enterFullscreenIcon = '/Virtual-compass-cadet.lv/img/fullscreen_enter.png';
-								const exitFullscreenIcon = '/Virtual-compass-cadet.lv/img/fullscreen_exit.png';
+								const enterFullscreenIcon = '/img/fullscreen_enter.png';
+								const exitFullscreenIcon = '/img/fullscreen_exit.png';
 
 								// Iestatām sākotnējo ikonu
 								fullscreenIcon.src = enterFullscreenIcon;
