@@ -1,637 +1,539 @@
 <!doctype html>
 <html lang="lv">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Direkcijas leņķis un azimuts — Virtuālais kompass</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- izmanto to pašu CSS, ko kompass -->
-  <link rel="stylesheet" href="style.css?v=2025-09-29-01">
 
+
+  <!-- Pannellum CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
   <style>
-    :root{
-      --vc-accent:#437e12;
-      --vc-bg:#05070a;
-      --vc-card:#111820;
-      --vc-border:rgba(255,255,255,.08);
-      --vc-text:#e7edf5;
-      --vc-muted:#9ba7b8;
+    /* ========= KONTEINERA IZMĒRS UN IZKĀRTOJUMS ========= */
+    .pano-block {
+      position: relative;
+      width: 100%;
+      height: 80vh;
+      overflow: hidden;
+      margin: 0 auto;
     }
-    body{
-      margin:0;
-      font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-      background: radial-gradient(circle at top, #101827 0, #05070a 55%, #000 100%);
-      color:var(--vc-text);
-      min-height:100vh;
+    /* Panorama (Pannellum) konteiners */
+    #panorama {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      z-index: 0;
     }
-
-    /* HEADER / MENU */
-    .vc-header{
-      position:sticky;
-      top:0;
-      z-index:20;
-      backdrop-filter: blur(16px);
-      background:linear-gradient(to bottom, rgba(0,0,0,.9), rgba(0,0,0,.75), transparent);
-      border-bottom:1px solid rgba(255,255,255,.08);
-      padding:10px 18px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
+    /* Video elements – sākotnēji paslēpts */
+    #liveVideo {
+      display: none;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      object-fit: cover;
+      z-index: 1;
     }
-    .vc-brand{
-      font-weight:800;
-      letter-spacing:.16em;
-      font-size:11px;
-      text-transform:uppercase;
-      color:#fff;
-      text-shadow:0 0 10px rgba(0,0,0,.8);
-      white-space:nowrap;
-    }
-    .vc-brand span{
-      color:var(--vc-accent);
+    /* Jauna "Kamera" poga */
+    #toggleCameraButton {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 12;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
     }
 
-    .vc-nav{
-      position:relative;
-      display:flex;
-      align-items:center;
-      gap:8px;
+    /* ========= 3D Kompass stils ========= */
+    .compass-container {
+      position: absolute;
+      left: 50%;
+      top: 75%;
+      transform: translate(-50%, -50%) rotateX(30deg);
+      perspective: 800px;
+      width: min(50vmin, 300px);
+      height: min(30vmin, 180px);
+      z-index: 2;
     }
-    .vc-nav-toggle{
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.22);
-      background:rgba(0,0,0,.35);
-      color:#fff;
-      padding:6px 12px;
-      font-size:11px;
-      text-transform:uppercase;
-      letter-spacing:.12em;
-      display:flex;
-      align-items:center;
-      gap:6px;
-      cursor:pointer;
+    .compass-container::after {
+      content: "";
+      position: absolute;
+      left: 47.8%;
+      top: -69.7vh;
+      width: 3px;
+      height: 87.5vh;
+      background: linear-gradient(to top, rgba(255, 0, 0, 0.7), rgba(255, 0, 0, 0.1));
+      transform: translateX(-50%) rotate(0deg) rotateX(50deg);
+      z-index: 2;
     }
-    .vc-nav-toggle span.chevron{
-      font-size:10px;
-      opacity:.7;
+    .compass-base {
+      position: absolute;
+      width: 95%;
+      height: 85%;
+      transform: rotateX(45deg) rotateZ(90deg);
+      transform-origin: center center;
+      filter: drop-shadow(3px 3px 5px rgba(0, 0, 0, 0.5));
     }
-
-    .vc-nav .dropdown-menu{
-      position:absolute;
-      right:0;
-      top:calc(100% + 6px);
-      background:rgba(0,0,0,.92);
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.14);
-      padding:6px 0;
-      min-width:260px;
-      box-shadow:0 18px 40px rgba(0,0,0,.6);
-      display:none;
-      flex-direction:column;
-      max-height:70vh;
-      overflow:auto;
+    /* 3D skala – manuāli regulējama */
+    .compass-scale {
+      position: absolute;
+      width: 51%;
+      left: 47.2%;
+      top: 66.4%;
+      transform: translate(-50%, -50%) rotateX(45deg) rotate(0deg);
+      transform-origin: center center;
+      filter: drop-shadow(2px 4px 4px rgba(0, 0, 0, 0.1))
+              drop-shadow(0px 3px 4px rgba(0, 0, 0, 0.1))
+              drop-shadow(0px 7px 4px rgba(0, 0, 0, 0.4));
+      cursor: grab;
     }
-    .vc-nav.open .dropdown-menu{
-      display:flex;
-    }
-    .vc-nav .dropdown-link{
-      display:block;
-      padding:8px 14px;
-      font-size:12px;
-      text-decoration:none;
-      color:var(--vc-text);
-      border-left:3px solid transparent;
-      transition:background .15s ease,border-color .15s ease,color .15s ease;
-      white-space:normal;
-    }
-    .vc-nav .dropdown-link:hover{
-      background:rgba(255,255,255,.06);
-      border-color:var(--vc-accent);
-      color:#fff;
-    }
-    .vc-nav .dropdown-link.active{
-      background:rgba(67,126,18,.18);
-      border-color:var(--vc-accent);
-      color:#fff;
+    .compass-needle {
+      position: absolute;
+      width: 2.5%;
+      left: 47%;
+      top: 67%;
+      transform: translate(-50%, -50%) rotateX(45deg);
+      transform-origin: center center;
+      animation: none !important;
     }
 
-    @media(max-width:600px){
-      .vc-header{
-        padding-inline:12px;
+    /* ========= 2D Kompass stils ========= */
+    .compass-2d-container {
+      position: absolute;
+      top: 1.5%;
+      right: 0.2%;
+      background-color: rgba(0, 0, 0, 0.7);
+      border-radius: 50%;
+      padding: 15px;
+      z-index: 3;
+      width: min(34vmin, 300px);
+      height: min(34vmin, 300px);
+      overflow: hidden;
+      filter: drop-shadow(0px 0px 40px rgba(0, 0, 0, 0.7));
+      transition: all 0.3s ease;
+    }
+    .compass-2d-container.expanded {
+      top: 50%;
+      left: 50%;
+      width: 90%;
+      height: 90%;
+      border-radius: 10px;
+      padding: 0;
+      z-index: 10;
+      transform-origin: center center;
+      transform: translate(-50%, -50%);
+    }
+    .compass-2d-scale {
+      position: absolute;
+      width: calc(90% - 20px);
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) rotate(0deg);
+      transform-origin: center center;
+      cursor: grab;
+      animation: none;
+    }
+    .compass-2d-needle {
+      position: absolute;
+      width: 4%;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      transform-origin: center center;
+      animation: none !important;
+    }
+    .compass-2d-scale-Background {
+      position: absolute;
+      width: calc(88.3% - 20px);
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      transform-origin: center center;
+    }
+    .compass-2d-container img {
+      display: block;
+      border-radius: 50%;
+      z-index: 10;
+    }
+
+    /* ===== Responsivitāte ===== */
+    /* Desktop režīms – jaunie izmēri */
+    .compass-2d-container.expanded .compass-2d-scale {
+      width: 43%;
+      top: 45%;
+      position: absolute;
+    }
+    .compass-2d-container.expanded .compass-2d-scale-Background {
+      width: 42%;
+      top: 45%;
+    }
+    .compass-2d-container.expanded .compass-2d-needle {
+      width: 2.5%;
+      top: 45%;
+    }
+    .compass-2d-container.expanded .arc-buttons {
+      width: 52%;
+      top: -28%;
+      left: 41.8%;
+    }
+
+    /* Planšetēm – pielāgoti jaunā desktop izkārtojuma proporcijām */
+    @media (max-width: 1024px) {
+      .compass-2d-container.expanded .compass-2d-scale,
+      .compass-2d-container.expanded .compass-2d-scale-Background,
+      .compass-2d-container.expanded .compass-2d-needle,
+      .compass-2d-container.expanded .arc-buttons {
+        width: 43%;
+        top: 45%;
+        left: 41.8%;
       }
-      .vc-brand{ font-size:10px; }
-      .vc-nav-toggle{ font-size:10px; padding:5px 10px; }
-      .vc-nav .dropdown-menu{ min-width:220px; }
-    }
-
-    /* PAGE LAYOUT */
-    .vc-page{
-      max-width:960px;
-      margin:0 auto;
-      padding:18px 16px 40px;
-    }
-    .vc-hero{
-      display:grid;
-      grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);
-      gap:22px;
-      align-items:center;
-      margin-bottom:26px;
-    }
-    .vc-eyebrow{
-      font-size:11px;
-      text-transform:uppercase;
-      letter-spacing:.18em;
-      color:var(--vc-muted);
-      margin-bottom:6px;
-    }
-    .vc-hero h1{
-      font-size: clamp(24px, 4vw, 32px);
-      margin:0 0 10px;
-      line-height:1.1;
-    }
-    .vc-hero p{
-      margin:0 0 12px;
-      color:var(--vc-muted);
-      font-size:14px;
-    }
-    .vc-tag-row{
-      display:flex;
-      flex-wrap:wrap;
-      gap:6px;
-      margin-bottom:10px;
-    }
-    .vc-tag{
-      font-size:11px;
-      padding:4px 8px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.16);
-      background:rgba(0,0,0,.4);
-      color:var(--vc-muted);
-    }
-    .vc-note{
-      font-size:12px;
-      color:var(--vc-muted);
-    }
-
-    .vc-hero-card{
-      border-radius:18px;
-      background:radial-gradient(circle at top left, rgba(67,126,18,.38), transparent 55%),
-                 radial-gradient(circle at bottom right, rgba(0,0,0,.85), #05070a);
-      padding:14px 14px 16px;
-      border:1px solid rgba(255,255,255,.1);
-      box-shadow:0 20px 40px rgba(0,0,0,.75);
-    }
-    .vc-hero-card h2{
-      font-size:13px;
-      text-transform:uppercase;
-      letter-spacing:.2em;
-      margin:0 0 12px;
-      color:#e9f2ff;
-    }
-    .vc-hero-card ul{
-      list-style:none;
-      padding:0;
-      margin:0;
-      font-size:12px;
-      color:var(--vc-muted);
-    }
-    .vc-hero-card li{
-      margin-bottom:6px;
-    }
-
-    @media(max-width:780px){
-      .vc-hero{
-        grid-template-columns:1fr;
+      .compass-2d-container.expanded .arc-buttons {
+        /* Atjaunots, lai saglabātu proporcijas */
+        width: 52%;
+        top: -28%;
       }
     }
 
-    /* CARDS (teorija) */
-    .vc-grid{
-      display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
-      gap:16px;
-      margin-bottom:26px;
-    }
-    .vc-card{
-      background:var(--vc-card);
-      border-radius:16px;
-      border:1px solid var(--vc-border);
-      padding:14px 14px 16px;
-      box-shadow:0 10px 26px rgba(0,0,0,.55);
-    }
-    .vc-card h3{
-      margin:0 0 8px;
-      font-size:15px;
-    }
-    .vc-card p{
-      margin:0 0 6px;
-      font-size:13px;
-      color:var(--vc-muted);
-    }
-    .vc-card dl{
-      margin:8px 0 0;
-      font-size:12px;
-    }
-    .vc-card dt{
-      font-weight:600;
-      margin-top:4px;
-    }
-    .vc-card dd{
-      margin:0;
-      color:var(--vc-muted);
-    }
-
-    /* INTERAKTĪVAIS LABORATORIJAS BLOKS */
-    .vc-lab{
-      margin-top:10px;
-      background:radial-gradient(circle at top, rgba(67,126,18,.2), rgba(0,0,0,.95) 55%);
-      border-radius:18px;
-      border:1px solid rgba(255,255,255,.12);
-      padding:16px 14px 18px;
-      box-shadow:0 18px 40px rgba(0,0,0,.75);
-    }
-    .vc-lab-header{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:10px;
-      margin-bottom:12px;
-      flex-wrap:wrap;
-    }
-    .vc-lab-title{
-      font-size:14px;
-      text-transform:uppercase;
-      letter-spacing:.16em;
-      color:#f0f6ff;
-    }
-    .vc-lab-mode{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      font-size:11px;
-      color:var(--vc-muted);
-    }
-    .vc-lab-mode label{
-      display:flex;
-      align-items:center;
-      gap:4px;
-      padding:4px 8px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.18);
-      cursor:pointer;
-      background:rgba(0,0,0,.6);
-    }
-    .vc-lab-mode input{
-      accent-color:var(--vc-accent);
-    }
-
-    .vc-lab-layout{
-      display:grid;
-      grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);
-      gap:18px;
-      align-items:center;
-    }
-    @media(max-width:760px){
-      .vc-lab-layout{
-        grid-template-columns:1fr;
+    /* Mobilajām ierīcēm – pielāgoti jaunā desktop izkārtojuma proporcijām */
+    @media (max-width: 768px) {
+      .pano-block {
+        height: 300px;
+      }
+      .compass-container::after {
+        top: -63.8vh;
+        height: 80vh;
+      }
+      .compass-scale {
+        width: 49%;
+      }
+      .compass-needle {
+        width: 2.5%;
+      }
+      .compass-2d-container {
+        top: 2%;
+        right: 2%;
+        width: min(30vmin, 210px);
+        height: min(30vmin, 210px);
+      }
+      .compass-2d-needle {
+        width: 4%;
+      }
+      .compass-2d-container.expanded .compass-2d-scale,
+      .compass-2d-container.expanded .compass-2d-scale-Background,
+      .compass-2d-container.expanded .compass-2d-needle,
+      .compass-2d-container.expanded .arc-buttons {
+        width: 43%;
+        top: 45%;
+        left: 41.8%;
+      }
+      .compass-2d-container.expanded .arc-buttons {
+        width: 52%;
+        top: -28%;
+      }
+      .rotation-indicator-2d {
+        width: 31vw;
+        height: 31vw;
+      }
+      .rotation-dot-2d {
+        width: 8px;
+        height: 8px;
+      }
+      .rotation-dot-2d .rotation-arrow-2d {
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-top: 8px solid red;
+        top: 100%;
+      }
+      .degree-display {
+        font-size: 16px;
+        padding: 4px 8px;
       }
     }
 
-    .vc-compass-wrap{
-      display:flex;
-      justify-content:center;
-    }
-    .vc-compass{
-      position:relative;
-      width:min(260px, 70vw);
-      aspect-ratio:1/1;
-      border-radius:50%;
-      background:radial-gradient(circle at center, #111a27 0, #020409 60%, #000 100%);
-      border:2px solid rgba(255,255,255,.2);
-      box-shadow:
-        0 0 0 1px rgba(0,0,0,.8),
-        0 14px 30px rgba(0,0,0,.9);
-      overflow:hidden;
-    }
-    .vc-compass-ring{
-      position:absolute;
-      inset:12%;
-      border-radius:50%;
-      border:1px dashed rgba(255,255,255,.2);
-      box-shadow:0 0 0 1px rgba(0,0,0,.7) inset;
-    }
-    .vc-compass-nsew span{
-      position:absolute;
-      font-size:11px;
-      font-weight:700;
-      text-shadow:0 0 6px rgba(0,0,0,.9);
-    }
-    .vc-compass-nsew span.n{ top:6px; left:50%; transform:translateX(-50%); color:#ffeb3b;}
-    .vc-compass-nsew span.s{ bottom:6px; left:50%; transform:translateX(-50%);}
-    .vc-compass-nsew span.e{ right:6px; top:50%; transform:translateY(-50%);}
-    .vc-compass-nsew span.w{ left:6px; top:50%; transform:translateY(-50%);}
-
-    .vc-compass-arrow{
-      position:absolute;
-      left:50%;
-      top:50%;
-      width:4px;
-      height:34%;
-      transform-origin:50% 100%;
-      transform:translate(-50%,-100%) rotate(0deg);
-      background:linear-gradient(to top, rgba(0,0,0,.2), var(--vc-accent));
-      border-radius:999px;
-      box-shadow:0 0 8px rgba(67,126,18,.7);
-    }
-    .vc-compass-arrow::before{
-      content:"";
-      position:absolute;
-      left:50%;
-      top:-8px;
-      transform:translateX(-50%);
-      border-style:solid;
-      border-width:8px 6px 0 6px;
-      border-color:var(--vc-accent) transparent transparent transparent;
-      filter:drop-shadow(0 0 6px rgba(67,126,18,.9));
-    }
-    .vc-compass-center{
-      position:absolute;
-      left:50%;
-      top:50%;
-      transform:translate(-50%,-50%);
-      width:16px;
-      height:16px;
-      border-radius:50%;
-      background:#000;
-      border:2px solid rgba(255,255,255,.85);
-      box-shadow:0 0 10px rgba(0,0,0,.9);
+    /* ====== Degrees display rādījums ====== */
+    .degree-display {
+      position: absolute;
+      top: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 18px;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 5px 10px;
+      border-radius: 5px;
+      z-index: 11;
+      display: none;
     }
 
-    .vc-lab-controls{
-      font-size:13px;
-      color:var(--vc-muted);
+    /* ====== Jauno 'loku pogu' stils ====== */
+    .arc-buttons {
+      position: absolute;
+      bottom: 0%;
+      left: 34.5%;
+      transform: translateX(-50%);
+      width: 100%;
+      top: -15%;
+      z-index: 10;
     }
-    .vc-slider-row{
-      margin-bottom:10px;
+    .arc-buttons svg {
+      width: 131%;
+      height: 117%;
+      display: block;
+      pointer-events: none;
     }
-    .vc-slider-row label{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:8px;
-      margin-bottom:4px;
-      font-size:12px;
-      color:var(--vc-text);
+    .arc {
+      fill: none;
+      stroke: rgba(165, 117, 0, 0.6);
+      stroke-width: 20;
+      cursor: pointer;
+      pointer-events: stroke;
+      transition: stroke 0.3s;
     }
-    .vc-angle-value{
-      font-variant-numeric:tabular-nums;
-      font-weight:600;
+    .arc:hover {
+      stroke: rgba(234, 166, 0, 1);
     }
-    .vc-slider-row input[type="range"]{
-      width:100%;
-    }
-    .vc-angle-extra{
-      font-size:12px;
-      margin-bottom:6px;
-    }
-    .vc-angle-extra strong{
-      color:#fff;
-    }
-    .vc-steps{
-      font-size:12px;
-      margin:0;
-      padding-left:18px;
-    }
-    .vc-steps li{
-      margin-bottom:4px;
+    .arc-label {
+      font-size: 14px;
+      font-weight: bold;
+      fill: #fff;
+      pointer-events: none;
+      dominant-baseline: middle;
+      letter-spacing: 2px;
     }
   </style>
-</head>
-<body>
-  <header class="vc-header">
-    <div class="vc-brand">CADET<span>.LV</span> · Virtuālais kompass</div>
 
-    <nav class="vc-nav" id="vcNav">
-      <button class="vc-nav-toggle" type="button" id="vcNavToggle">
-        Mācību materiāli
-        <span class="chevron">▾</span>
-      </button>
-      <div class="dropdown-menu" id="dropdownMaterials">
-        <a href="https://cadet.mozello.lv/virtualais-kompass-macibu-materiali-un-instrukcija/macibu-materiali/topografiskas-kartes/" class="dropdown-link">TOPOGRĀFISKĀS KARTES</a>
-        <a href="https://cadet.mozello.lv/virtualais-kompass-macibu-materiali-un-instrukcija/macibu-materiali/merogs-un-attalumi/" class="dropdown-link">MĒROGS UN ATTĀLUMI</a>
-        <a href="https://cadet.mozello.lv/virtualais-kompass-macibu-materiali-un-instrukcija/macibu-materiali/apzimejumi-kartes/" class="dropdown-link">APZĪMĒJUMI KARTĒS</a>
 
-        <!-- ŠEIT TAGAD IET UZ JAUNO LAPU REPO IETVAROS -->
-        <a href="direkcijas-lenkis-un-azimuts.html" class="dropdown-link active">DIREKCIJAS LEŅĶIS UN AZIMUTS</a>
+  <div class="pano-block">
+    <!-- Panorāmas pamatkontainers (Pannellum) -->
+    <div id="panorama"></div>
+    <!-- Video elements reāllaika kameras straume (sākotnēji paslēpts) -->
+    <video id="liveVideo" autoplay="" playsinline=""></video>
+    <!-- Jauna poga, kas pārslēdzas starp panorāmu un kameru -->
+    <button id="toggleCameraButton" onclick="toggleCamera()">Kamera</button>
 
-        <a href="https://cadet.mozello.lv/virtualais-kompass-macibu-materiali-un-instrukcija/macibu-materiali/koordinates/" class="dropdown-link">KOORDINĀTES</a>
-        <a href="https://cadet.mozello.lv/virtualais-kompass-macibu-materiali-un-instrukcija/macibu-materiali/citi/" class="dropdown-link">CITI</a>
+    <!-- 3D Kompass -->
+    <div class="compass-container">
+      <img src="https://site-710050.mozfiles.com/files/710050/VIRTUALAIS_KOMPASS_PAMATNE_PV7.png" class="compass-base" alt="Kompass pamats (3D)">
+      <img src="https://site-710050.mozfiles.com/files/710050/KOMPASA_SKALA_CADET_LV_PV6_V3.png" class="compass-scale" alt="Kompass skala (3D)">
+      <img src="https://site-710050.mozfiles.com/files/710050/VIRTUALAIS_KOMPASS_ADATA_CADET_LV_PV4-1.png" class="compass-needle" alt="Kompass adata (3D)">
+      <div class="rotation-indicator-3d">
+        <div class="rotation-dot-3d"></div>
       </div>
-    </nav>
-  </header>
+    </div>
 
-  <main class="vc-page">
-    <section class="vc-hero">
-      <div>
-        <div class="vc-eyebrow">Mācību materiāli</div>
-        <h1>Direkcijas leņķis un azimuts</h1>
-        <p>
-          Šī lapa palīdz jauniešiem saprast, kā no kompasa nolasīt virzienu
-          grādos un kā to izmantot kartē un dabā.
-        </p>
-        <div class="vc-tag-row">
-          <div class="vc-tag">0–360°</div>
-          <div class="vc-tag">Pulksteņrādītāja virzienā</div>
-          <div class="vc-tag">Darbs ar kompasu un karti</div>
-        </div>
-        <p class="vc-note">
-          Ieteikums: atver šo lapu kopā ar interaktīvo kompasu, lai
-          skolēni uzreiz praksē redzētu, kā grādi mainās, griežot kompasu.
-        </p>
+    <!-- 2D Kompass -->
+    <div class="compass-2d-container" id="compass2dContainer">
+      <!-- SVG "Loku pogas" -->
+      <div class="arc-buttons">
+        <svg viewBox="0 0 300 300">
+          <!-- Kreisais loks – šis pogas teksts tiks mainīts -->
+          <g transform="translate(-1.5,0)">
+            <path id="leftArc" class="arc" d="M50,170 A100,100 0 0 0 150,250" onclick="toggleExpand2D();">
+            </path>
+            <text class="arc-label">
+              <textPath href="#leftArc" startOffset="50%" text-anchor="middle" dy="-15">
+                palielināt
+              </textPath>
+            </text>
+          </g>
+          <!-- Labais loks -->
+          <g transform="translate(1.5,0)">
+            <path id="rightArc" class="arc" d="M150,250 A100,100 0 0 0 250,170" onclick="toggleDegrees();">
+            </path>
+            <text class="arc-label">
+              <textPath href="#rightArc" startOffset="50%" text-anchor="middle" dy="-15">
+                grādi
+              </textPath>
+            </text>
+          </g>
+        </svg>
       </div>
-
-      <aside class="vc-hero-card">
-        <h2>Šodien iemācāmies</h2>
-        <ul>
-          <li>• Kas ir <strong>direkcijas leņķis</strong> kartē.</li>
-          <li>• Kas ir <strong>azimuts</strong> dabā.</li>
-          <li>• Kā pareizi mērīt virzienu no ziemeļiem.</li>
-          <li>• Kā tulkot starp karti un reālo virzienu.</li>
-        </ul>
-      </aside>
-    </section>
-
-    <section class="vc-grid">
-      <article class="vc-card">
-        <h3>Kas ir direkcijas leņķis?</h3>
-        <p>
-          Direkcijas leņķis ir grādu skaits starp kartes ziemeļu virzienu
-          (parasti augšup) un līniju uz objektu, mērīts
-          <strong>pulksteņrādītāja virzienā</strong> no 0° līdz 360°.
-        </p>
-        <dl>
-          <dt>0° / 360°</dt>
-          <dd>virziens uz ziemeļiem</dd>
-          <dt>90°</dt>
-          <dd>uz austrumiem</dd>
-          <dt>180°</dt>
-          <dd>uz dienvidiem</dd>
-          <dt>270°</dt>
-          <dd>uz rietumiem</dd>
-        </dl>
-      </article>
-
-      <article class="vc-card">
-        <h3>Kas ir azimuts?</h3>
-        <p>
-          Azimuts ir virziens uz objektu, ko nolasām ar kompasu
-          <strong>dabas apstākļos</strong>. To arī mēra no ziemeļiem
-          pulksteņrādītāja virzienā 0°–360°.
-        </p>
-        <p>
-          Atkarībā no tā, pret kādiem ziemeļiem mērām, runā par
-          <strong>magnētisko</strong>, <strong>ģeogrāfisko</strong> vai
-          <strong>režģa</strong> azimutu.
-        </p>
-      </article>
-
-      <article class="vc-card">
-        <h3>Direkcijas leņķis vs azimuts</h3>
-        <p>
-          Praktiski virziena leņķis un azimuts strādā vienādi –
-          virziens grādos no ziemeļiem. Atšķiras:
-        </p>
-        <dl>
-          <dt>Karte</dt>
-          <dd>direkcijas leņķis – pret kartes (režģa) ziemeļiem.</dd>
-          <dt>Daba</dt>
-          <dd>azimuts – pret magnētiskajiem vai ģeogrāfiskajiem ziemeļiem.</dd>
-          <dt>Uzdevums</dt>
-          <dd>bieži jāpiemēro korekcija starp dažādiem “ziemeļiem”.</dd>
-        </dl>
-      </article>
-    </section>
-
-    <section class="vc-lab">
-      <div class="vc-lab-header">
-        <div class="vc-lab-title">Interaktīvais virziena demo</div>
-        <div class="vc-lab-mode">
-          Režīms:
-          <label>
-            <input type="radio" name="angleMode" value="direction" checked>
-            Direkcijas leņķis
-          </label>
-          <label>
-            <input type="radio" name="angleMode" value="azimuth">
-            Azimuts
-          </label>
-        </div>
+      <img src="https://site-710050.mozfiles.com/files/710050/KOMPASA_SKALA_BACKGROUND_CADET_LV_PV2-1.png" class="compass-2d-scale-Background" alt="Kompass fons (2D)">
+      <img src="https://site-710050.mozfiles.com/files/710050/KOMPASA_SKALA_CADET_LV_PV6_V3.png" class="compass-2d-scale" alt="Kompass skala (2D)">
+      <img src="https://site-710050.mozfiles.com/files/710050/VIRTUALAIS_KOMPASS_ADATA_CADET_LV_PV4-1.png" class="compass-2d-needle" alt="Kompass adata (2D)">
+      <div class="rotation-indicator-2d">
+        <div class="rotation-dot-2d"></div>
       </div>
+      <div id="degreeDisplay" class="degree-display">0°</div>
+    </div>
+  </div>
 
-      <div class="vc-lab-layout">
-        <div class="vc-compass-wrap">
-          <div class="vc-compass" aria-hidden="true">
-            <div class="vc-compass-ring"></div>
-            <div class="vc-compass-nsew">
-              <span class="n">N</span>
-              <span class="e">E</span>
-              <span class="s">S</span>
-              <span class="w">W</span>
-            </div>
-            <div class="vc-compass-arrow" id="vcArrow"></div>
-            <div class="vc-compass-center"></div>
-          </div>
-        </div>
-
-        <div class="vc-lab-controls">
-          <div class="vc-slider-row">
-            <label for="vcAngle">
-              <span id="vcModeLabel">Direkcijas leņķis</span>
-              <span class="vc-angle-value" id="vcAngleValue">0°</span>
-            </label>
-            <input id="vcAngle" type="range" min="0" max="360" value="0" step="1">
-          </div>
-
-          <div class="vc-angle-extra" id="vcAngleExtra"></div>
-
-          <ul class="vc-steps">
-            <li>1. Izvēlies režīmu – <strong>direkcijas leņķis</strong> vai <strong>azimuts</strong>.</li>
-            <li>2. Pārvieto slīdni un vēro, kā mainās virziens.</li>
-            <li>3. Salīdzini, ko nozīmē tas pats grādu skaits kartē un dabā.</li>
-          </ul>
-        </div>
-      </div>
-    </section>
-  </main>
-
+  <!-- Pannellum JS -->
+  <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
   <script>
-    // Dropdown atvēršana / aizvēršana
-    (function(){
-      const nav = document.getElementById('vcNav');
-      const btn = document.getElementById('vcNavToggle');
-      if(!nav || !btn) return;
-      btn.addEventListener('click', () => {
-        nav.classList.toggle('open');
+    var cameraStream = null;
+    window.onload = function() {
+      // Inicializē Pannellum (panorāma)
+      var viewer = pannellum.viewer('panorama', {
+        type: 'equirectangular',
+        panorama: 'https://i.imgur.com/w4maDHx.jpeg',
+        autoLoad: true,
+        showControls: true,
+        showFullscreenCtrl: false,
+        compass: false,
+        hfov: 200,
+        autoRotate: -2,
+        yaw: -0.5,
+        ignoreGPanoXMP: true
       });
-      document.addEventListener('click', (e) => {
-        if(!nav.contains(e.target) && e.target !== btn){
-          nav.classList.remove('open');
+
+      // Atjauno kompasu adatu rotāciju
+      function updateCompassNeedles() {
+        var currentYaw = viewer.getYaw();
+        // 3D adata
+        var needle3d = document.querySelector('.compass-needle');
+        if (needle3d) {
+          needle3d.style.transform = 'translate(-50%, -50%) rotateX(45deg) rotateZ(' + (-currentYaw) + 'deg)';
         }
-      });
-    })();
-
-    // Interaktīvais virziena demo
-    (function(){
-      const angleInput = document.getElementById('vcAngle');
-      const angleValue = document.getElementById('vcAngleValue');
-      const angleExtra = document.getElementById('vcAngleExtra');
-      const modeLabel = document.getElementById('vcModeLabel');
-      const arrow = document.getElementById('vcArrow');
-      const modeInputs = document.querySelectorAll('input[name="angleMode"]');
-
-      if(!angleInput || !angleValue || !arrow) return;
-
-      function getMode(){
-        const checked = document.querySelector('input[name="angleMode"]:checked');
-        return checked ? checked.value : 'direction';
-      }
-
-      function getSector(angle){
-        angle = (angle % 360 + 360) % 360;
-        if(angle >= 337.5 || angle < 22.5) return 'Z';
-        if(angle < 67.5) return 'Z–A';
-        if(angle < 112.5) return 'A';
-        if(angle < 157.5) return 'D–A';
-        if(angle < 202.5) return 'D';
-        if(angle < 247.5) return 'D–R';
-        if(angle < 292.5) return 'R';
-        return 'Z–R';
-      }
-
-      function update(){
-        const angle = parseInt(angleInput.value, 10) || 0;
-        const mode = getMode();
-
-        angleValue.textContent = angle + '°';
-        arrow.style.transform = 'translate(-50%,-100%) rotate(' + angle + 'deg)';
-
-        if(mode === 'direction'){
-          modeLabel.textContent = 'Direkcijas leņķis';
-          const sector = getSector(angle);
-          angleExtra.textContent =
-            'Virziens kartē: ' + angle + '° (' + sector + ' sektors, mērīts no kartes ziemeļiem).';
-        }else{
-          modeLabel.textContent = 'Azimuts';
-          const sector = getSector(angle);
-          angleExtra.textContent =
-            'Virziens dabā (magnētiskais vai ģeogrāfiskais azimuts): ' +
-            angle + '° (' + sector + ' sektorā no ziemeļiem).';
+        // 2D adata
+        var needle2d = document.querySelector('.compass-2d-needle');
+        if (needle2d) {
+          needle2d.style.transform = 'translate(-50%, -50%) rotate(' + (-currentYaw) + 'deg)';
         }
       }
+      setInterval(updateCompassNeedles, 50);
+      viewer.on('viewchange', updateCompassNeedles);
 
-      angleInput.addEventListener('input', update);
-      modeInputs.forEach(r => r.addEventListener('change', update));
-      update();
-    })();
+      // Manuālā skalas rotācija
+      var currentManualAngle = 0;
+      function updateScales(angle) {
+        angle = ((angle % 360) + 360) % 360;
+        currentManualAngle = angle;
+        // 3D skala
+        var compassScale = document.querySelector('.compass-scale');
+        compassScale.style.transform = 'translate(-50%, -50%) rotateX(45deg) rotate(' + angle + 'deg)';
+        // 2D skala
+        var compass2dScale = document.querySelector('.compass-2d-scale');
+        compass2dScale.style.transform = 'translate(-50%, -50%) rotate(' + angle + 'deg)';
+        // Atjaunina 2D loka punktiņu
+        var indicator2d = document.querySelector('.rotation-indicator-2d');
+        var dot2d = document.querySelector('.rotation-dot-2d');
+        updateRotationDot(indicator2d, dot2d, angle);
+        // Ja grādu displejs ir redzams, atjaunina tā vērtību
+        var degreeDisplay = document.getElementById('degreeDisplay');
+        if (degreeDisplay.style.display !== 'none') {
+          var displayAngle = (360 - angle) % 360;
+          degreeDisplay.innerText = Math.round(displayAngle) + "°";
+        }
+      }
+      function updateRotationDot(indicatorElem, dotElem, angleDeg) {
+        if (!indicatorElem || !dotElem) return;
+        var radius = (indicatorElem.offsetWidth / 2) - (dotElem.offsetWidth / 2);
+        var rad = angleDeg * (Math.PI / 180);
+        var x = radius * Math.cos(rad);
+        var y = radius * Math.sin(rad);
+        dotElem.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
+      }
+      function calculateAngle(clientX, clientY, element) {
+        var rect = element.getBoundingClientRect();
+        var centerX = rect.left + rect.width / 2;
+        var centerY = rect.top + rect.height / 2;
+        var dx = clientX - centerX;
+        var dy = clientY - centerY;
+        return Math.atan2(dy, dx) * (180 / Math.PI);
+      }
+      var isDragging = false;
+      var activeElement = null;
+      function startDrag(e) {
+        isDragging = true;
+        activeElement = e.currentTarget;
+        activeElement.style.cursor = "grabbing";
+        e.preventDefault();
+      }
+      function onDrag(e) {
+        if (!isDragging) return;
+        var clientX, clientY;
+        if (e.type.startsWith("touch")) {
+          clientX = e.touches[0].clientX;
+          clientY = e.touches[0].clientY;
+        } else {
+          clientX = e.clientX;
+          clientY = e.clientY;
+        }
+        var angle = calculateAngle(clientX, clientY, activeElement);
+        updateScales(angle);
+      }
+      function endDrag() {
+        if (activeElement) {
+          activeElement.style.cursor = "grab";
+        }
+        isDragging = false;
+        activeElement = null;
+      }
+      var compassScaleElem = document.querySelector('.compass-scale');
+      var compass2dScaleElem = document.querySelector('.compass-2d-scale');
+      [compassScaleElem, compass2dScaleElem].forEach(function(el) {
+        el.addEventListener("mousedown", startDrag);
+        el.addEventListener("touchstart", startDrag);
+      });
+      window.addEventListener("mousemove", onDrag);
+      window.addEventListener("touchmove", onDrag);
+      window.addEventListener("mouseup", endDrag);
+      window.addEventListener("touchend", endDrag);
+      updateScales(0);
+
+      // Funkcija grādu displeja toggling (labais loks)
+      window.toggleDegrees = function() {
+        var degreeDisplay = document.getElementById('degreeDisplay');
+        if (degreeDisplay.style.display === 'none' || degreeDisplay.style.display === '') {
+          degreeDisplay.style.display = 'block';
+          var displayAngle = (360 - currentManualAngle) % 360;
+          degreeDisplay.innerText = Math.round(displayAngle) + "°";
+        } else {
+          degreeDisplay.style.display = 'none';
+        }
+      };
+
+      // Toggle funkcija 2D kompasa paplašināšanai – maina tekstu uz "samazināt" vai "palielināt"
+      window.toggleExpand2D = function() {
+        var compass2dContainer = document.getElementById('compass2dContainer');
+        var textPath = document.querySelector('textPath[href="#leftArc"]');
+        if (compass2dContainer.classList.contains('expanded')) {
+          compass2dContainer.classList.remove('expanded');
+          textPath.textContent = "palielināt";
+        } else {
+          compass2dContainer.classList.add('expanded');
+          textPath.textContent = "samazināt";
+        }
+      };
+
+      // Jaunā toggleCamera funkcija – pārslēdz starp panorāmu un mobīlo ierīces kameru
+      window.toggleCamera = function() {
+        var video = document.getElementById("liveVideo");
+        var panorama = document.getElementById("panorama");
+        var btn = document.getElementById("toggleCameraButton");
+        if (video.style.display === "none" || video.style.display === "") {
+          // Pārslēdz uz kameras reāllaika režīmu
+          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+              .then(function(stream) {
+                cameraStream = stream;
+                video.srcObject = stream;
+                video.style.display = "block";
+                panorama.style.display = "none";
+                btn.textContent = "Panorama";
+              })
+              .catch(function(err) {
+                console.log("Kameras piekļuve neizdevās:", err);
+              });
+          }
+        } else {
+          // Pārslēdz atpakaļ uz panorāmu
+          if (cameraStream) {
+            cameraStream.getTracks().forEach(function(track) {
+              track.stop();
+            });
+          }
+          video.style.display = "none";
+          panorama.style.display = "block";
+          btn.textContent = "Kamera";
+        }
+      };
+    };
   </script>
 </body>
 </html>
