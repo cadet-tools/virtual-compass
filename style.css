@@ -947,7 +947,7 @@ body.preloading{ overflow: hidden; }
 								left: 0;
 								width: 100%;
 								height: calc(100vh - 40px);
-								background-color: rgba(0, 0, 0, 0.8);
+								background-color: rgba(0, 0, 0, 1);
 								padding: 20px;
 								display: flex;
 								flex-wrap: wrap;
