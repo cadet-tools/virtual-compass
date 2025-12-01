@@ -1012,7 +1012,7 @@ body.preloading{ overflow: hidden; }
 							/* Kad iframe ir aktīvs, dropdown pogas tiek paceltas un samazinātas */
 							.dropdown-menu.shrink .dropdown-link {
 								padding: 5px 1px;
-								font-size: 14px;
+								font: small-caps bold 16px / 1 sans-serif;
 								height: 20px;
 								transform: translateY(70px); /* Paceļ pogas augstāk, bet saglabā rindu izvietojumu */
 								margin-top:-40px;
