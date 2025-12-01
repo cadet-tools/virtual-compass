@@ -515,5 +515,44 @@
       }, { passive: false });
     });
   </script>
+
+  <script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Paņem pašreizējā URL faila nosaukumu
+  let path = window.location.pathname.split('/').pop();
+  // Ja URL ir .../virtual-compass/ bez faila – uzskatām, ka tā ir index.html
+  if (!path) path = 'index.html';
+
+  // 1) Atzīmē dropdown linkus (Mācību materiāli, Lietotāju ceļvedis)
+  document.querySelectorAll('.dropdown-menu .dropdown-link').forEach(function (link) {
+    const href = link.getAttribute('href');
+    if (!href) return;
+
+    const file = href.split('/').pop(); // tikai faila daļa
+    if (file === path) {
+      // Pašam linkam pievieno .active
+      link.classList.add('active');
+
+      // Atzīmē arī galveno pogu – tā, kas ir tieši pirms .dropdown-menu
+      const menu = link.closest('.dropdown-menu');
+      if (menu && menu.previousElementSibling) {
+        menu.previousElementSibling.classList.add('active');
+      }
+    }
+  });
+
+  // 2) Ja ir augšējā līmeņa linki bez dropdown (piem. Sākums)
+  document.querySelectorAll('nav a').forEach(function (link) {
+    const href = link.getAttribute('href');
+    if (!href) return;
+
+    const file = href.split('/').pop();
+    if (file === path) {
+      link.classList.add('active');
+    }
+  });
+});
+</script>
+
 </body>
 </html>
