@@ -7,21 +7,20 @@
 
   <style>
     /* width */
-  ::-webkit-scrollbar {
+    ::-webkit-scrollbar {
       width: 10px;
-  }
-  
-  /* Track */
-  ::-webkit-scrollbar-track {
+    }
+    /* Track */
+    ::-webkit-scrollbar-track {
       box-shadow: inset 0 0 5px grey; 
       border-radius: 10px;
-  }
-   
-  /* Handle */
-  ::-webkit-scrollbar-thumb {
+    }
+    /* Handle */
+    ::-webkit-scrollbar-thumb {
       background: rgba(255, 0, 0, 0.6); 
       border-radius: 10px;
-  }
+    }
+
     body{
       margin: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -31,30 +30,24 @@
       background-position: center;
       background-attachment: fixed;
       min-height: 100vh;
-}
-    
+    }
 
     /* 3 konteineru izkārtojums */
-   .parent {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: repeat(3, auto);
-  gap: 8px;
-  padding: 12px;
-  background-color: #00000099;
-  border-radius: 10px;
-
-  /* JAUNAIS */
-  max-width: 90%;      /* vai citu vērtību, kas patīk */
-  margin: 40px auto;      /* atstāj malas un iecentrē */
-}
+    .parent {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: repeat(3, auto);
+      gap: 8px;
+      padding: 12px;
+      background-color: #00000099;
+      border-radius: 10px;
+      max-width: 90%;
+      margin: 40px auto;
+    }
     .div1,
     .div2,
     .div3{
-     
       border-radius:12px;
-      
-     
       padding:8px;
       position:relative;
       min-height:120px;
@@ -96,7 +89,6 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      
     }
 
     #rulerContainer {
@@ -219,6 +211,13 @@
       text-align: center;
       color: white;
       margin-top: 10px;
+      box-sizing: border-box;
+    }
+    #controls select {
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      padding-right: 24px;
     }
 
     #MapOverlay {
@@ -255,6 +254,207 @@
       font-size: 18px;
       border-radius: inherit;
     }
+
+    /* ===== Kalkulators + tests (2. un 3. konteiners) ===== */
+
+    .container-cal {
+      background-color: rgba(0, 0, 0, 0.5);
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 85%;
+      max-width: 400px;
+      margin: auto;
+      color: white;
+      position: relative;
+    }
+
+    /* Lai overlay elementam pozicionētu attiecībā pret kalkulatora konteinera malu */
+    #scaleCalcContainer {
+      position: relative;
+    }
+
+    /* Overlay elements – banneris, kas tiks pozicionēts virs kalkulatora */
+    #calcOverlay {
+      position: absolute;
+      bottom: 4%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 95%;
+      height: 10%;
+      background-color: rgba(255, 0, 0, 1);
+      color: white;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      border-radius: 5px;
+      font-size: 16px;
+      z-index: 100;
+    }
+
+    label {
+      font-weight: bold;
+      display: block;
+      margin-top: 10px;
+      color: white;
+    }
+
+    .container-cal input,
+    .container-cal button {
+      color: white;
+      cursor: pointer;
+      margin-top: 15px;
+      width: 100%;
+      border-style: solid;
+      background-color: rgba(0, 0, 0, 0.5);
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 5px;
+      text-align: center;
+      border-color: #783200;
+    }
+
+    .container-cal select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 5px;
+      display: block;
+      font-size: 16px;
+      background-color: rgba(0, 0, 0, 0.5);
+      color: white;
+      text-align: center;
+      border-style: solid;
+      border-color: #783200;
+    }
+
+    .button-container {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      margin-top: 15px;
+    }
+    .clear-btn {
+      background-color: rgba(255, 0, 0, 0.5) !important;
+      border: none;
+    }
+
+    .result, .explanation {
+      margin-top: 20px;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 16px;
+      width: 95%;
+      color: white;
+    }
+    .result.success {
+      background: rgba(0, 255, 0, 0.2) !important;
+    }
+    .result.error { 
+      background: rgba(255, 0, 0, 0.5) !important; 
+    }
+    .explanation {
+      background: rgba(255, 255, 0, 0.3) !important;
+    }
+
+    /* Testa specifiskais */
+    .result-mtest1 {
+      margin-top: 20px;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 16px;
+      width: 95%;
+      color: white;
+    }
+
+    #question-boxes {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 20px;
+      justify-content: center;
+      width: 100%;
+    }
+    .question-box {
+      width: calc((100% - 45px) / 10);
+      aspect-ratio: 1;
+      background-color: #ccc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      user-select: none;
+      font-weight: bold;
+    }
+
+    #final-result {
+      display: none;
+      margin-top: 20px;
+      background: #dff0d8;
+      padding: 15px;
+      border-radius: 5px;
+      width: 85%;
+      max-width: 400px;
+      margin: 20px auto;
+      text-align: center;
+      color: #000;
+    }
+
+    #exit-test-btn, #exitTestDuringBtn {
+      margin-top: 15px;
+      background-color: rgba(255, 0, 0, 0.5);
+      color: white;
+      border: none;
+      cursor: pointer;
+      padding: 10px 20px;
+      border-radius: 5px;
+    }
+
+    #explanation-btn {
+      background-color: #783200;
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 5px;
+      display: none;
+    }
+
+    #exitConfirmationDropdown {
+      display: none;
+      background: rgba(0, 0, 0, 0.2);
+      color: white;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 5px;
+      margin-top: 10px;
+      width: 100%;
+      text-align: center;
+      border-color: #783200;
+    }
+    #exitConfirmationDropdown p {
+      margin: 0 0 10px 0;
+    }
+    .confirm-btn {
+      background-color: rgba(255, 0, 0, 0.5);
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      margin: 5px;
+      border-radius: 5px;
+      cursor: pointer;
+      width: auto;
+    }
+    .cancel-btn {
+      background-color: #783200;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      margin: 5px;
+      border-radius: 5px;
+      cursor: pointer;
+      width: auto;
+    }
   </style>
 </head>
 <body>
@@ -271,7 +471,7 @@
 
           <div id="MapOverlay">Materiāls nav pieejams testa izpildes laikā!</div>
 
-          <!-- Karte (vari pārlikt uz savu img/ mapi) -->
+          <!-- Karte -->
           <img id="mapImage"
                src="./img/karte virtual kompass dark.jpg"
                alt="Karte">
@@ -288,31 +488,107 @@
                 <option value="cm" selected>cm</option>
                 <option value="mm">mm</option>
               </select>
+              <input
+                type="number"
+                id="cm-input"
+                min="0"
+                max="20"
+                step="0.1"
+                placeholder="Attālums uz kartes (cm 0–20)">
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 2. un 3. konteineris – pagaidām tukši vietturi -->
+    <!-- 2. KONTEINERS: Mēroga kalkulators -->
     <div class="div2">
-      2. konteiners (šeit vēlāk ieliksi nākamo interaktīvo materiālu)
+      <div id="scaleCalcContainer" class="container-cal">
+        <div id="calcOverlay">Kalkulātors nav pieejams testa izpildes laikā!</div>
+        <h2>Mēroga kalkulators</h2>
+
+        <label for="scale">Ievadiet mērogu (piem. 1:XXXXX):</label>
+        <input type="text" id="scale" placeholder="1:25000" onfocus="clearPlaceholder(this)">
+
+        <label for="distance">Mērītais attālums kartē:</label>
+        <input type="number" id="distance" placeholder="0" onfocus="clearPlaceholder(this)">
+
+        <label for="unit">Izvēlieties mērvienību:</label>
+        <select id="unit">
+          <option value="cm">cm</option>
+          <option value="mm">mm</option>
+        </select>
+
+        <div class="button-container">
+          <button class="clear-btn" onclick="clearData()">Notīrīt datus</button>
+          <button style="background-color: #783200; color: white; cursor: pointer; margin-top: 15px; border: none;" onclick="calculateDistance()">Aprēķināt</button>
+        </div>
+
+        <div id="result" class="result" style="display: none;"></div>
+        <div id="calc-explanation" class="explanation" style="display: none;"></div>
+      </div>
     </div>
+
+    <!-- 3. KONTEINERS: Mēroga aprēķinu tests -->
     <div class="div3">
-      3. konteiners (šeit vēlāk ieliksi nākamo interaktīvo materiālu)
+      <div class="container-cal" id="test-container">
+        <div id="question-boxes">
+          <div class="question-box" id="qb1">1</div>
+          <div class="question-box" id="qb2">2</div>
+          <div class="question-box" id="qb3">3</div>
+          <div class="question-box" id="qb4">4</div>
+          <div class="question-box" id="qb5">5</div>
+          <div class="question-box" id="qb6">6</div>
+          <div class="question-box" id="qb7">7</div>
+          <div class="question-box" id="qb8">8</div>
+          <div class="question-box" id="qb9">9</div>
+          <div class="question-box" id="qb10">10</div>
+        </div>
+
+        <h2>Mēroga aprēķinu tests</h2>
+        <p><b>Uzdevums:</b></p>
+        <p id="task-mtest">Nospied pogu "Sākt testu" lai uzsāktu!</p>
+
+        <label for="answer-mtest">Ievadiet aprēķināto attālumu dabā (m):</label>
+        <input type="number" id="answer-mtest" placeholder="Ievadi atbildi" disabled>
+
+        <button id="startTestBtn" onclick="startTest()">Sākt testu</button>
+        <button id="check-btn-mtest" style="display:none;" onclick="checkAnswerMtest()">Pārbaudīt</button>
+
+        <div id="result-mtest" class="result-mtest1" style="display: none;"></div>
+
+        <button id="explanation-btn" onclick="toggleExplanation()">Skaidrojums</button>
+        <div id="explanation-mtest" class="explanation" style="display: none;"></div>
+
+        <button id="next-btn-mtest" onclick="nextTaskMtest()" style="display: none;">Nākamais uzdevums</button>
+        <button id="exitTestDuringBtn" onclick="toggleExitDropdown()" style="display:none;">Iziet no testa</button>
+
+        <div id="exitConfirmationDropdown">
+          <p>Vai tiešām vēlaties iziet no testa?</p>
+          <button class="confirm-btn" onclick="confirmExitTest()">Jā</button>
+          <button class="cancel-btn" onclick="toggleExitDropdown()">Turpināt testu</button>
+        </div>
+      </div>
+
+      <div id="final-result">
+        <h3>Tests pabeigts!</h3>
+        <p id="score-info"></p>
+        <button id="exit-test-btn" onclick="toggleExitDropdown()">Iziet no testa</button>
+      </div>
     </div>
   </div>
 
+  <!-- 1) Interaktīvais lineāls -->
   <script>
-    // gaidām, kamēr viss HTML ielādējas
     document.addEventListener('DOMContentLoaded', function () {
       let currentCmValue = 5; // sākotnējais attālums cm
       let isDragging = false;
+      let isTypingCmInput = false;
 
       const rulerContainer = document.getElementById('rulerContainer');
       const ruler = document.getElementById('ruler');
 
-      if (!rulerContainer || !ruler) return; // drošības pārbaude
+      if (!rulerContainer || !ruler) return;
 
       const markerStart = document.createElement('div');
       markerStart.id = 'markerStart';
@@ -367,27 +643,22 @@
         markerStart.style.left = (leftMargin - 15) + 'px';
       }
 
-      function setMarkerDraggablePosition(cmValue) {
-        const containerRect = rulerContainer.getBoundingClientRect();
-        const fullWidth = containerRect.width;
-        const leftMarginPx = fullWidth * 0.01;
-        const effectiveWidthPx = fullWidth * 0.98;
-        const x = leftMarginPx + (cmValue / 20) * effectiveWidthPx;
-        markerDraggable.style.left = (x - 15) + 'px';
-        calculateDistanceDynamic(cmValue);
-      }
-
       function calculateDistanceDynamic(measuredCm) {
         const explanationDiv = document.getElementById("explanation");
         const scaleInputEl = document.getElementById("scale-maps");
         const unitEl = document.getElementById("unit");
+        const cmInputEl = document.getElementById("cm-input");
         if (!explanationDiv || !scaleInputEl || !unitEl) return;
+
+        const roundedCm = Math.round(measuredCm * 10) / 10;
+        const displayCm = roundedCm.toFixed(1);
 
         const scaleInput = scaleInputEl.value;
         let match = scaleInput.match(/1:(\d+)/);
         if (!match) {
           explanationDiv.style.display = "block";
           explanationDiv.innerHTML = "Lūdzu, ievadiet mērogu formātā 1:XXXXXX";
+          if (cmInputEl && !isTypingCmInput) cmInputEl.value = "";
           return;
         }
 
@@ -401,26 +672,37 @@
 
         if (unit === "cm") {
           convertedScale /= 100;
-          explanationText += `Mērogs 1:${scaleValue} nozīmē, ka 1 cm uz kartes atbilst ${scaleValue / 100} m dabā.<br>` +
-                             `Noņemot pēdējās divas nulles, iegūstam ${convertedScale} m.<br>`;
-          result = Math.round(convertedScale * measuredCm);
-          explanationText += `Tātad, ja attālums uz kartes ir ${measuredCm.toFixed(2)} cm, tad reālais attālums būs ${result} m dabā.<br><br>`;
+          result = Math.round(convertedScale * roundedCm);
+          explanationText += `Mērogs 1:${scaleValue} nozīmē, ka 1 cm uz kartes atbilst ${scaleValue / 100} m dabā.<br>`;
+          explanationText += `Tātad, ja attālums uz kartes ir ${displayCm} cm, tad reālais attālums būs ${result} m dabā.<br><br>`;
           explanationText += `<strong>Formula:</strong><br>`;
-          explanationText += `${convertedScale} m x ${measuredCm.toFixed(2)} cm = <strong>${result} m</strong>`;
+          explanationText += `${convertedScale} m x ${displayCm} cm = <strong>${result} m</strong>`;
         } else if (unit === "mm") {
           convertedScale /= 1000;
-          explanationText += `Mērogs 1:${scaleValue} nozīmē, ka 1 mm uz kartes atbilst ${scaleValue / 1000} m dabā.<br>` +
-                             `Noņemot pēdējās trīs nulles, iegūstam ${convertedScale} m.<br>`;
-          let measuredMm = measuredCm * 10;
-          explanationText += `Uz kartes attālums: ${measuredMm.toFixed(0)} mm (t.i., ${measuredCm.toFixed(2)} cm).<br>`;
+          const measuredMm = Math.round(roundedCm * 10);
           result = Math.round(convertedScale * measuredMm);
-          explanationText += `Tātad, reālais attālums būs ${result} m dabā.<br><br>`;
+          explanationText += `Mērogs 1:${scaleValue} nozīmē, ka 1 mm uz kartes atbilst ${scaleValue / 1000} m dabā.<br>`;
+          explanationText += `Uz kartes attālums: ${measuredMm} mm (t.i., ${displayCm} cm).<br><br>`;
           explanationText += `<strong>Formula:</strong><br>`;
-          explanationText += `${convertedScale} m x ${measuredMm.toFixed(0)} mm = <strong>${result} m</strong>`;
+          explanationText += `${convertedScale} m x ${measuredMm} mm = <strong>${result} m</strong>`;
         }
 
         explanationDiv.style.display = "block";
         explanationDiv.innerHTML = explanationText;
+
+        if (cmInputEl && !isTypingCmInput) {
+          cmInputEl.value = displayCm;
+        }
+      }
+
+      function setMarkerDraggablePosition(cmValue) {
+        const containerRect = rulerContainer.getBoundingClientRect();
+        const fullWidth = containerRect.width;
+        const leftMarginPx = fullWidth * 0.01;
+        const effectiveWidthPx = fullWidth * 0.98;
+        const x = leftMarginPx + (cmValue / 20) * effectiveWidthPx;
+        markerDraggable.style.left = (x - 15) + 'px';
+        calculateDistanceDynamic(cmValue);
       }
 
       function updateAll() {
@@ -455,19 +737,18 @@
         }
       }
 
-      // Reaģē uz loga izmēru un orientāciju
       window.addEventListener('resize', () => {
         updateAll();
         checkMobileOrientation();
       });
       window.addEventListener('load', checkMobileOrientation);
 
-      // Uzreiz uzbūvē lineālu
       updateAll();
 
-      // ievades laukiem
       const scaleInputEl = document.getElementById("scale-maps");
       const unitEl = document.getElementById("unit");
+      const cmInputEl = document.getElementById("cm-input");
+
       if (scaleInputEl) {
         scaleInputEl.addEventListener("change", () => {
           calculateDistanceDynamic(currentCmValue);
@@ -478,8 +759,23 @@
           calculateDistanceDynamic(currentCmValue);
         });
       }
+      if (cmInputEl) {
+        cmInputEl.addEventListener("input", () => {
+          isTypingCmInput = true;
+          let raw = cmInputEl.value.replace(',', '.');
+          let val = parseFloat(raw);
+          if (isNaN(val)) {
+            isTypingCmInput = false;
+            return;
+          }
+          if (val < 0) val = 0;
+          if (val > 20) val = 20;
+          currentCmValue = val;
+          setMarkerDraggablePosition(currentCmValue);
+          isTypingCmInput = false;
+        });
+      }
 
-      // Pele
       markerDraggable.addEventListener('mousedown', (e) => {
         e.preventDefault();
         isDragging = true;
@@ -495,7 +791,6 @@
         handleDrag(e.clientX);
       });
 
-      // Skārieni
       markerDraggable.addEventListener('touchstart', (e) => {
         e.preventDefault();
         isDragging = true;
@@ -516,43 +811,298 @@
     });
   </script>
 
+  <!-- 2) Mēroga kalkulators -->
   <script>
-document.addEventListener('DOMContentLoaded', function () {
-  // Paņem pašreizējā URL faila nosaukumu
-  let path = window.location.pathname.split('/').pop();
-  // Ja URL ir .../virtual-compass/ bez faila – uzskatām, ka tā ir index.html
-  if (!path) path = 'index.html';
+    function clearPlaceholder(element) {
+      element.placeholder = "";
+    }
+    function calculateDistance() {
+      let scaleInput = document.getElementById("scale").value;
+      let distance = parseFloat(document.getElementById("distance").value);
+      let unit = document.getElementById("unit").value;
+      let resultDiv = document.getElementById("result");
+      let explanationDiv = document.getElementById("calc-explanation");
 
-  // 1) Atzīmē dropdown linkus (Mācību materiāli, Lietotāju ceļvedis)
-  document.querySelectorAll('.dropdown-menu .dropdown-link').forEach(function (link) {
-    const href = link.getAttribute('href');
-    if (!href) return;
+      let match = scaleInput.match(/1:(\d+)/);
+      if (!match) {
+        resultDiv.style.display = "block";
+        resultDiv.className = "result error";
+        resultDiv.innerHTML = "Lūdzu, ievadiet mērogu formātā 1:XXXXXX";
+        explanationDiv.style.display = "none";
+        return;
+      }
 
-    const file = href.split('/').pop(); // tikai faila daļa
-    if (file === path) {
-      // Pašam linkam pievieno .active
-      link.classList.add('active');
+      if (isNaN(distance)) {
+        resultDiv.style.display = "block";
+        resultDiv.className = "result error";
+        resultDiv.innerHTML = "Lūdzu, ievadiet mērīto attālumu!";
+        explanationDiv.style.display = "none";
+        return;
+      }
 
-      // Atzīmē arī galveno pogu – tā, kas ir tieši pirms .dropdown-menu
-      const menu = link.closest('.dropdown-menu');
-      if (menu && menu.previousElementSibling) {
-        menu.previousElementSibling.classList.add('active');
+      let scaleValue = parseInt(match[1]);
+      let convertedScale = scaleValue;
+      let explanationText = `<strong>Aprēķina skaidrojums:</strong><br>` +
+          `Mērogs: 1:${scaleValue}<br>`;
+
+      if (unit === "cm") {
+        convertedScale /= 100;
+        explanationText += `Mērogs 1:${scaleValue} nozīmē, ka 1 cm uz kartes atbilst ${scaleValue / 100} m dabā.<br>` +
+                           `Noņemot pēdējās divas nulles, iegūstam ${convertedScale}, kas ir attālums dabā metros.<br>`;
+      } else if (unit === "mm") {
+        convertedScale /= 1000;
+        explanationText += `Mērogs 1:${scaleValue} nozīmē, ka 1 mm uz kartes atbilst ${scaleValue / 1000} m dabā.<br>` +
+                           `Noņemot pēdējās trīs nulles, iegūstam ${convertedScale}, kas ir attālums dabā metros.<br>`;
+      }
+
+      let result = convertedScale * distance;
+      result = Math.round(result * 100) / 100; // līdz 2 cipariem aiz komata
+
+      resultDiv.style.display = "block";
+      resultDiv.className = "result success";
+      resultDiv.innerHTML = `<strong>Rezultāts:</strong><br>${result} m dabā`;
+
+      explanationText += `Tātad, ja attālums uz kartes ir ${distance} ${unit}, tad reālais attālums būs ${result} metri dabā.<br><br>`;
+      explanationText += `<strong>Formula:</strong><br>`;
+      explanationText += `${convertedScale} m x ${distance} ${unit} = <strong>${result} m</strong>`;
+
+      explanationDiv.style.display = "block";
+      explanationDiv.innerHTML = explanationText;
+    }
+
+    function clearData() {
+      document.getElementById("scale").value = "";
+      document.getElementById("distance").value = "";
+      document.getElementById("unit").selectedIndex = 0;
+      document.getElementById("result").style.display = "none";
+      document.getElementById("calc-explanation").style.display = "none";
+    }
+  </script>
+
+  <!-- 3) Mēroga aprēķinu tests -->
+  <script>
+    let scalesMtest = [10000, 25000, 50000, 75000];
+    let currentScaleMtest, currentDistanceMtest, correctAnswerMtest, unitTypeMtest;
+    let questionCount = 0;
+    let correctCount = 0;
+
+    function startTest() {
+      const calcContainer = document.getElementById("scaleCalcContainer");
+      const mapContainer = document.getElementById("scaleMapContainer");
+      
+      if (calcContainer) {
+        calcContainer.style.pointerEvents = "none";
+        calcContainer.style.opacity = "0.7";
+        document.getElementById("calcOverlay").style.display = "flex";
+      }
+      if (mapContainer) {
+        mapContainer.style.pointerEvents = "none";
+        mapContainer.style.opacity = "0.7";
+        document.getElementById("MapOverlay").style.display = "flex";
+      }
+
+      document.getElementById("startTestBtn").style.display = "none";
+      document.getElementById("check-btn-mtest").style.display = "block";
+      document.getElementById("exitTestDuringBtn").style.display = "block";
+
+      questionCount = 0;
+      correctCount = 0;
+      for (let i = 1; i <= 10; i++) {
+        document.getElementById("qb" + i).style.backgroundColor = "#ccc";
+      }
+      generateTaskMtest();
+    }
+
+    function generateTaskMtest() {
+      if (questionCount >= 10) {
+        showFinalResult();
+        return;
+      }
+      document.getElementById("check-btn-mtest").disabled = false;
+      unitTypeMtest = Math.random() < 0.5 ? "cm" : "mm";
+      currentScaleMtest = scalesMtest[Math.floor(Math.random() * scalesMtest.length)];
+      currentDistanceMtest = parseFloat(
+        unitTypeMtest === "cm"
+          ? (Math.random() * 19 + 1).toFixed(1)
+          : (Math.random() * 190 + 10).toFixed(0)
+      );
+      let scaleFactorMtest = unitTypeMtest === "cm" ? currentScaleMtest / 100 : currentScaleMtest / 1000;
+      correctAnswerMtest = parseFloat((currentDistanceMtest * scaleFactorMtest).toFixed(2));
+
+      let taskText = `Mērogs: <strong>1:${currentScaleMtest}</strong>, attālums kartē: <strong>${currentDistanceMtest} ${unitTypeMtest}</strong>`;
+      document.getElementById("task-mtest").innerHTML = taskText;
+
+      let answerInput = document.getElementById("answer-mtest");
+      answerInput.value = "";
+      answerInput.disabled = false;
+
+      document.getElementById("result-mtest").style.display = "none";
+      document.getElementById("explanation-mtest").style.display = "none";
+      document.getElementById("next-btn-mtest").style.display = "none";
+      document.getElementById("explanation-btn").style.display = "none";
+    }
+
+    function checkAnswerMtest() {
+      let answerInput = document.getElementById("answer-mtest");
+      let userAnswerMtest = parseFloat(answerInput.value);
+      let resultDivMtest = document.getElementById("result-mtest");
+      let explanationDivMtest = document.getElementById("explanation-mtest");
+      let checkBtn = document.getElementById("check-btn-mtest");
+
+      if (isNaN(userAnswerMtest)) {
+        resultDivMtest.style.display = "block";
+        resultDivMtest.style.background = "rgba(255, 0, 0, 0.3)";
+        resultDivMtest.innerHTML = "<strong>Kļūda:</strong> Lūdzu, ievadiet skaitlisku atbildi!";
+        return;
+      }
+
+      answerInput.disabled = true;
+      checkBtn.disabled = true;
+
+      let isCorrectMtest = Math.abs(userAnswerMtest - correctAnswerMtest) < 0.1;
+      resultDivMtest.style.display = "block";
+      resultDivMtest.style.background = isCorrectMtest 
+          ? "rgba(0, 255, 0, 0.2)" 
+          : "rgba(255, 0, 0, 0.2)";
+      resultDivMtest.innerHTML = `<strong>Rezultāts:</strong><br>Pareizā atbilde: ${correctAnswerMtest} m`;
+
+      questionCount++;
+      let currentBox = document.getElementById("qb" + questionCount);
+      if (isCorrectMtest) {
+        currentBox.style.backgroundColor = "green";
+        correctCount++;
+      } else {
+        currentBox.style.backgroundColor = "red";
+      }
+
+      let scaleConverted = currentScaleMtest / (unitTypeMtest === "cm" ? 100 : 1000);
+      explanationDivMtest.innerHTML = `<strong>Aprēķina skaidrojums:</strong><br>` +
+          `Mērogs: 1:${currentScaleMtest}<br>` +
+          `Mērogs 1:${currentScaleMtest} nozīmē, ka 1 ${unitTypeMtest} uz kartes atbilst ${scaleConverted} m dabā.<br>` +
+          `Noņemot pēdējās ${unitTypeMtest === "cm" ? "divas" : "trīs"} nulles mērogam ${currentScaleMtest}, iegūstam ${scaleConverted}.<br>` +
+          `Tātad, ja attālums uz kartes ir ${currentDistanceMtest} ${unitTypeMtest}, tad reālais attālums būs ${correctAnswerMtest} metri dabā.<br><br>` +
+          `<strong>Formula:</strong><br>` +
+          `${scaleConverted} m x ${currentDistanceMtest} ${unitTypeMtest} = <strong>${correctAnswerMtest} m</strong>`;
+
+      document.getElementById("explanation-btn").style.display = "block";
+
+      if (questionCount < 10) {
+        document.getElementById("next-btn-mtest").style.display = "block";
+      } else {
+        showFinalResult();
       }
     }
-  });
 
-  // 2) Ja ir augšējā līmeņa linki bez dropdown (piem. Sākums)
-  document.querySelectorAll('nav a').forEach(function (link) {
-    const href = link.getAttribute('href');
-    if (!href) return;
-
-    const file = href.split('/').pop();
-    if (file === path) {
-      link.classList.add('active');
+    function toggleExplanation() {
+      let explanationDivMtest = document.getElementById("explanation-mtest");
+      explanationDivMtest.style.display = explanationDivMtest.style.display === "none" || explanationDivMtest.style.display === "" ? "block" : "none";
     }
-  });
-});
-</script>
+
+    function nextTaskMtest() {
+      document.getElementById("result-mtest").style.display = "none";
+      document.getElementById("explanation-mtest").style.display = "none";
+      document.getElementById("explanation-btn").style.display = "none";
+      document.getElementById("next-btn-mtest").style.display = "none";
+      generateTaskMtest();
+    }
+
+    function showFinalResult() {
+      document.getElementById("test-container").style.display = "none";
+      document.getElementById("final-result").style.display = "block";
+      document.getElementById("score-info").innerHTML = 
+          `Jūsu rezultāts: <strong>${correctCount}</strong> pareizas atbildes no 10.`;
+
+      const calcContainer = document.getElementById("scaleCalcContainer");
+      if (calcContainer) {
+        calcContainer.style.pointerEvents = "auto";
+        calcContainer.style.opacity = "1";
+        document.getElementById("calcOverlay").style.display = "none";
+      }
+      const mapContainer = document.getElementById("scaleMapContainer");
+      if (mapContainer) {
+        mapContainer.style.pointerEvents = "auto";
+        mapContainer.style.opacity = "1";
+        document.getElementById("MapOverlay").style.display = "none";
+      }
+    }
+
+    function toggleExitDropdown() {
+      let dropdown = document.getElementById("exitConfirmationDropdown");
+      dropdown.style.display = dropdown.style.display === "none" || dropdown.style.display === "" ? "block" : "none";
+    }
+
+    function confirmExitTest() {
+      document.getElementById("exitConfirmationDropdown").style.display = "none";
+      performExitTest();
+    }
+
+    function performExitTest() {
+      document.getElementById("final-result").style.display = "none";
+      document.getElementById("test-container").style.display = "none";
+
+      questionCount = 0;
+      correctCount = 0;
+      for (let i = 1; i <= 10; i++) {
+        document.getElementById("qb" + i).style.backgroundColor = "#ccc";
+      }
+      document.getElementById("task-mtest").innerHTML = `Nospied pogu "Sākt testu" lai uzsāktu!`;
+      let answerInput = document.getElementById("answer-mtest");
+      answerInput.value = "";
+      answerInput.disabled = true;
+      document.getElementById("result-mtest").style.display = "none";
+      document.getElementById("explanation-mtest").style.display = "none";
+      document.getElementById("explanation-btn").style.display = "none";
+      document.getElementById("next-btn-mtest").style.display = "none";
+
+      document.getElementById("test-container").style.display = "flex";
+      document.getElementById("startTestBtn").style.display = "block";
+      document.getElementById("check-btn-mtest").style.display = "none";
+      document.getElementById("exitTestDuringBtn").style.display = "none";
+
+      const calcContainer = document.getElementById("scaleCalcContainer");
+      if (calcContainer) {
+        calcContainer.style.pointerEvents = "auto";
+        calcContainer.style.opacity = "1";
+        document.getElementById("calcOverlay").style.display = "none";
+      }
+      const mapContainer = document.getElementById("scaleMapContainer");
+      if (mapContainer) {
+        mapContainer.style.pointerEvents = "auto";
+        mapContainer.style.opacity = "1";
+        document.getElementById("MapOverlay").style.display = "none";
+      }
+    }
+  </script>
+
+  <!-- 4) Navigācijas aktīvā poga -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      let path = window.location.pathname.split('/').pop();
+      if (!path) path = 'index.html';
+
+      document.querySelectorAll('.dropdown-menu .dropdown-link').forEach(function (link) {
+        const href = link.getAttribute('href');
+        if (!href) return;
+        const file = href.split('/').pop();
+        if (file === path) {
+          link.classList.add('active');
+          const menu = link.closest('.dropdown-menu');
+          if (menu && menu.previousElementSibling) {
+            menu.previousElementSibling.classList.add('active');
+          }
+        }
+      });
+
+      document.querySelectorAll('nav a').forEach(function (link) {
+        const href = link.getAttribute('href');
+        if (!href) return;
+        const file = href.split('/').pop();
+        if (file === path) {
+          link.classList.add('active');
+        }
+      });
+    });
+  </script>
 
 </body>
 </html>
