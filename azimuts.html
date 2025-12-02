@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="lv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Direkcijas leņķis un azimuts — Virtuālais kompass</title>
+  <!-- izmanto to pašu CSS, ko kompass -->
+
+
+  <!-- Pannellum CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
+  <style>
+    body {
+      overflow: hidden; /* Hide scrollbars */
+    }
+    /* ========= KONTEINERA IZMĒRS UN IZKĀRTOJUMS ========= */
+    .pano-block {
+      position: relative;
+      width: 100%;
+      height: 99vh;
+      overflow: hidden;
+      margin: 0 auto;
+    }
+    /* Panorama (Pannellum) konteiners */
+    #panorama {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      z-index: 0;
+    }
+    /* Video elements – sākotnēji paslēpts */
+    #liveVideo {
+      display: none;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      object-fit: cover;
+      z-index: 1;
+    }
+
+
+    /* ========= 3D Kompass stils ========= */
+    .compass-container {
+      position: absolute;
+      left: 50%;
+      top: 75%;
+      transform: translate(-50%, -50%) rotateX(30deg);
+      perspective: 800px;
+      width: min(50vmin, 300px);
+      height: min(30vmin, 180px);
+      z-index: 2;
+    }
+    .compass-container::after {
+      content: "";
+      position: absolute;
+      left: 47.8%;
+      top: -69.7vh;
+      width: 3px;
+      height: 87.5vh;
+      background: linear-gradient(to top, rgba(255, 0, 0, 0.7), rgba(255, 0, 0, 0.1));
+      transform: translateX(-50%) rotate(0deg) rotateX(50deg);
+      z-index: 2;
+    }
+    .compass-base {
+      position: absolute;
+      width: 95%;
+      height: 85%;
+      transform: rotateX(45deg) rotateZ(90deg);
+      transform-origin: center center;
+      filter: drop-shadow(3px 3px 5px rgba(0, 0, 0, 0.5));
+    }
+    /* 3D skala – manuāli regulējama */
+    .compass-scale {
+      position: absolute;
+      width: 51%;
+      left: 47.2%;
+      top: 66.4%;
+      transform: translate(-50%, -50%) rotateX(45deg) rotate(0deg);
+      transform-origin: center center;
+      filter: drop-shadow(2px 4px 4px rgba(0, 0, 0, 0.1))
+              drop-shadow(0px 3px 4px rgba(0, 0, 0, 0.1))
+              drop-shadow(0px 7px 4px rgba(0, 0, 0, 0.4));
+      cursor: grab;
+    }
+    .compass-needle {
+      position: absolute;
+      width: 2.5%;
+      left: 47%;
+      top: 67%;
+      transform: translate(-50%, -50%) rotateX(45deg);
+      transform-origin: center center;
+      animation: none !important;
+    }
+
+    /* ========= 2D Kompass stils ========= */
+    .compass-2d-container {
+      position: absolute;
+      top: 1.5%;
+      right: 0.2%;
+      background-color: rgba(0, 0, 0, 0.7);
+      border-radius: 50%;
+      padding: 15px;
+      z-index: 3;
+      width: min(34vmin, 300px);
+      height: min(34vmin, 300px);
+      overflow: hidden;
+      filter: drop-shadow(0px 0px 40px rgba(0, 0, 0, 0.7));
+      transition: all 0.3s ease;
+    }
+    .compass-2d-container.expanded {
+      top: 50%;
+      left: 50%;
+      width: 90%;
+      height: 90%;
+      border-radius: 10px;
+      padding: 0;
+      z-index: 10;
+      transform-origin: center center;
+      transform: translate(-50%, -50%);
+    }
+    .compass-2d-scale {
+      position: absolute;
+      width: calc(90% - 20px);
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) rotate(0deg);
+      transform-origin: center center;
+      cursor: grab;
+      animation: none;
+    }
+    .compass-2d-needle {
+      position: absolute;
+      width: 4%;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      transform-origin: center center;
+      animation: none !important;
+    }
+    .compass-2d-scale-Background {
+      position: absolute;
+      width: calc(88.3% - 20px);
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      transform-origin: center center;
+    }
+    .compass-2d-container img {
+      display: block;
+      border-radius: 50%;
+      z-index: 10;
+    }
+
+    /* ===== Responsivitāte ===== */
+    /* Desktop režīms – jaunie izmēri */
+   
+  
+/* 2D Kompass – pamatstāvoklis (mazs aplis augšējā labajā stūrī) */
+.compass-2d-container {
+  position: absolute;
+  top: 1.5%;
+  right: 0.8%;
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 50%;
+  padding: 12px;
+  z-index: 3;
+  width: min(34vmin, 260px);
+  aspect-ratio: 1 / 1;         /* vienmēr kvadrāts */
+  overflow: hidden;
+  filter: drop-shadow(0 0 40px rgba(0, 0, 0, 0.7));
+  transition: all 0.3s ease;
+}
+
+/* Paplašinātais stāvoklis – centrēts, lielāks, bet iekšējā ģeometrija nemainās */
+.compass-2d-container.expanded {
+  top: 50%;
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -50%);
+  width: min(90vmin, 520px);
+  padding: 18px;
+  border-radius: 16px;
+}
+
+/* Skala, fons, adata – vienmēr centrēti uz 50/50 */
+.compass-2d-scale,
+.compass-2d-scale-Background,
+.compass-2d-needle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%); /* rotācija tiks pielikta JS pusē */
+  transform-origin: center center;
+  display: block;
+}
+
+/* Proporcijas iekš kompasa */
+.compass-2d-scale-Background {
+  width: 82%;
+}
+
+.compass-2d-scale {
+  width: 84%;
+  cursor: grab;
+}
+
+.compass-2d-needle {
+  width: 8%;
+  pointer-events: none; /* lai vilkšana notiek pa skalu, nevis pa adatu */
+}
+
+/* Loku pogas – vienmēr zem kompasa, centrētas horizontāli */
+.arc-buttons {
+  position: absolute;
+  bottom: 6%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  max-width: 320px;
+  z-index: 10;
+}
+
+.arc-buttons svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  pointer-events: none;
+}
+
+.arc {
+  fill: none;
+  stroke: rgba(165, 117, 0, 0.6);
+  stroke-width: 20;
+  cursor: pointer;
+  pointer-events: stroke;
+  transition: stroke 0.3s;
+}
+
+.arc:hover {
+  stroke: rgba(234, 166, 0, 1);
+}
+
+.arc-label {
+  font-size: 14px;
+  font-weight: bold;
+  fill: #fff;
+  pointer-events: none;
+  dominant-baseline: middle;
+  letter-spacing: 2px;
+}
+  
+   
+
+    /* Mobilajām ierīcēm – pielāgoti jaunā desktop izkārtojuma proporcijām */
+    @media (max-width: 768px) {
+      .pano-block {
+        height: 300px;
+      }
+      .compass-container::after {
+        top: -63.8vh;
+        height: 80vh;
+      }
+      .compass-scale {
+        width: 49%;
+      }
+      .compass-needle {
+        width: 2.5%;
+      }
+       .compass-2d-container {
+    top: 2%;
+    right: 3%;
+    width: min(40vmin, 220px);
+    padding: 10px;
+  }
+     
+
+      .rotation-indicator-2d {
+        width: 31vw;
+        height: 31vw;
+      }
+      .rotation-dot-2d {
+        width: 8px;
+        height: 8px;
+      }
+      .rotation-dot-2d .rotation-arrow-2d {
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-top: 8px solid red;
+        top: 100%;
+      }
+      .degree-display {
+        font-size: 16px;
+        padding: 4px 8px;
+      }
+    }
+
+    /* ====== Degrees display rādījums ====== */
+    .degree-display {
+      position: absolute;
+      top: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 18px;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 5px 10px;
+      border-radius: 5px;
+      z-index: 11;
+      display: none;
+    }
+
+    /* ====== Jauno 'loku pogu' stils ====== */
+    .arc-buttons {
+      position: absolute;
+      bottom: 0%;
+      left: 34.5%;
+      transform: translateX(-50%);
+      width: 100%;
+      top: -15%;
+      z-index: 10;
+    }
+    .arc-buttons svg {
+      width: 131%;
+      height: 117%;
+      display: block;
+      pointer-events: none;
+    }
+    .arc {
+      fill: none;
+      stroke: rgba(165, 117, 0, 0.6);
+      stroke-width: 20;
+      cursor: pointer;
+      pointer-events: stroke;
+      transition: stroke 0.3s;
+    }
+    .arc:hover {
+      stroke: rgba(234, 166, 0, 1);
+    }
+    .arc-label {
+      font-size: 14px;
+      font-weight: bold;
+      fill: #fff;
+      pointer-events: none;
+      dominant-baseline: middle;
+      letter-spacing: 2px;
+    }
+  </style>
+
+
+  <div class="pano-block">
+    <!-- Panorāmas pamatkontainers (Pannellum) -->
+    <div id="panorama"></div>
+    <!-- Video elements reāllaika kameras straume (sākotnēji paslēpts) -->
+    <video id="liveVideo" autoplay="" playsinline=""></video>
+
+
+    <!-- 3D Kompass -->
+    <div class="compass-container">
+      <img src="./img/pamatne.png" class="compass-base" alt="Kompass pamats (3D)">
+      <img src="./img/skala.png" class="compass-scale" alt="Kompass skala (3D)">
+      <img src="./img/adata.png" class="compass-needle" alt="Kompass adata (3D)">
+      <div class="rotation-indicator-3d">
+        <div class="rotation-dot-3d"></div>
+      </div>
+    </div>
+
+    <!-- 2D Kompass -->
+    <div class="compass-2d-container" id="compass2dContainer">
+      <!-- SVG "Loku pogas" -->
+      <div class="arc-buttons">
+        <svg viewBox="0 0 300 300">
+          <!-- Kreisais loks – šis pogas teksts tiks mainīts -->
+          <g transform="translate(-1.5,0)">
+            <path id="leftArc" class="arc" d="M50,170 A100,100 0 0 0 150,250" onclick="toggleExpand2D();">
+            </path>
+            <text class="arc-label">
+              <textPath href="#leftArc" startOffset="50%" text-anchor="middle" dy="-15">
+                palielināt
+              </textPath>
+            </text>
+          </g>
+          <!-- Labais loks -->
+          <g transform="translate(1.5,0)">
+            <path id="rightArc" class="arc" d="M150,250 A100,100 0 0 0 250,170" onclick="toggleDegrees();">
+            </path>
+            <text class="arc-label">
+              <textPath href="#rightArc" startOffset="50%" text-anchor="middle" dy="-15">
+                grādi
+              </textPath>
+            </text>
+          </g>
+        </svg>
+      </div>
+      <img src="./img/KOMPASA_SKALA_BACKGROUND.png" class="compass-2d-scale-Background" alt="Kompass fons (2D)">
+      <img src="./img/skala.png" class="compass-2d-scale" alt="Kompass skala (2D)">
+      <img src="./img/adata.png" class="compass-2d-needle" alt="Kompass adata (2D)">
+      <div class="rotation-indicator-2d">
+        <div class="rotation-dot-2d"></div>
+      </div>
+      <div id="degreeDisplay" class="degree-display">0°</div>
+    </div>
+  </div>
+
+  <!-- Pannellum JS -->
+  <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+  <script>
+    var cameraStream = null;
+    window.onload = function() {
+      // Inicializē Pannellum (panorāma)
+      var viewer = pannellum.viewer('panorama', {
+        type: 'equirectangular',
+        panorama: 'https://i.imgur.com/w4maDHx.jpeg',
+        autoLoad: true,
+        showControls: true,
+        showFullscreenCtrl: false,
+        compass: false,
+        hfov: 200,
+        autoRotate: -2,
+        yaw: -0.5,
+        ignoreGPanoXMP: true
+      });
+
+      // Atjauno kompasu adatu rotāciju
+      function updateCompassNeedles() {
+        var currentYaw = viewer.getYaw();
+        // 3D adata
+        var needle3d = document.querySelector('.compass-needle');
+        if (needle3d) {
+          needle3d.style.transform = 'translate(-50%, -50%) rotateX(45deg) rotateZ(' + (-currentYaw) + 'deg)';
+        }
+        // 2D adata
+        var needle2d = document.querySelector('.compass-2d-needle');
+        if (needle2d) {
+          needle2d.style.transform = 'translate(-50%, -50%) rotate(' + (-currentYaw) + 'deg)';
+        }
+      }
+      setInterval(updateCompassNeedles, 50);
+      viewer.on('viewchange', updateCompassNeedles);
+
+      // Manuālā skalas rotācija
+      var currentManualAngle = 0;
+      function updateScales(angle) {
+        angle = ((angle % 360) + 360) % 360;
+        currentManualAngle = angle;
+        // 3D skala
+        var compassScale = document.querySelector('.compass-scale');
+        compassScale.style.transform = 'translate(-50%, -50%) rotateX(45deg) rotate(' + angle + 'deg)';
+        // 2D skala
+        var compass2dScale = document.querySelector('.compass-2d-scale');
+        compass2dScale.style.transform = 'translate(-50%, -50%) rotate(' + angle + 'deg)';
+        // Atjaunina 2D loka punktiņu
+        var indicator2d = document.querySelector('.rotation-indicator-2d');
+        var dot2d = document.querySelector('.rotation-dot-2d');
+        updateRotationDot(indicator2d, dot2d, angle);
+        // Ja grādu displejs ir redzams, atjaunina tā vērtību
+        var degreeDisplay = document.getElementById('degreeDisplay');
+        if (degreeDisplay.style.display !== 'none') {
+          var displayAngle = (360 - angle) % 360;
+          degreeDisplay.innerText = Math.round(displayAngle) + "°";
+        }
+      }
+      function updateRotationDot(indicatorElem, dotElem, angleDeg) {
+        if (!indicatorElem || !dotElem) return;
+        var radius = (indicatorElem.offsetWidth / 2) - (dotElem.offsetWidth / 2);
+        var rad = angleDeg * (Math.PI / 180);
+        var x = radius * Math.cos(rad);
+        var y = radius * Math.sin(rad);
+        dotElem.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
+      }
+      function calculateAngle(clientX, clientY, element) {
+        var rect = element.getBoundingClientRect();
+        var centerX = rect.left + rect.width / 2;
+        var centerY = rect.top + rect.height / 2;
+        var dx = clientX - centerX;
+        var dy = clientY - centerY;
+        return Math.atan2(dy, dx) * (180 / Math.PI);
+      }
+           var isDragging = false;
+      var activeElement = null;
+
+      // jaunie mainīgie relatīvai rotācijai
+      var dragStartPointerAngle = 0;
+      var dragStartManualAngle = 0;
+
+      // Mazs palīgs, kas dod "īsāko" leņķa starpību (-180..180)
+      function angleDiff(a, b) {
+        var d = a - b;
+        var tmp = (d + 180) % 360;
+        if (tmp < 0) tmp += 360;
+        return tmp - 180;
+      }
+
+      function startDrag(e) {
+        isDragging = true;
+        activeElement = e.currentTarget;
+        activeElement.style.cursor = "grabbing";
+
+        var clientX, clientY;
+        if (e.type.startsWith("touch")) {
+          clientX = e.touches[0].clientX;
+          clientY = e.touches[0].clientY;
+        } else {
+          clientX = e.clientX;
+          clientY = e.clientY;
+        }
+
+        // leņķis no elementa centra līdz peles/touch punktam
+        dragStartPointerAngle = calculateAngle(clientX, clientY, activeElement);
+        // skala tajā brīdī jau ir pagriezta par currentManualAngle
+        dragStartManualAngle = currentManualAngle;
+
+        e.preventDefault();
+      }
+
+      function onDrag(e) {
+        if (!isDragging || !activeElement) return;
+
+        var clientX, clientY;
+        if (e.type.startsWith("touch")) {
+          clientX = e.touches[0].clientX;
+          clientY = e.touches[0].clientY;
+        } else {
+          clientX = e.clientX;
+          clientY = e.clientY;
+        }
+
+        var currentPointerAngle = calculateAngle(clientX, clientY, activeElement);
+
+        // cik ļoti ir izmainījies peles leņķis attiecībā pret sākumu
+        var delta = angleDiff(currentPointerAngle, dragStartPointerAngle);
+
+        // jaunais skalas leņķis = tas, kādā tā bija, + izmaiņa
+        var newAngle = dragStartManualAngle + delta;
+        updateScales(newAngle);
+
+        e.preventDefault();
+      }
+
+      function endDrag() {
+        if (activeElement) {
+          activeElement.style.cursor = "grab";
+        }
+        isDragging = false;
+        activeElement = null;
+      }
+
+      var compassScaleElem = document.querySelector('.compass-scale');
+      var compass2dScaleElem = document.querySelector('.compass-2d-scale');
+      [compassScaleElem, compass2dScaleElem].forEach(function(el) {
+        el.addEventListener("mousedown", startDrag);
+        el.addEventListener("touchstart", startDrag);
+      });
+      window.addEventListener("mousemove", onDrag);
+      window.addEventListener("touchmove", onDrag);
+      window.addEventListener("mouseup", endDrag);
+      window.addEventListener("touchend", endDrag);
+      updateScales(0);
+
+      // Funkcija grādu displeja toggling (labais loks)
+      window.toggleDegrees = function() {
+        var degreeDisplay = document.getElementById('degreeDisplay');
+        if (degreeDisplay.style.display === 'none' || degreeDisplay.style.display === '') {
+          degreeDisplay.style.display = 'block';
+          var displayAngle = (360 - currentManualAngle) % 360;
+          degreeDisplay.innerText = Math.round(displayAngle) + "°";
+        } else {
+          degreeDisplay.style.display = 'none';
+        }
+      };
+
+      // Toggle funkcija 2D kompasa paplašināšanai – maina tekstu uz "samazināt" vai "palielināt"
+      window.toggleExpand2D = function() {
+        var compass2dContainer = document.getElementById('compass2dContainer');
+        var textPath = document.querySelector('textPath[href="#leftArc"]');
+        if (compass2dContainer.classList.contains('expanded')) {
+          compass2dContainer.classList.remove('expanded');
+          textPath.textContent = "palielināt";
+        } else {
+          compass2dContainer.classList.add('expanded');
+          textPath.textContent = "samazināt";
+        }
+      };
+
+      // Jaunā toggleCamera funkcija – pārslēdz starp panorāmu un mobīlo ierīces kameru
+      window.toggleCamera = function() {
+        var video = document.getElementById("liveVideo");
+        var panorama = document.getElementById("panorama");
+        var btn = document.getElementById("toggleCameraButton");
+        if (video.style.display === "none" || video.style.display === "") {
+          // Pārslēdz uz kameras reāllaika režīmu
+          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+              .then(function(stream) {
+                cameraStream = stream;
+                video.srcObject = stream;
+                video.style.display = "block";
+                panorama.style.display = "none";
+                btn.textContent = "Panorama";
+              })
+              .catch(function(err) {
+                console.log("Kameras piekļuve neizdevās:", err);
+              });
+          }
+        } else {
+          // Pārslēdz atpakaļ uz panorāmu
+          if (cameraStream) {
+            cameraStream.getTracks().forEach(function(track) {
+              track.stop();
+            });
+          }
+          video.style.display = "none";
+          panorama.style.display = "block";
+          btn.textContent = "Kamera";
+        }
+      };
+    };
+  </script>
+
+  <script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Paņem pašreizējā URL faila nosaukumu
+  let path = window.location.pathname.split('/').pop();
+  // Ja URL ir .../virtual-compass/ bez faila – uzskatām, ka tā ir index.html
+  if (!path) path = 'index.html';
+
+  // 1) Atzīmē dropdown linkus (Mācību materiāli, Lietotāju ceļvedis)
+  document.querySelectorAll('.dropdown-menu .dropdown-link').forEach(function (link) {
+    const href = link.getAttribute('href');
+    if (!href) return;
+
+    const file = href.split('/').pop(); // tikai faila daļa
+    if (file === path) {
+      // Pašam linkam pievieno .active
+      link.classList.add('active');
+
+      // Atzīmē arī galveno pogu – tā, kas ir tieši pirms .dropdown-menu
+      const menu = link.closest('.dropdown-menu');
+      if (menu && menu.previousElementSibling) {
+        menu.previousElementSibling.classList.add('active');
+      }
+    }
+  });
+
+  // 2) Ja ir augšējā līmeņa linki bez dropdown (piem. Sākums)
+  document.querySelectorAll('nav a').forEach(function (link) {
+    const href = link.getAttribute('href');
+    if (!href) return;
+
+    const file = href.split('/').pop();
+    if (file === path) {
+      link.classList.add('active');
+    }
+  });
+});
+</script>
+
+</body>
+</html>
