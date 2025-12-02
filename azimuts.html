@@ -158,45 +158,59 @@
    
   
 /* 2D Kompass – pamatstāvoklis (mazs aplis augšējā labajā stūrī) */
+/* 2D kompass – ārējais konteiners */
 .compass-2d-container {
   position: absolute;
   top: 1.5%;
   right: 0.8%;
-  background-color: rgba(0, 0, 0, 0.7);
-  border-radius: 50%;
-  padding: 12px;
   z-index: 3;
+
   width: min(34vmin, 260px);
-  aspect-ratio: 1 / 1;         /* vienmēr kvadrāts */
-  overflow: hidden;
+  padding: 10px 10px 12px;
+
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 16px;
   filter: drop-shadow(0 0 40px rgba(0, 0, 0, 0.7));
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+
   transition: all 0.3s ease;
 }
 
-/* Paplašinātais stāvoklis – centrēts, lielāks, bet iekšējā ģeometrija nemainās */
+/* Paplašinātais (palielināts) režīms */
 .compass-2d-container.expanded {
   top: 50%;
   left: 50%;
   right: auto;
   transform: translate(-50%, -50%);
   width: min(90vmin, 520px);
-  padding: 18px;
-  border-radius: 16px;
+  padding: 16px 16px 18px;
 }
 
-/* Skala, fons, adata – vienmēr centrēti uz 50/50 */
-.compass-2d-scale,
+/* Apaļais kompass iekšā */
+.compass-2d-core {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;      /* vienmēr kvadrāts */
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+/* Skala, fons, adata – centrēti */
 .compass-2d-scale-Background,
+.compass-2d-scale,
 .compass-2d-needle {
   position: absolute;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%); /* rotācija tiks pielikta JS pusē */
+  transform: translate(-50%, -50%);
   transform-origin: center center;
   display: block;
 }
 
-/* Proporcijas iekš kompasa */
 .compass-2d-scale-Background {
   width: 82%;
 }
@@ -208,25 +222,20 @@
 
 .compass-2d-needle {
   width: 4%;
-  pointer-events: none; /* lai vilkšana notiek pa skalu, nevis pa adatu */
+  pointer-events: none;  /* lai vilkšana notiek pa skalu */
 }
 
-/* Loku pogas – vienmēr zem kompasa, centrētas horizontāli */
+/* Loku pogas – VIENMĒR zem kompasa, neatkarīgi no izmēra */
 .arc-buttons {
-  position: absolute;
-  bottom: 6%;
-  left: 50%;
-  transform: translateX(-50%);
   width: 80%;
   max-width: 320px;
-  z-index: 10;
 }
 
 .arc-buttons svg {
   width: 100%;
   height: auto;
   display: block;
-  pointer-events: none;
+  pointer-events: none;    /* klikšķināmas ir tikai .arc */
 }
 
 .arc {
@@ -269,11 +278,11 @@
         width: 2.5%;
       }
        .compass-2d-container {
-    top: 2%;
-    right: 3%;
-    width: min(40vmin, 220px);
-    padding: 10px;
-  }
+        top: 2%;
+        right: 3%;
+        width: min(40vmin, 220px);
+        padding: 8px 8px 10px;
+      }
      
 
       .rotation-indicator-2d {
@@ -366,42 +375,55 @@
       </div>
     </div>
 
-    <!-- 2D Kompass -->
-    <div class="compass-2d-container" id="compass2dContainer">
-      <!-- SVG "Loku pogas" -->
-      <div class="arc-buttons">
-        <svg viewBox="0 0 300 300">
-          <!-- Kreisais loks – šis pogas teksts tiks mainīts -->
-          <g transform="translate(-1.5,0)">
-            <path id="leftArc" class="arc" d="M50,170 A100,100 0 0 0 150,250" onclick="toggleExpand2D();">
-            </path>
-            <text class="arc-label">
-              <textPath href="#leftArc" startOffset="50%" text-anchor="middle" dy="-15">
-                palielināt
-              </textPath>
-            </text>
-          </g>
-          <!-- Labais loks -->
-          <g transform="translate(1.5,0)">
-            <path id="rightArc" class="arc" d="M150,250 A100,100 0 0 0 250,170" onclick="toggleDegrees();">
-            </path>
-            <text class="arc-label">
-              <textPath href="#rightArc" startOffset="50%" text-anchor="middle" dy="-15">
-                grādi
-              </textPath>
-            </text>
-          </g>
-        </svg>
-      </div>
-      <img src="./img/KOMPASA_SKALA_BACKGROUND.png" class="compass-2d-scale-Background" alt="Kompass fons (2D)">
-      <img src="./img/skala.png" class="compass-2d-scale" alt="Kompass skala (2D)">
-      <img src="./img/adata.png" class="compass-2d-needle" alt="Kompass adata (2D)">
-      <div class="rotation-indicator-2d">
-        <div class="rotation-dot-2d"></div>
-      </div>
-      <div id="degreeDisplay" class="degree-display">0°</div>
+<!-- 2D Kompass -->
+<div class="compass-2d-container" id="compass2dContainer">
+  <!-- Apaļais kompass (skala + adata) -->
+  <div class="compass-2d-core">
+    <img src="./img/KOMPASA_SKALA_BACKGROUND.png"
+         class="compass-2d-scale-Background"
+         alt="Kompass fons (2D)">
+    <img src="./img/skala.png"
+         class="compass-2d-scale"
+         alt="Kompass skala (2D)">
+    <img src="./img/adata.png"
+         class="compass-2d-needle"
+         alt="Kompass adata (2D)">
+
+    <div class="rotation-indicator-2d">
+      <div class="rotation-dot-2d"></div>
     </div>
+
+    <div id="degreeDisplay" class="degree-display">0°</div>
   </div>
+
+  <!-- Loku pogas – vienmēr ZEM kompasa -->
+  <div class="arc-buttons">
+    <svg viewBox="0 0 300 300">
+      <!-- Kreisais loks -->
+      <g transform="translate(-1.5,0)">
+        <path id="leftArc" class="arc"
+              d="M50,170 A100,100 0 0 0 150,250"
+              onclick="toggleExpand2D();"></path>
+        <text class="arc-label">
+          <textPath href="#leftArc" startOffset="50%" text-anchor="middle" dy="-15">
+            palielināt
+          </textPath>
+        </text>
+      </g>
+      <!-- Labais loks -->
+      <g transform="translate(1.5,0)">
+        <path id="rightArc" class="arc"
+              d="M150,250 A100,100 0 0 0 250,170"
+              onclick="toggleDegrees();"></path>
+        <text class="arc-label">
+          <textPath href="#rightArc" startOffset="50%" text-anchor="middle" dy="-15">
+            grādi
+          </textPath>
+        </text>
+      </g>
+    </svg>
+  </div>
+</div>
 
   <!-- Pannellum JS -->
   <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
