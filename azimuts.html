@@ -98,140 +98,129 @@
       animation: none !important;
     }
 
-    /* ========= 2D Kompass – TĪRA JAUNĀ VERSIJA ========= */
+/* ========= 2D Kompass – jaunā versija (aplis + pogas zem tā) ========= */
 
-    /* Ārējais aplis ar nelielu tumšu fonu */
-    .compass-2d-container {
-      position: absolute;
-      top: 1.5%;
-      right: 0.8%;
-      z-index: 3;
+/* Ārējais konteineris – tabletes forma */
+.compass-2d-container {
+  position: absolute;
+  top: 1.5%;
+  right: 0.8%;
+  z-index: 3;
 
-      width: min(34vmin, 260px);
-      height: min(34vmin, 260px);
-      padding: 8px;
-      box-sizing: border-box;
+  width: min(34vmin, 260px);
+  padding: 8px 10px 14px;
+  box-sizing: border-box;
 
-      background-color: rgba(0, 0, 0, 0.7);
-      border-radius: 50%;
-      filter: drop-shadow(0 0 40px rgba(0, 0, 0, 0.7));
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 999px;              /* ovāls */
+  filter: drop-shadow(0 0 40px rgba(0, 0, 0, 0.7));
 
-      overflow: visible; /* ļaujam pogām mazliet iziet ārpus apļa */
-      transition: all 0.3s ease;
-    }
+  display: flex;                     /* apļis + pogas kolonnā */
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
 
-    /* Palielināts režīms – joprojām aplis, tikai lielāks */
-    .compass-2d-container.expanded {
-      top: 50%;
-      left: 50%;
-      right: auto;
-      transform: translate(-50%, -50%);
-      width: min(80vmin, 480px);
-      height: min(80vmin, 480px);
-      padding: 12px;
-    }
+/* Palielināts režīms */
+.compass-2d-container.expanded {
+  top: 50%;
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -50%);
+  width: min(80vmin, 480px);
+  padding: 14px 18px 18px;
+}
 
-    /* Apaļais kompass iekšā */
-    .compass-2d-core {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      overflow: hidden;
-    }
+/* Pats apaļais kompass iekšā */
+.compass-2d-core {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;      /* vienmēr kvadrāts → aplis */
+  border-radius: 50%;
+  overflow: hidden;
+}
 
-    /* Skala, fons, adata – centrēti aplī */
-    .compass-2d-scale-Background,
-    .compass-2d-scale,
-    .compass-2d-needle {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      transform-origin: center center;
-      display: block;
-    }
+/* Skala, fons, adata – centrēti aplī */
+.compass-2d-scale-Background,
+.compass-2d-scale,
+.compass-2d-needle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transform-origin: center center;
+  display: block;
+}
 
-    .compass-2d-scale-Background {
-      width: 82%;
-    }
+.compass-2d-scale-Background {
+  width: 82%;
+}
 
-    .compass-2d-scale {
-      width: 84%;
-      cursor: grab;
-    }
+.compass-2d-scale {
+  width: 84%;
+  cursor: grab;
+}
 
-    .compass-2d-needle {
-      width: 4%;
-      pointer-events: none;
-    }
+.compass-2d-needle {
+  width: 4%;
+  pointer-events: none;  /* lai vilkšana notiek pa skalu */
+}
 
+/* Grādu displejs virs kompasa */
+.degree-display {
+  position: absolute;
+  top: 0px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 25px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 5px 10px;
+  border-radius: 5px;
+  z-index: 11;
+  display: none;
+}
 
-
-
-
-    /* Grādu displejs virs kompasa */
-    .degree-display {
-      position: absolute;
-      top: 0px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 25px;
-      color: #fff;
-      background: rgba(0, 0, 0, 0.7);
-      padding: 5px 10px;
-      border-radius: 5px;
-      z-index: 11;
-      display: none;
-    }
-
-/* Loku pogas – vienmēr zem skalas pa vidu */
+/* Loku pogas – vienkārši zem apļa */
 .arc-buttons {
-    position: absolute;
-    left: 50%;
-    top: 37%;
-    transform: translate(-50%, -38%);
-    width: 130%;
-    max-width: 320px;
+  position: relative;
+  width: 80%;
+  max-width: 360px;
 }
 
-/* Palielinātajā režīmā pogas nedaudz tuvāk aplim un platākas */
 .compass-2d-container.expanded .arc-buttons {
-    width: 75%;
-    transform: translate(-50%, -46%);
-    top: 47%;
-    width: 130%;
-    max-width: 630px;
+  width: 80%;
+  max-width: 520px;
 }
-    .arc-buttons svg {
-      width: 100%;
-      height: auto;
-      display: block;
-      pointer-events: none;
-    }
 
-    .arc {
-      fill: none;
-      stroke: rgba(165, 117, 0, 0.6);
-      stroke-width: 20;
-      cursor: pointer;
-      pointer-events: stroke;
-      transition: stroke 0.3s;
-    }
+.arc-buttons svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  pointer-events: none;   /* klikšķināmas ir tikai .arc */
+}
 
-    .arc:hover {
-      stroke: rgba(234, 166, 0, 1);
-    }
+.arc {
+  fill: none;
+  stroke: rgba(165, 117, 0, 0.6);
+  stroke-width: 20;
+  cursor: pointer;
+  pointer-events: stroke;
+  transition: stroke 0.3s;
+}
 
-    .arc-label {
-      font-size: 14px;
-      font-weight: bold;
-      fill: #fff;
-      pointer-events: none;
-      dominant-baseline: middle;
-      letter-spacing: 2px;
-    }
+.arc:hover {
+  stroke: rgba(234, 166, 0, 1);
+}
 
+.arc-label {
+  font-size: 14px;
+  font-weight: bold;
+  fill: #fff;
+  pointer-events: none;
+  dominant-baseline: middle;
+  letter-spacing: 2px;
+}
     /* Mobilajām ierīcēm – tikai izmēri, nevis izkārtojums */
     @media (max-width: 768px) {
       .pano-block {
@@ -247,13 +236,16 @@
       .compass-needle {
         width: 2.5%;
       }
-      .compass-2d-container {
-        top: 2%;
-        right: 3%;
-        width: min(40vmin, 220px);
-        height: min(40vmin, 220px);
-        padding: 6px;
-      }
+  .compass-2d-container {
+    top: 2%;
+    right: 3%;
+    width: min(40vmin, 220px);
+    padding: 6px 8px 12px;
+  }
+
+      .arc-buttons {
+    max-width: 380px;
+  }  
      
       .degree-display {
         font-size: 16px;
