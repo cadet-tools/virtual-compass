@@ -300,15 +300,16 @@
       transition: width .25s ease;
     }
 
-    .spinner {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      border: 3px solid rgba(255, 255, 255, .24);
-      border-top-color: #ffffff;
-      margin: 0.4rem auto 0.8rem;
-      animation: spin 0.75s linear infinite;
-    }
+.spinner {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, .18);
+  border-top-color: #d63c3c; /* sarkans, kā progress joslai */
+  margin: 0.4rem auto 0.8rem;
+  animation: spin 0.75s linear infinite;
+}
+
 
     @keyframes spin {
       to { transform: rotate(360deg); }
@@ -467,302 +468,270 @@
 
  <!-- Pannellum JS -->
   <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
-  <script>
-    var cameraStream = null;
+<script>
+  var cameraStream = null;
 
-    /* ===================== PRELOADER JS ===================== */
-    var pre = document.getElementById('app-preloader');
-    var preBar = pre ? pre.querySelector('.progress > span') : null;
-    var preMsg = pre ? pre.querySelector('.msg') : null;
-    var preSkip = document.getElementById('preloaderSkip');
-    var fakeProgress = 0;
-    var fakeTimer = null;
+  /* ===================== PRELOADER JS ===================== */
+  var pre = document.getElementById('app-preloader');
+  var preBar = pre ? pre.querySelector('.progress > span') : null;
+  var preMsg = pre ? pre.querySelector('.msg') : null;
+  var preSkip = document.getElementById('preloaderSkip');
+  var fakeProgress = 0;
+  var fakeTimer = null;
 
-    function setPreloaderProgress(pct) {
-      if (!preBar || !preMsg) return;
-      pct = Math.max(0, Math.min(100, pct));
-      preBar.style.width = pct + '%';
-      preMsg.textContent = 'Ielādējam… ' + pct + '%';
+  function setPreloaderProgress(pct) {
+    if (!preBar || !preMsg) return;
+    pct = Math.max(0, Math.min(100, pct));
+    preBar.style.width = pct + '%';
+    preMsg.textContent = 'Ielādējam… ' + pct + '%';
+  }
+
+  function hidePreloader() {
+    document.body.classList.remove('preloading');
+    if (pre) pre.classList.add('hidden');
+    if (fakeTimer) {
+      clearInterval(fakeTimer);
+      fakeTimer = null;
     }
+  }
 
-    function hidePreloader() {
-      document.body.classList.remove('preloading');
-      if (pre) pre.classList.add('hidden');
-      if (fakeTimer) {
+  if (preSkip) {
+    preSkip.addEventListener('click', hidePreloader);
+    // skip poga parādās pēc 4s
+    setTimeout(function () {
+      if (pre) pre.classList.add('show-skip');
+    }, 4000);
+  }
+
+  // "reāls" progress: 0→90% ar taimeri, 100% kad panorāma gatava
+  if (preBar) {
+    fakeProgress = 5;
+    setPreloaderProgress(fakeProgress);
+    fakeTimer = setInterval(function () {
+      fakeProgress += 5;
+      if (fakeProgress >= 90) {
+        fakeProgress = 90;
         clearInterval(fakeTimer);
         fakeTimer = null;
       }
-    }
-
-    if (preSkip) {
-      preSkip.addEventListener('click', hidePreloader);
-      // skip poga parādās pēc 4s
-      setTimeout(function () {
-        if (pre) pre.classList.add('show-skip');
-      }, 4000);
-    }
-
-    // "reāls" progress: 0→90% ar taimeri, 100% kad panorāma gatava
-    if (preBar) {
-      fakeProgress = 5;
       setPreloaderProgress(fakeProgress);
-      fakeTimer = setInterval(function () {
-        fakeProgress += 5;
-        if (fakeProgress >= 90) {
-          fakeProgress = 90;
-          clearInterval(fakeTimer);
-          fakeTimer = null;
-        }
-        setPreloaderProgress(fakeProgress);
-      }, 400);
-    }
-    /* ===================== /PRELOADER JS ===================== */
- // Kad Pannellum pabeidz ielādi → 100% un paslēp preloaderi
-      try {
-        viewer.on('load', function () {
-          setPreloaderProgress(100);
-          setTimeout(hidePreloader, 300);
-        });
-      } catch (e) {
-        // ja kas neizdodas, vismaz paslēp preloaderi uz window load
-        setPreloaderProgress(100);
-        setTimeout(hidePreloader, 300);
-      }
-
-      /* ===== Adata no panorāmas yaw ===== */
-      function updateCompassNeedles() {
-        var currentYaw = viewer.getYaw();
-        var needle3d = document.querySelector('.compass-needle');
-        if (needle3d) {
-          needle3d.style.transform =
-            'translate(-50%, -50%) rotateX(45deg) rotateZ(' + (-currentYaw) + 'deg)';
-        }
-        var needle2d = document.querySelector('.compass-2d-needle');
-        if (needle2d) {
-          needle2d.style.transform =
-            'translate(-50%, -50%) rotate(' + (-currentYaw) + 'deg)';
-        }
-      }
-      setInterval(updateCompassNeedles, 50);
-      viewer.on('viewchange', updateCompassNeedles);
-
-      /* ===== Manuālā skalas rotācija (relatīva) ===== */
-      var currentManualAngle = 0;
-
-      function updateScales(angle) {
-        angle = ((angle % 360) + 360) % 360;
-        currentManualAngle = angle;
-
-        var compassScale3d = document.querySelector('.compass-scale');
-        if (compassScale3d) {
-          compassScale3d.style.transform =
-            'translate(-50%, -50%) rotateX(45deg) rotate(' + angle + 'deg)';
-        }
-
-        var compass2dScale = document.querySelector('.compass-2d-scale');
-        if (compass2dScale) {
-          compass2dScale.style.transform =
-            'translate(-50%, -50%) rotate(' + angle + 'deg)';
-        }
-
-
-
-        var degreeDisplay = document.getElementById('degreeDisplay');
-        if (degreeDisplay && degreeDisplay.style.display !== 'none') {
-          var displayAngle = (360 - angle) % 360;
-          degreeDisplay.innerText = Math.round(displayAngle) + "°";
-        }
-      }
-
-      function updateRotationDot(indicatorElem, dotElem, angleDeg) {
-        if (!indicatorElem || !dotElem) return;
-        var radius = (indicatorElem.offsetWidth / 2) - (dotElem.offsetWidth / 2);
-        var rad = angleDeg * (Math.PI / 180);
-        var x = radius * Math.cos(rad);
-        var y = radius * Math.sin(rad);
-        dotElem.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
-      }
-
-      function calculateAngle(clientX, clientY, element) {
-        var rect = element.getBoundingClientRect();
-        var centerX = rect.left + rect.width / 2;
-        var centerY = rect.top + rect.height / 2;
-        var dx = clientX - centerX;
-        var dy = clientY - centerY;
-        return Math.atan2(dy, dx) * (180 / Math.PI);
-      }
-
-      var isDragging = false;
-      var activeElement = null;
-      var dragStartPointerAngle = 0;
-      var dragStartManualAngle = 0;
-
-      function angleDiff(a, b) {
-        var d = a - b;
-        var tmp = (d + 180) % 360;
-        if (tmp < 0) tmp += 360;
-        return tmp - 180;
-      }
-
-      function startDrag(e) {
-        isDragging = true;
-        activeElement = e.currentTarget;
-        activeElement.style.cursor = "grabbing";
-
-        var clientX, clientY;
-        if (e.type.startsWith("touch")) {
-          clientX = e.touches[0].clientX;
-          clientY = e.touches[0].clientY;
-        } else {
-          clientX = e.clientX;
-          clientY = e.clientY;
-        }
-
-        dragStartPointerAngle = calculateAngle(clientX, clientY, activeElement);
-        dragStartManualAngle = currentManualAngle;
-
-        e.preventDefault();
-      }
-
-      function onDrag(e) {
-        if (!isDragging || !activeElement) return;
-
-        var clientX, clientY;
-        if (e.type.startsWith("touch")) {
-          clientX = e.touches[0].clientX;
-          clientY = e.touches[0].clientY;
-        } else {
-          clientX = e.clientX;
-          clientY = e.clientY;
-        }
-
-        var currentPointerAngle = calculateAngle(clientX, clientY, activeElement);
-        var delta = angleDiff(currentPointerAngle, dragStartPointerAngle);
-        var newAngle = dragStartManualAngle + delta;
-        updateScales(newAngle);
-
-        e.preventDefault();
-      }
-
-      function endDrag() {
-        if (activeElement) {
-          activeElement.style.cursor = "grab";
-        }
-        isDragging = false;
-        activeElement = null;
-      }
-
-      var compassScaleElem = document.querySelector('.compass-scale');
-      var compass2dScaleElem = document.querySelector('.compass-2d-scale');
-      [compassScaleElem, compass2dScaleElem].forEach(function (el) {
-        if (!el) return;
-        el.addEventListener("mousedown", startDrag);
-        el.addEventListener("touchstart", startDrag);
-      });
-      window.addEventListener("mousemove", onDrag);
-      window.addEventListener("touchmove", onDrag);
-      window.addEventListener("mouseup", endDrag);
-      window.addEventListener("touchend", endDrag);
-
-      updateScales(0);
-
-      /* ===== Grādu displeja toggling ===== */
-      window.toggleDegrees = function () {
-        var degreeDisplay = document.getElementById('degreeDisplay');
-        if (!degreeDisplay) return;
-        if (degreeDisplay.style.display === 'none' || degreeDisplay.style.display === '') {
-          degreeDisplay.style.display = 'block';
-          var displayAngle = (360 - currentManualAngle) % 360;
-          degreeDisplay.innerText = Math.round(displayAngle) + "°";
-        } else {
-          degreeDisplay.style.display = 'none';
-        }
-      };
-
-/* ===== 2D kompasa palielināšana/samazināšana + fona blur ===== */
-window.toggleExpand2D = function () {
-  var compass2dContainer = document.getElementById('compass2dContainer');
-  var textPath = document.querySelector('textPath[href="#leftArc"]');
-  var panoBlock = document.querySelector('.pano-block');
-  if (!compass2dContainer || !textPath || !panoBlock) return;
-
-  if (compass2dContainer.classList.contains('expanded')) {
-    // Atgriežamies mazajā režīmā
-    compass2dContainer.classList.remove('expanded');
-    textPath.textContent = "palielināt";
-    panoBlock.classList.remove('blurred');   // noņem blur
-  } else {
-    // Palielināts režīms
-    compass2dContainer.classList.add('expanded');
-    textPath.textContent = "samazināt";
-    panoBlock.classList.add('blurred');      // uzliek blur
+    }, 400);
   }
-};
+  /* ===================== /PRELOADER JS ===================== */
 
-
-      /* ===== toggleCamera kā iepriekš ===== */
-      window.toggleCamera = function () {
-        var video = document.getElementById("liveVideo");
-        var panorama = document.getElementById("panorama");
-        var btn = document.getElementById("toggleCameraButton");
-        if (!video || !panorama || !btn) return;
-
-        if (video.style.display === "none" || video.style.display === "") {
-          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-              .then(function (stream) {
-                cameraStream = stream;
-                video.srcObject = stream;
-                video.style.display = "block";
-                panorama.style.display = "none";
-                btn.textContent = "Panorama";
-              })
-              .catch(function (err) {
-                console.log("Kameras piekļuve neizdevās:", err);
-              });
-          }
-        } else {
-          if (cameraStream) {
-            cameraStream.getTracks().forEach(function (track) {
-              track.stop();
-            });
-          }
-          video.style.display = "none";
-          panorama.style.display = "block";
-          btn.textContent = "Kamera";
-        }
-      };
-    };
-  </script>
-
-  <!-- Navigācijas active-classes skripts (kā tev bija) -->
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      let path = window.location.pathname.split('/').pop();
-      if (!path) path = 'index.html';
-
-      document.querySelectorAll('.dropdown-menu .dropdown-link').forEach(function (link) {
-        const href = link.getAttribute('href');
-        if (!href) return;
-        const file = href.split('/').pop();
-        if (file === path) {
-          link.classList.add('active');
-          const menu = link.closest('.dropdown-menu');
-          if (menu && menu.previousElementSibling) {
-            menu.previousElementSibling.classList.add('active');
-          }
-        }
-      });
-
-      document.querySelectorAll('nav a').forEach(function (link) {
-        const href = link.getAttribute('href');
-        if (!href) return;
-        const file = href.split('/').pop();
-        if (file === path) {
-          link.classList.add('active');
-        }
-      });
+  // visu pārējo (Pannellum + kompasi) liekam window.onload,
+  // lai 'viewer' būtu definēts
+  window.onload = function () {
+    var viewer = pannellum.viewer('panorama', {
+      type: 'equirectangular',
+      panorama: 'https://i.imgur.com/w4maDHx.jpeg',
+      autoLoad: true,
+      showControls: true,
+      showFullscreenCtrl: false,
+      compass: false,
+      hfov: 200,
+      autoRotate: -2,
+      yaw: -0.5,
+      ignoreGPanoXMP: true
     });
-  </script>
+
+    // Kad Pannellum pabeidz ielādi → 100% un paslēp preloaderi
+    viewer.on('load', function () {
+      setPreloaderProgress(100);
+      setTimeout(hidePreloader, 300);
+    });
+
+    /* ===== Adata no panorāmas yaw ===== */
+    function updateCompassNeedles() {
+      var currentYaw = viewer.getYaw();
+      var needle3d = document.querySelector('.compass-needle');
+      if (needle3d) {
+        needle3d.style.transform =
+          'translate(-50%, -50%) rotateX(45deg) rotateZ(' + (-currentYaw) + 'deg)';
+      }
+      var needle2d = document.querySelector('.compass-2d-needle');
+      if (needle2d) {
+        needle2d.style.transform =
+          'translate(-50%, -50%) rotate(' + (-currentYaw) + 'deg)';
+      }
+    }
+    setInterval(updateCompassNeedles, 50);
+    viewer.on('viewchange', updateCompassNeedles);
+
+    /* ===== Manuālā skalas rotācija (relatīva) ===== */
+    var currentManualAngle = 0;
+
+    function updateScales(angle) {
+      angle = ((angle % 360) + 360) % 360;
+      currentManualAngle = angle;
+
+      var compassScale3d = document.querySelector('.compass-scale');
+      if (compassScale3d) {
+        compassScale3d.style.transform =
+          'translate(-50%, -50%) rotateX(45deg) rotate(' + angle + 'deg)';
+      }
+
+      var compass2dScale = document.querySelector('.compass-2d-scale');
+      if (compass2dScale) {
+        compass2dScale.style.transform =
+          'translate(-50%, -50%) rotate(' + angle + 'deg)';
+      }
+
+      var degreeDisplay = document.getElementById('degreeDisplay');
+      if (degreeDisplay && degreeDisplay.style.display !== 'none') {
+        var displayAngle = (360 - angle) % 360;
+        degreeDisplay.innerText = Math.round(displayAngle) + "°";
+      }
+    }
+
+    function calculateAngle(clientX, clientY, element) {
+      var rect = element.getBoundingClientRect();
+      var centerX = rect.left + rect.width / 2;
+      var centerY = rect.top + rect.height / 2;
+      var dx = clientX - centerX;
+      var dy = clientY - centerY;
+      return Math.atan2(dy, dx) * (180 / Math.PI);
+    }
+
+    function angleDiff(a, b) {
+      var d = a - b;
+      var tmp = (d + 180) % 360;
+      if (tmp < 0) tmp += 360;
+      return tmp - 180;
+    }
+
+    var isDragging = false;
+    var activeElement = null;
+    var dragStartPointerAngle = 0;
+    var dragStartManualAngle = 0;
+
+    function startDrag(e) {
+      isDragging = true;
+      activeElement = e.currentTarget;
+      activeElement.style.cursor = "grabbing";
+
+      var clientX, clientY;
+      if (e.type.startsWith("touch")) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+
+      dragStartPointerAngle = calculateAngle(clientX, clientY, activeElement);
+      dragStartManualAngle = currentManualAngle;
+
+      e.preventDefault();
+    }
+
+    function onDrag(e) {
+      if (!isDragging || !activeElement) return;
+
+      var clientX, clientY;
+      if (e.type.startsWith("touch")) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+
+      var currentPointerAngle = calculateAngle(clientX, clientY, activeElement);
+      var delta = angleDiff(currentPointerAngle, dragStartPointerAngle);
+      var newAngle = dragStartManualAngle + delta;
+      updateScales(newAngle);
+
+      e.preventDefault();
+    }
+
+    function endDrag() {
+      if (activeElement) {
+        activeElement.style.cursor = "grab";
+      }
+      isDragging = false;
+      activeElement = null;
+    }
+
+    var compassScaleElem = document.querySelector('.compass-scale');
+    var compass2dScaleElem = document.querySelector('.compass-2d-scale');
+    [compassScaleElem, compass2dScaleElem].forEach(function (el) {
+      if (!el) return;
+      el.addEventListener("mousedown", startDrag);
+      el.addEventListener("touchstart", startDrag);
+    });
+    window.addEventListener("mousemove", onDrag);
+    window.addEventListener("touchmove", onDrag);
+    window.addEventListener("mouseup", endDrag);
+    window.addEventListener("touchend", endDrag);
+
+    updateScales(0);
+
+    /* ===== Grādu displeja toggling ===== */
+    window.toggleDegrees = function () {
+      var degreeDisplay = document.getElementById('degreeDisplay');
+      if (!degreeDisplay) return;
+      if (degreeDisplay.style.display === 'none' || degreeDisplay.style.display === '') {
+        degreeDisplay.style.display = 'block';
+        var displayAngle = (360 - currentManualAngle) % 360;
+        degreeDisplay.innerText = Math.round(displayAngle) + "°";
+      } else {
+        degreeDisplay.style.display = 'none';
+      }
+    };
+
+    /* ===== 2D kompasa palielināšana/samazināšana + fona blur ===== */
+    window.toggleExpand2D = function () {
+      var compass2dContainer = document.getElementById('compass2dContainer');
+      var textPath = document.querySelector('textPath[href="#leftArc"]');
+      var panoBlock = document.querySelector('.pano-block');
+      if (!compass2dContainer || !textPath || !panoBlock) return;
+
+      if (compass2dContainer.classList.contains('expanded')) {
+        compass2dContainer.classList.remove('expanded');
+        textPath.textContent = "palielināt";
+        panoBlock.classList.remove('blurred');
+      } else {
+        compass2dContainer.classList.add('expanded');
+        textPath.textContent = "samazināt";
+        panoBlock.classList.add('blurred');
+      }
+    };
+
+    /* ===== toggleCamera kā iepriekš ===== */
+    window.toggleCamera = function () {
+      var video = document.getElementById("liveVideo");
+      var panorama = document.getElementById("panorama");
+      var btn = document.getElementById("toggleCameraButton");
+      if (!video || !panorama || !btn) return;
+
+      if (video.style.display === "none" || video.style.display === "") {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(function (stream) {
+              cameraStream = stream;
+              video.srcObject = stream;
+              video.style.display = "block";
+              panorama.style.display = "none";
+              btn.textContent = "Panorama";
+            })
+            .catch(function (err) {
+              console.log("Kameras piekļuve neizdevās:", err);
+            });
+        }
+      } else {
+        if (cameraStream) {
+          cameraStream.getTracks().forEach(function (track) {
+            track.stop();
+          });
+        }
+        video.style.display = "none";
+        panorama.style.display = "block";
+        btn.textContent = "Kamera";
+      }
+    };
+  };
+</script>
+
 </body>
 </html>
