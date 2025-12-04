@@ -243,58 +243,109 @@
 
 /* ===== PRELOADER (no index.html minimālā versija) ===== */
 
-/* body stāvoklis ielādes laikā */
-body.preloading { overflow: hidden; }
+ /* ===================== PRELOADER ===================== */
+    body.preloading {
+      overflow: hidden;
+    }
 
-/* pilnekrāna pārklājums */
-#app-preloader{
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 2147483647;
-  display: grid; place-items: center;
-  padding: 16px;
-  background: linear-gradient(180deg,#0b0f14,#11161d);
-  color: #eef2f7;
-  min-height: 100vh;
-  min-height: calc(var(--vh, 1vh) * 100);
-}
+    #app-preloader {
+      position: fixed;
+      inset: 0; /* top/right/bottom/left:0 */
+      z-index: 2147483647;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background: linear-gradient(180deg, #0b0f14, #11161d);
+      color: #eef2f7;
+      min-height: 100vh;
+      min-height: calc(var(--vh, 1vh) * 100);
+    }
 
-#app-preloader .preloader-inner{
-  width: min(540px, 94vw);
-  background: rgba(0,0,0,.25);
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 16px;
-  padding: 16px 18px 14px;
-  box-shadow: 0 10px 30px rgba(0,0,0,.45);
-  text-align: center;
-}
-#app-preloader .logo{ font-weight: 700; margin-bottom: 6px; letter-spacing: .3px; }
-#app-preloader .msg{ margin: .2rem 0 .6rem; opacity: .9; }
+    #app-preloader .preloader-inner {
+      width: min(540px, 94vw);
+      background: rgba(0, 0, 0, .25);
+      border: 1px solid rgba(255, 255, 255, .08);
+      border-radius: 16px;
+      padding: 16px 18px 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+      text-align: center;
+    }
 
-#app-preloader .progress{
-  height: 10px; border-radius: 999px; overflow: hidden;
-  background: rgba(255,255,255,.09);
-  border: 1px solid rgba(255,255,255,.12);
-}
-#app-preloader .progress > span{
-  display:block; height:100%; width:0%;
-  background: linear-gradient(90deg,#aa2d2d,#d63c3c);
-  transition: width .25s ease;
-}
+    #app-preloader .brand {
+      display: block;
+      width: 190px;
+      max-width: 70%;
+      margin: 0 auto 10px;
+    }
 
-#preloaderSkip{
-  display: none; margin-top: .8rem;
-  padding: .5rem .8rem;
-  background:#2b2f36; color:#fff;
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:10px; cursor:pointer;
-}
-#app-preloader.show-skip #preloaderSkip{ display: inline-block; }
+    #app-preloader .msg {
+      margin: .4rem 0 .8rem;
+      opacity: .9;
+    }
 
-#app-preloader.hidden{
-  opacity: 0; visibility: hidden;
-  transition: opacity .36s ease, visibility 0s linear .4s;
-}
+    #app-preloader .progress {
+      height: 10px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, .09);
+      border: 1px solid rgba(255, 255, 255, .12);
+      margin-bottom: .4rem;
+    }
+
+    #app-preloader .progress > span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #aa2d2d, #d63c3c);
+      transition: width .25s ease;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 3px solid rgba(255, 255, 255, .24);
+      border-top-color: #ffffff;
+      margin: 0.4rem auto 0.8rem;
+      animation: spin 0.75s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .preloader-about {
+      margin-top: .6rem;
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .18em;
+      opacity: .75;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      align-items: center;
+    }
+
+    #preloaderSkip {
+      display: none;
+      margin-top: .8rem;
+      padding: .5rem .8rem;
+      background: #2b2f36;
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, .12);
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    #app-preloader.show-skip #preloaderSkip {
+      display: inline-block;
+    }
+
+    #app-preloader.hidden {
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity .36s ease, visibility 0s linear .4s;
+    }
 
     
     /* Mobilajām ierīcēm – tikai izmēri, nevis izkārtojums */
@@ -327,24 +378,29 @@ body.preloading { overflow: hidden; }
     }
   </style>
 </head>
+<!-- PIEVIENOTS class="preloading" -->
 <body class="preloading">
 
-<!-- PRELOADER -->
-<div id="app-preloader" role="status" aria-live="polite" aria-label="Ielādējam…">
-  <div class="preloader-inner">
-    <img class="brand" src="./img/CADET.LV.png" alt="CADET.LV" />
+  <!-- ===================== PRELOADER HTML ===================== -->
+  <div id="app-preloader" role="status" aria-live="polite" aria-label="Ielādējam…">
+    <div class="preloader-inner">
+      <img class="brand" src="./img/CADET.LV.png" alt="CADET.LV">
 
-    <div class="spinner" aria-hidden="true"></div>
-    <div class="progress"><span style="width:0%"></span></div>
-    <p class="msg">Ielādējam… 0%</p>
-    <div class="preloader-about" aria-label="Par projektu">
-      <span>CADET.LV</span>
-      <span>INTERAKTĪVAIS KOMPASS</span>
-      <span>© JĀNIS EGLIS</span>
+      <div class="spinner" aria-hidden="true"></div>
+
+      <div class="progress"><span style="width:0%"></span></div>
+      <p class="msg">Ielādējam… 0%</p>
+
+      <div class="preloader-about" aria-label="Par projektu">
+        <span>CADET.LV</span>
+        <span>INTERAKTĪVAIS KOMPASS</span>
+        <span>© JĀNIS EGLIS</span>
+      </div>
+
+      <button id="preloaderSkip" type="button">Turpināt</button>
     </div>
-    <button id="preloaderSkip" class="skip" type="button">Turpināt</button>
   </div>
-</div>
+  <!-- ===================== /PRELOADER HTML ===================== -->
 
 
   
@@ -409,48 +465,68 @@ body.preloading { overflow: hidden; }
     </div>
   </div>
 
-  <!-- Pannellum JS -->
+ <!-- Pannellum JS -->
   <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
   <script>
     var cameraStream = null;
 
-    window.onload = function() {
-      var viewer = pannellum.viewer('panorama', {
-        type: 'equirectangular',
-        panorama: 'https://i.imgur.com/w4maDHx.jpeg',
-        autoLoad: true,
-        showControls: true,
-        showFullscreenCtrl: false,
-        compass: false,
-        hfov: 200,
-        autoRotate: -2,
-        yaw: -0.5,
-        ignoreGPanoXMP: true
-      });
-      // === PRELOADER: helper, lai paslēptu ===
-      function hidePreloader() {
-        var pre = document.getElementById('app-preloader');
-        if (!pre) return;
-        document.body.classList.remove('preloading');
-        pre.classList.add('hidden');
+    /* ===================== PRELOADER JS ===================== */
+    var pre = document.getElementById('app-preloader');
+    var preBar = pre ? pre.querySelector('.progress > span') : null;
+    var preMsg = pre ? pre.querySelector('.msg') : null;
+    var preSkip = document.getElementById('preloaderSkip');
+    var fakeProgress = 0;
+    var fakeTimer = null;
 
-        var bar = pre.querySelector('.progress > span');
-        var msg = pre.querySelector('.msg');
-        if (bar) bar.style.width = '100%';
-        if (msg) msg.textContent = 'Ielādēts — 100%';
+    function setPreloaderProgress(pct) {
+      if (!preBar || !preMsg) return;
+      pct = Math.max(0, Math.min(100, pct));
+      preBar.style.width = pct + '%';
+      preMsg.textContent = 'Ielādējam… ' + pct + '%';
+    }
+
+    function hidePreloader() {
+      document.body.classList.remove('preloading');
+      if (pre) pre.classList.add('hidden');
+      if (fakeTimer) {
+        clearInterval(fakeTimer);
+        fakeTimer = null;
       }
+    }
 
-      // Kad panorāma pilnībā ielādēta – slēdzam preloaderi
-      viewer.on('load', function () {
-        hidePreloader();
-      });
+    if (preSkip) {
+      preSkip.addEventListener('click', hidePreloader);
+      // skip poga parādās pēc 4s
+      setTimeout(function () {
+        if (pre) pre.classList.add('show-skip');
+      }, 4000);
+    }
 
-      // Skip poga – ja gribi ļaut lietotājam nospiest "Turpināt"
-      var skipBtn = document.getElementById('preloaderSkip');
-      if (skipBtn) {
-        skipBtn.addEventListener('click', function () {
-          hidePreloader();
+    // "reāls" progress: 0→90% ar taimeri, 100% kad panorāma gatava
+    if (preBar) {
+      fakeProgress = 5;
+      setPreloaderProgress(fakeProgress);
+      fakeTimer = setInterval(function () {
+        fakeProgress += 5;
+        if (fakeProgress >= 90) {
+          fakeProgress = 90;
+          clearInterval(fakeTimer);
+          fakeTimer = null;
+        }
+        setPreloaderProgress(fakeProgress);
+      }, 400);
+    }
+    /* ===================== /PRELOADER JS ===================== */
+ // Kad Pannellum pabeidz ielādi → 100% un paslēp preloaderi
+      try {
+        viewer.on('load', function () {
+          setPreloaderProgress(100);
+          setTimeout(hidePreloader, 300);
         });
+      } catch (e) {
+        // ja kas neizdodas, vismaz paslēp preloaderi uz window load
+        setPreloaderProgress(100);
+        setTimeout(hidePreloader, 300);
       }
 
       /* ===== Adata no panorāmas yaw ===== */
