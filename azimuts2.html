@@ -287,18 +287,15 @@
       stroke-width: 1;
     }
 
-    .radar-sweep {
-      fill: url(#radarSweepGradient);
-      opacity: 0.8;
-      transform-origin: 100px 100px;
-      animation: radarSweep 3s linear infinite;
-    }
+.radar-sweep {
+  fill: url(#radarSweepGradient);
+  opacity: 0.8;
+  transform-origin: 100px 100px;
+  /* Animāciju vairs nelietojam – griezīsim ar JS pēc skata virziena */
+  animation: none;
+}
 
-    @keyframes radarSweep {
-      from { transform: rotate(0deg); }
-      to   { transform: rotate(360deg); }
-    }
-
+ 
     .radar-target {
       fill: #ffeb3b;
       stroke: rgba(255, 255, 255, 0.8);
@@ -757,8 +754,8 @@
         <circle id="radarTarget" class="radar-target hidden" cx="100" cy="35" r="4"></circle>
 
         <!-- uzraksti -->
-        <text class="radar-label" x="100" y="150" text-anchor="middle">MĒRĶA VIRZIENS</text>
-        <text class="radar-az" id="radarAzLabel" x="100" y="166" text-anchor="middle">--°</text>
+        <text class="radar-label" x="100" y="150" text-anchor="middle">SKATA VIRZIENS</text>
+<text class="radar-az" id="radarAzLabel" x="100" y="166" text-anchor="middle">0°</text>
       </svg>
     </div>
 
@@ -956,6 +953,8 @@
           needle2d.style.transform =
             'translate(-50%, -50%) rotate(' + (-currentYaw) + 'deg)';
         }
+         // JAUNUMS: radars rāda skata virzienu
+          updateRadarViewFromYaw(currentYaw);
       }
       setInterval(updateCompassNeedles, 50);
       viewer.on('viewchange', updateCompassNeedles);
@@ -1070,26 +1069,37 @@
       /* ===== Radara mērķa pozicionēšana ===== */
       var radarTargetEl = document.getElementById('radarTarget');
       var radarAzLabel = document.getElementById('radarAzLabel');
+      var radarSweepEl = document.querySelector('.radar-sweep');
 
-      function setRadarTarget(azimuthDeg) {
-        if (!radarTargetEl || !radarAzLabel) return;
+function setRadarTarget(azimuthDeg) {
+  if (!radarTargetEl) return;
 
-        if (azimuthDeg == null) {
-          radarTargetEl.classList.add('hidden');
-          radarAzLabel.textContent = '--°';
-          return;
-        }
+  if (azimuthDeg == null) {
+    radarTargetEl.classList.add('hidden');
+    return;
+  }
 
-        var radius = 60; // pikseļi no centra
-        var rad = (azimuthDeg - 90) * Math.PI / 180; // 0° uz augšu
-        var cx = 100 + Math.cos(rad) * radius;
-        var cy = 100 + Math.sin(rad) * radius;
+  var radius = 60; // pikseļi no centra
+  var rad = (azimuthDeg - 90) * Math.PI / 180; // 0° uz augšu
+  var cx = 100 + Math.cos(rad) * radius;
+  var cy = 100 + Math.sin(rad) * radius;
 
-        radarTargetEl.setAttribute('cx', cx.toFixed(2));
-        radarTargetEl.setAttribute('cy', cy.toFixed(2));
-        radarTargetEl.classList.remove('hidden');
-        radarAzLabel.textContent = Math.round(azimuthDeg) + '°';
-      }
+  radarTargetEl.setAttribute('cx', cx.toFixed(2));
+  radarTargetEl.setAttribute('cy', cy.toFixed(2));
+  radarTargetEl.classList.remove('hidden');
+}
+
+function updateRadarViewFromYaw(yaw) {
+  if (!radarSweepEl || !radarAzLabel) return;
+  // Pārvēršam Pannellum yaw (-180..180) uz azimutu 0..359°
+  var az = ((yaw % 360) + 360) % 360;
+
+  // Pagriežam radara sektoru skata virzienā
+  radarSweepEl.style.transform = 'rotate(' + az + 'deg)';
+
+  // Parādām skata azimutu skaitliski
+  radarAzLabel.textContent = Math.round(az) + '°';
+}
 
       /* ===== Grādu displeja toggling ===== */
       window.toggleDegrees = function () {
