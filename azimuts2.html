@@ -1200,9 +1200,11 @@ function updateRadarViewFromYaw(yaw) {
       var btnTrainingClose = document.getElementById('btnTrainingClose');
 
       var trainingSteps = [
-        "1. Pagriez panorāmu tā, lai <strongmērķis būtu tieši priekšā</strong>. Vari izmantot arī radaru – zaļais sektors rāda, kurā virzienā atrodas mērķis.",
-        "2. Pagriez <strong>kompasa skalu</strong>, līdz uz tās esošā Z bultiņa sakrīt ar magnētiskās adatas Z bultiņu. Tā tu \"pielīmē\" skalu pie ziemeļiem.",
-        "3. Skaties no centra caur mērķi līdz skalai un <strong>nolasī azimutu grādos</strong> (0–360°). Šo vērtību vari ierakstīt atbildes lodziņā."
+        "1. Pagriezies un atrodi mērķi tā, lai <strong>mērķis būtu tieši priekšā</strong>. izmanto raderu lai redzētu kur atrodas mērķis – zaļais sektors rāda, kurā virzienā šobrīd skaties. Dzeltenais punktiņš raderā norāda kur atrodas mērķis.",
+        "2. Precīzi notēmē uz mērķi ar <strong>kompasa pamatnes virzienbultu.</strong> Vari izmantot intigrēto sarkano līniju no virzienbultas, lai precīzi notēmētu. ",
+        "3. Pagriez <strong>kompasa skalu</strong>, līdz skalas Z bultiņa sakrīt ar magnētiskās adatas Z bultiņu. Tā tu norādi skalai reālos ziemeļus ko rāda magnētiskā adata.",
+        "4. Nolasi grādus <strong>tiesi pie atzīmes (sarkana līnija skalā kas nekustās)</strong> kura ir taisnā līnijā ar virzienu ko norāda kompasa pamatnes virziena bulta. Tā tu nolasīsi azimutu grādos (0–360°). Svarīgi grādus nelasīt no magnētiskās bultas.",
+        "5. Nolasītie grādi no skalas ir azimuts."
       ];
       var trainingIndex = 0;
 
