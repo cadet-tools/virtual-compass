@@ -1151,15 +1151,19 @@
         // Palielinātā skala zem lupas (tikai .expanded režīmā redzama)
         var magnifierScale = document.querySelector('.compass-magnifier-scale');
         if (magnifierScale) {
-          var magnifyFactor = 3.0;   // palielinājums 2–4x
-          var offset = -90;          // nobīde % uz augšu (sāc ar -40)
+          var magnifyFactor = 5.0;
+
+          // ŠO skaitli grozi:
+          // - tuvāk -50  → redzi vairāk centru
+          // - tuvāk -85  → vairāk ciparu gredzenu
+          var centerOffset = -75; 
 
           magnifierScale.style.transform =
-            'translate(-50%, -50%) ' +        // ieliekam skalu elementa centrā
-            'scale(' + magnifyFactor + ') ' + // palielinām
-            'translate(0,' + offset + '%) ' + // pabīdam PALIELINĀTO skalu uz augšu
-            'rotate(' + angle + 'deg)';       // un tikai tad griežam
+            'translate(-50%, ' + centerOffset + '%) ' + // pabīdam skalu uz augšu
+            'scale(' + magnifyFactor + ') ' +
+            'rotate(' + angle + 'deg)';
         }
+
 
 
 
