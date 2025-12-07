@@ -178,6 +178,65 @@
       pointer-events: none;
     }
 
+
+
+    /* ========= 2D kompasa palielināmais stikls ========= */
+
+    .compass-magnifier {
+      position: absolute;
+      inset: 0;               /* pārklāj 2D kodolu */
+      pointer-events: none;   /* lai rotē skalu kā iepriekš */
+      z-index: 3;
+    }
+
+    .compass-magnifier-lens {
+      position: absolute;
+      left: 50%;
+      top: 9%;                /* cik “augstu” stāv lupa uz skalas */
+      transform: translate(-50%, -50%);
+      width: 34%;             /* diametrs – pielāgo pēc sajūtas */
+      aspect-ratio: 1 / 1;
+      border-radius: 50%;
+      overflow: hidden;
+
+      border: 3px solid rgba(200, 160, 40, 0.95);      /* zeltains rāmis */
+      box-shadow:
+        0 0 10px rgba(0, 0, 0, 0.9),
+        0 0 20px rgba(0, 0, 0, 0.9);
+
+      background:
+        radial-gradient(circle at 30% 20%,
+          rgba(255, 255, 255, 0.30),
+          rgba(0, 0, 0, 0.85) 70%);
+    }
+
+    .compass-magnifier-lens::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg,
+                 rgba(255, 255, 255, 0.55),
+                 transparent 55%);
+      mix-blend-mode: screen;
+      opacity: 0.55;          /* “stikla” atspīdums */
+      pointer-events: none;
+    }
+
+    .compass-magnifier-scale {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 84%;             /* tāpat kā .compass-2d-scale */
+      transform-origin: center center;
+      filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.85));
+      opacity: 0.98;
+      pointer-events: none;
+    }
+
+
+
+
+    
     /* Grādu displejs virs kompasa */
     .degree-display {
       position: absolute;
@@ -819,19 +878,38 @@
 
     <!-- 2D Kompass -->
     <div class="compass-2d-container" id="compass2dContainer">
-      <div class="compass-2d-core">
-        <img src="./img/KOMPASA_SKALA_BACKGROUND.png"
-             class="compass-2d-scale-Background"
-             alt="Kompass fons (2D)">
-        <img src="./img/skala.png"
-             class="compass-2d-scale"
-             alt="Kompass skala (2D)">
-        <img src="./img/adata.png"
-             class="compass-2d-needle"
-             alt="Kompass adata (2D)">
+    <div class="compass-2d-core">
+      <img src="./img/KOMPASA_SKALA_BACKGROUND.png"
+           class="compass-2d-scale-Background"
+           alt="Kompass fons (2D)">
 
-        <div id="degreeDisplay" class="degree-display">0°</div>
+      <img src="./img/skala.png"
+           class="compass-2d-scale"
+           alt="Kompass skala (2D)">
+
+      <!-- Palielināmais stikls virs grādu atzīmes -->
+      <div class="compass-magnifier">
+        <div class="compass-magnifier-lens">
+          <img src="./img/skala.png"
+               class="compass-magnifier-scale"
+               alt="Palielināta kompasa skala">
+        </div>
       </div>
+
+      <img src="./img/adata.png"
+           class="compass-2d-needle"
+           alt="Kompass adata (2D)">
+
+      <div id="degreeDisplay" class="degree-display">0°</div>
+    </div>
+
+
+      <img src="./img/adata.png"
+           class="compass-2d-needle"
+           alt="Kompass adata (2D)">
+
+      <div id="degreeDisplay" class="degree-display">0°</div>
+    </div>
 
       <div class="arc-buttons">
         <svg viewBox="0 0 300 300">
@@ -1080,11 +1158,20 @@
             'translate(-50%, -50%) rotate(' + angle + 'deg)';
         }
 
+        // Palielināmais stikls: tā pati skala, tikai 2–4x lielāka
+        var magnifierScale = document.querySelector('.compass-magnifier-scale');
+        if (magnifierScale) {
+          var magnifyFactor = 3.0; // ← palielinājums (2..4x)
+          magnifierScale.style.transform =
+            'translate(-50%, -50%) rotate(' + angle + 'deg) scale(' + magnifyFactor + ')';
+        }
+
         var degreeDisplay = document.getElementById('degreeDisplay');
         if (degreeDisplay && degreeDisplay.style.display !== 'none') {
           var displayAngle = (360 - angle) % 360;
           degreeDisplay.innerText = Math.round(displayAngle) + "°";
         }
+
       }
 
       function calculateAngle(clientX, clientY, element) {
