@@ -1149,20 +1149,19 @@
         }
 
         // Palielinātā skala zem lupas (tikai .expanded režīmā redzama)
-        var magnifierScale = document.querySelector('.compass-magnifier-scale');
-        if (magnifierScale) {
-          var magnifyFactor = 5.0;
+var magnifierScale = document.querySelector('.compass-magnifier-scale');
+if (magnifierScale) {
+  var magnifyFactor = 3.0;
 
-          // ŠO skaitli grozi:
-          // - tuvāk -50  → redzi vairāk centru
-          // - tuvāk -85  → vairāk ciparu gredzenu
-          var centerOffset = -75; 
+  // horizontāli centrē, vertikāli – kā iestādīts ar CSS "top: 255%"
+  magnifierScale.style.transform =
+    'translateX(-50%) ' +
+    'scale(' + magnifyFactor + ') ' +
+    'rotate(' + angle + 'deg)';
+}
 
-          magnifierScale.style.transform =
-            'translate(-50%, ' + centerOffset + '%) ' + // pabīdam skalu uz augšu
-            'scale(' + magnifyFactor + ') ' +
-            'rotate(' + angle + 'deg)';
-        }
+
+ 
 
 
 
