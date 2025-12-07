@@ -364,6 +364,17 @@
   height: 34px;
 }
 
+.target-hotspot-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+  font-weight: 700;
+  color: #000;
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+}
 
     /* ========= APakšējā pogu josla ========= */
 
@@ -1193,6 +1204,27 @@ function yawFromAzimuth(az) {
   if (yaw > 180) yaw -= 360;
   return yaw;
 }
+// === Hotspota zīmēšana ar numuru centrā (apmācība + paštests 2. variants) ===
+function createNumberedTargetHotspot(hotSpotDiv, args) {
+  hotSpotDiv.classList.add('target-hotspot');
+  var label = document.createElement('div');
+  label.className = 'target-hotspot-label';
+  label.textContent = args && typeof args.number !== 'undefined'
+    ? String(args.number)
+    : '';
+  hotSpotDiv.appendChild(label);
+}
+
+// Palīgfunkcija: iztīrīt apmācības 2. varianta mērķus
+function clearTrainingObjFromAzTargets() {
+  if (trainingTargetsObjFromAz && trainingTargetsObjFromAz.length) {
+    trainingTargetsObjFromAz.forEach(function (t) {
+      try { viewer.removeHotSpot(t.id); } catch (e) {}
+    });
+  }
+  trainingTargetsObjFromAz = [];
+  trainingGivenAz = null;
+}
 
 // === Mācību režīma mērķis (Azimuta noteikšana objektam) ===
 function placeTrainingTarget() {
@@ -1369,19 +1401,39 @@ function startNewSelfTestTask() {
       ];
 
       var trainingStepsObjFromAz = [
-        "1. Iedomājies, ka tev tiek dots konkrēts azimuts (piemēram, 130°) uz kādu objektu apkārtējā vidē.",
-        "2. Ar kompasu uzstādi skalu tā, lai Z bultiņa sakristu ar magnētisko adatu – kā parasti, lai skala rāda ziemeļus.",
-        "3. Pagriezies tā, lai kompasa pamatnes virzienbulta rādītu dotajā azimutā (piemēram, 130°). Tagad skaties, uz kuru objektu šī virzienbulta norāda.",
-        "4. Aplūko panorāmu un sameklē objektu, kas atrodas tieši šajā virzienā. Tas ir objekts, kas atrodas dotajā azimutā.",
-        "5. Reālajā vidē šo pašu principu izmanto, lai pēc dotā azimuta atrastu objektu dabā vai kartē."
+        function () {
+          var azText = (trainingGivenAz != null) ? Math.round(trainingGivenAz) : 130;
+          return "1. Iedomājies, ka tev tiek dots konkrēts azimuts (piemēram, <strong>" +
+                 azText + "°</strong>) uz kādu objektu apkārtējā vidē.";
+        },
+        function () {
+          return "2. Ar kompasu uzstādi skalu tā, lai Z bultiņa sakristu ar magnētisko adatu – kā parasti, lai skala rāda ziemeļus.";
+        },
+        function () {
+          var azText = (trainingGivenAz != null) ? Math.round(trainingGivenAz) : 130;
+          return "3. Pagriezies tā, lai kompasa pamatnes virzienbulta rādītu dotajā azimutā (piemēram, " +
+                 azText + "°). Tagad skaties, uz kuru objektu šī virzienbulta norāda.";
+        },
+        function () {
+          return "4. Aplūko panorāmu un sameklē objektu ar numuru, kas atrodas tieši šajā virzienā. Tas ir objekts, kas atrodas dotajā azimutā.";
+        },
+        function () {
+          return "5. Reālajā vidē šo pašu principu izmanto, lai pēc dotā azimuta atrastu objektu dabā vai kartē.";
+        }
       ];
 
-      var trainingIndex = 0;
+
+           var trainingIndex = 0;
       var trainingVariant = null; // 'azToObj' vai 'objFromAz'
 
-      var selfTestVariant = null;  // 'azToObj' vai 'objFromAz'
-      var selfTestTargets = [];    // 3 mērķi 2. variantam
-      var selfTestGivenAz = null;  // dotais azimuts 2. variantam
+      var selfTestVariant = null;      // 'azToObj' vai 'objFromAz'
+      var selfTestTargets = [];        // 3 mērķi 2. variantam
+      var selfTestGivenAz = null;      // dotais azimuts 2. variantam
+
+      // Apmācības 2. varianta (objekts pēc dotā azimuta) mērķi
+      var trainingTargetsObjFromAz = [];
+      var trainingGivenAz = null;
+
 
       function renderTrainingStep() {
         if (!trainingText || !trainingStepInfo || !trainingVariant) return;
@@ -1390,9 +1442,13 @@ function startNewSelfTestTask() {
           ? trainingStepsObjFromAz
           : trainingStepsAzToObj;
 
-        trainingText.innerHTML = steps[trainingIndex];
+        var step = steps[trainingIndex];
+        var html = (typeof step === 'function') ? step() : step;
+
+        trainingText.innerHTML = html;
         trainingStepInfo.textContent = "Solis " + (trainingIndex + 1) + " no " + steps.length;
       }
+
 
       function openTrainingMenu() {
         trainingVariant = null;
@@ -1403,12 +1459,53 @@ function startNewSelfTestTask() {
         if (trainingText) trainingText.innerHTML = "";
         if (trainingStepInfo) trainingStepInfo.textContent = "";
 
-        // Notīram mērķi un radaru
+        // Notīram mērķus un radaru
         if (currentTarget && currentTarget.id) {
           try { viewer.removeHotSpot(currentTarget.id); } catch (e) {}
         }
         currentTarget = null;
+        clearTrainingObjFromAzTargets();
         setRadarTarget(null);
+      }
+
+      // Apmācības 2. variants – uzstāda 3 numurētus mērķus un vienu "dotu" azimutu
+      function setupTrainingObjFromAzScene() {
+        clearTrainingObjFromAzTargets();
+
+        // Fiksēti, labi izkliedēti azimuti mācību piemēram
+        var azList = [60, 150, 260];
+        trainingTargetsObjFromAz = [];
+
+        azList.forEach(function (az, index) {
+          var yaw = yawFromAzimuth(az);
+          var pitch = (Math.random() * 20) - 10; // neliels pacēlums
+          var num = index + 1;
+          var hotspotId = 'train-objaz-' + num;
+
+          trainingTargetsObjFromAz.push({
+            id: hotspotId,
+            number: num,
+            azimuth: az,
+            yaw: yaw,
+            pitch: pitch
+          });
+
+          viewer.addHotSpot({
+            id: hotspotId,
+            pitch: pitch,
+            yaw: yaw,
+            cssClass: '',
+            createTooltipFunc: createNumberedTargetHotspot,
+            createTooltipArgs: { number: num }
+          });
+        });
+
+        // Šajā apmācības piemērā izmantojam mērķi nr.2 kā "doto azimutu"
+        var correct = trainingTargetsObjFromAz[1];
+        trainingGivenAz = correct.azimuth;
+
+        // Radarā parādām dota azimuta virzienu
+        setRadarTarget(trainingGivenAz);
       }
 
       function startTrainingVariant(variant) {
@@ -1425,20 +1522,25 @@ function startNewSelfTestTask() {
               : "Apmācība: azimuta noteikšana objektam";
         }
 
-        // Noņemam iepriekšējo mērķi
+        // Noņemam iepriekšējo mērķi / mērķus
         if (currentTarget && currentTarget.id) {
           try { viewer.removeHotSpot(currentTarget.id); } catch (e) {}
         }
         currentTarget = null;
+        clearTrainingObjFromAzTargets();
         setRadarTarget(null);
 
         if (variant === 'azToObj') {
           // fiksēts mācību mērķis azimuta noteikšanai
           placeTrainingTarget();
+        } else if (variant === 'objFromAz') {
+          // uzstādām 3 mācību mērķus ar numuriem 1–3
+          setupTrainingObjFromAzScene();
         }
 
         renderTrainingStep();
       }
+
 
       function clearSelfTestTargets() {
         if (selfTestTargets && selfTestTargets.length) {
@@ -1516,7 +1618,9 @@ function startNewSelfTestTask() {
         }
         currentTarget = null;
         clearSelfTestTargets();
+        clearTrainingObjFromAzTargets();
         setRadarTarget(null);
+
 
         if (selfTestMode) {
           openSelfTestMenu();
@@ -1683,6 +1787,7 @@ function startNewSelfTestTask() {
         if (!selfTestMode || selfTestVariant !== 'objFromAz') return;
 
         clearSelfTestTargets();
+        setRadarTarget(null);
 
         // Izveidojam 3 nejaušus mērķus ar dažādiem azimutiem
         var used = {};
@@ -1710,9 +1815,9 @@ function startNewSelfTestTask() {
             id: hotspotId,
             pitch: pitch,
             yaw: yaw,
-            type: 'info',
-            text: String(i),
-            cssClass: 'target-hotspot'
+            cssClass: '',
+            createTooltipFunc: createNumberedTargetHotspot,
+            createTooltipArgs: { number: i }
           });
         }
 
@@ -1725,6 +1830,9 @@ function startNewSelfTestTask() {
           selfTestGivenAzSpan.textContent = Math.round(selfTestGivenAz);
         }
 
+        // Radarā rādām dotā azimuta virzienu
+        setRadarTarget(selfTestGivenAz);
+
         if (selfTestTargetNumberInput) {
           selfTestTargetNumberInput.value = "";
         }
@@ -1734,6 +1842,7 @@ function startNewSelfTestTask() {
             "Uzdevums ielādēts. Aplūko panorāmu un nosaki, kurš no trim mērķiem atrodas dotajā azimutā.";
         }
       }
+
 
       if (btnCheckTargetNumber && selfTestTargetNumberInput) {
         btnCheckTargetNumber.addEventListener('click', function () {
