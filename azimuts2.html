@@ -486,8 +486,6 @@
   backdrop-filter: blur(10px);
   font-size: 0.9rem;
   display: none;
-
-  display: flex;
   flex-direction: column;
 }
 
@@ -1223,8 +1221,9 @@ function updateRadarViewFromYaw(yaw) {
   if (btnTraining) btnTraining.classList.toggle('active', trainingMode);
   if (btnSelfTest) btnSelfTest.classList.toggle('active', selfTestMode);
 
-  if (trainingPanel) trainingPanel.style.display = trainingMode ? 'block' : 'none';
-  if (selfTestPanel) selfTestPanel.style.display = selfTestMode ? 'block' : 'none';
+if (trainingPanel) trainingPanel.style.display = trainingMode ? 'flex' : 'none';
+if (selfTestPanel) selfTestPanel.style.display = selfTestMode ? 'flex' : 'none';
+
 
   // Vispirms notīram iepriekšējo mērķi
   if (currentTarget && currentTarget.id) {
