@@ -1187,6 +1187,81 @@ function updateRadarViewFromYaw(yaw) {
   radarAzLabel.textContent = Math.round(az) + '°';
 }
 
+// === Palīgfunkcija: azimuts (0–359) → Pannellum yaw (-180..180) ===
+function yawFromAzimuth(az) {
+  var yaw = ((az % 360) + 360) % 360;
+  if (yaw > 180) yaw -= 360;
+  return yaw;
+}
+
+// === Mācību režīma mērķis (Azimuta noteikšana objektam) ===
+function placeTrainingTarget() {
+  // Fiksēts azimuts mācību mērķim, piem. 60°
+  var az = 60;
+  currentCorrectAzimuth = az; // ja gribi, var izmantot arī skaidrojumos
+
+  var yaw = yawFromAzimuth(az);
+  var pitch = 0; // horizontāli
+
+  // Noņemam iepriekšējo mērķi, ja bija
+  if (currentTarget && currentTarget.id) {
+    try { viewer.removeHotSpot(currentTarget.id); } catch (e) {}
+  }
+
+  var hotspotId = 'training-target';
+  currentTarget = { id: hotspotId, yaw: yaw, pitch: pitch };
+
+  viewer.addHotSpot({
+    id: hotspotId,
+    pitch: pitch,
+    yaw: yaw,
+    type: 'info',
+    text: '',
+    cssClass: 'target-hotspot'
+  });
+
+  // Radarā parādam mērķa virzienu
+  setRadarTarget(az);
+}
+
+// === Paštests 1. variants – Azimuta noteikšana objektam ===
+function startNewSelfTestTask() {
+  // drošības pārbaude – lai šī funkcija strādā tikai atbilstošajā režīmā
+  if (!selfTestMode || selfTestVariant !== 'azToObj') return;
+
+  // Nejaušs mērķa azimuts 0–359°
+  var az = Math.floor(Math.random() * 360);
+  currentCorrectAzimuth = az;
+
+  var yaw = yawFromAzimuth(az);
+  var pitch = (Math.random() * 20) - 10; // neliels nejaušs pacēlums
+
+  // Noņemam iepriekšējo mērķi, ja tāds bija
+  if (currentTarget && currentTarget.id) {
+    try { viewer.removeHotSpot(currentTarget.id); } catch (e) {}
+  }
+
+  var hotspotId = 'target-' + Date.now();
+  currentTarget = { id: hotspotId, yaw: yaw, pitch: pitch };
+
+  viewer.addHotSpot({
+    id: hotspotId,
+    pitch: pitch,
+    yaw: yaw,
+    type: 'info',
+    text: '',
+    cssClass: 'target-hotspot'
+  });
+
+  // Radarā parādam jaunā mērķa virzienu
+  setRadarTarget(az);
+
+  if (selfTestAnswer) selfTestAnswer.value = "";
+  if (selfTestFeedback) {
+    selfTestFeedback.textContent =
+      "Uzdevums ielādēts. Sameklē mērķīti panorāmā un nosaki azimutu.";
+  }
+}
 
 
       /* ===== Grādu displeja toggling ===== */
