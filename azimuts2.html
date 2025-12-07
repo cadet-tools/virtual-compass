@@ -339,6 +339,7 @@
     rgba(255, 235, 59, 0.95) 0%,
     rgba(255, 235, 59, 0.3) 55%,
     transparent 70%
+    z-index: 100;
   );
   position: relative;
 }
@@ -1310,12 +1311,14 @@ function placeTrainingTarget() {
   var hotspotId = 'training-target';
   currentTarget = { id: hotspotId, yaw: yaw, pitch: pitch };
 
-  viewer.addHotSpot({
-    id: hotspotId,
-    pitch: pitch,
-    yaw: yaw,
-    cssClass: 'target-hotspot'
-  });
+viewer.addHotSpot({
+  id: hotspotId,
+  pitch: pitch,
+  yaw: yaw,
+  type: 'info',
+  text: '',
+  cssClass: 'target-hotspot'
+});
 
   // Radars rāda mērķa azimutu (dzeltenais punkts uz radara)
   setRadarTarget(az);
@@ -1339,12 +1342,14 @@ function placeTrainingTarget() {
         var hotspotId = 'target-' + Date.now();
         currentTarget = { id: hotspotId, yaw: yaw, pitch: pitch };
 
-        viewer.addHotSpot({
-          id: hotspotId,
-          pitch: pitch,
-          yaw: yaw,
-          cssClass: 'target-hotspot'
-        });
+viewer.addHotSpot({
+  id: hotspotId,
+  pitch: pitch,
+  yaw: yaw,
+  type: 'info',
+  text: '',
+  cssClass: 'target-hotspot'
+});
 
         setRadarTarget(az);
 
