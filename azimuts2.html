@@ -755,7 +755,7 @@
 
         <!-- uzraksti -->
         <text class="radar-label" x="100" y="150" text-anchor="middle">SKATA VIRZIENS</text>
-
+<text class="radar-az" id="radarAzLabel" x="100" y="166" text-anchor="middle">0°</text>
       </svg>
     </div>
 
@@ -1068,7 +1068,7 @@
 
       /* ===== Radara mērķa pozicionēšana ===== */
       var radarTargetEl = document.getElementById('radarTarget');
-      
+      var radarAzLabel = document.getElementById('radarAzLabel');
       var radarSweepEl = document.querySelector('.radar-sweep');
 
 function setRadarTarget(azimuthDeg) {
@@ -1090,17 +1090,21 @@ function setRadarTarget(azimuthDeg) {
 }
 
 function updateRadarViewFromYaw(yaw) {
-  if (!radarSweepEl) return;
+  if (!radarSweepEl || !radarAzLabel) return;
 
   // Pannellum yaw (-180..180) → azimuts 0..359°
   var az = ((yaw % 360) + 360) % 360;
 
-  // sektors ir plats, tāpēc pabīdam, lai VIDUS atbilst skata virzienam
-  var SWEEP_CENTER_OFFSET = 30; // pielāgots nobīdei no kreisās malas
+  // sektors reāli ir apmēram 60° plats,
+  // tāpēc tā VIDUS ir ~30° no kreisās malas
+  var SWEEP_CENTER_OFFSET = 30; // grādi
 
+  // rotējam tā, lai sektora VIDUSLĪNIJA rāda skata virzienu
   radarSweepEl.style.transform = 'rotate(' + (az - SWEEP_CENTER_OFFSET) + 'deg)';
-}
 
+  // skaitlis zem radara – skata azimuts
+  radarAzLabel.textContent = Math.round(az) + '°';
+}
 
 
 
