@@ -851,35 +851,91 @@
       </div>
     </div>
 
-    <!-- Apmācības panelis -->
+       <!-- Apmācības panelis -->
     <div id="trainingPanel" class="mode-panel">
-      <h2>Apmācība: azimuta noteikšana</h2>
-      <p id="trainingText"></p>
-      <p id="trainingStepInfo"></p>
-      <div class="mode-panel-footer">
-        <button id="btnTrainingPrev" class="toolbar-btn secondary" type="button">← Atpakaļ</button>
-        <button id="btnTrainingNext" class="toolbar-btn" type="button">Tālāk →</button>
-        <button id="btnTrainingClose" class="toolbar-btn secondary" type="button">Aizvērt</button>
+      <h2 id="trainingTitle">Apmācība</h2>
+
+      <!-- Izvēlne ar 2 apmācības veidiem -->
+      <div id="trainingModeChooser">
+        <p>Izvēlies apmācības veidu:</p>
+        <button id="btnTrainAzToObj" class="toolbar-btn" type="button">
+          1. Azimuta noteikšana objektam
+        </button>
+        <button id="btnTrainObjFromAz" class="toolbar-btn secondary" type="button">
+          2. Objekta noteikšana pēc dotā azimuta
+        </button>
+      </div>
+
+      <!-- Saturs, kas parādās pēc veida izvēles -->
+      <div id="trainingContent" style="display:none;">
+        <p id="trainingText"></p>
+        <p id="trainingStepInfo"></p>
+
+        <div class="mode-panel-footer">
+          <button id="btnTrainingPrev" class="toolbar-btn secondary" type="button">← Atpakaļ</button>
+          <button id="btnTrainingNext" class="toolbar-btn" type="button">Tālāk →</button>
+          <button id="btnTrainingBackToMenu" class="toolbar-btn secondary" type="button">Atpakaļ uz izvēlni</button>
+          <button id="btnTrainingClose" class="toolbar-btn secondary" type="button">Aizvērt</button>
+        </div>
       </div>
     </div>
 
-    <!-- Paštesta panelis -->
+
+     <!-- Paštesta panelis -->
     <div id="selfTestPanel" class="mode-panel">
-      <h2>Paštests</h2>
-      <p>Uzdevums: sameklē mērķīti panorāmā (dzeltenais krustiņš) un nosaki azimutu līdz tam, izmantojot kompasu.</p>
-      <div class="selftest-input-row">
-        <span>Tava atbilde:</span>
-        <input id="selfTestAnswer" type="number" min="0" max="359" step="1" inputmode="decimal" />
-        <span>° (±3° tiek ieskaitīti)</span>
-        <button id="btnCheckAnswer" class="toolbar-btn" type="button">Pārbaudīt</button>
-        <button id="btnNewTask" class="toolbar-btn secondary" type="button">Jauns mērķis</button>
+      <h2 id="selfTestTitle">Paštests</h2>
+
+      <!-- Izvēlne ar 2 paštesta veidiem -->
+      <div id="selfTestModeChooser">
+        <p>Izvēlies paštesta veidu:</p>
+        <button id="btnSelfAzToObj" class="toolbar-btn" type="button">
+          1. Azimuta noteikšana objektam
+        </button>
+        <button id="btnSelfObjFromAz" class="toolbar-btn secondary" type="button">
+          2. Objekta noteikšana pēc dotā azimuta
+        </button>
       </div>
+
+      <!-- 1. veids: azimuta noteikšana objektam -->
+      <div id="selfTestModeAzToObj" style="display:none;">
+        <p>Uzdevums: sameklē mērķīti panorāmā (dzeltenais krustiņš) un nosaki azimutu līdz tam, izmantojot kompasu.</p>
+        <div class="selftest-input-row">
+          <span>Tava atbilde:</span>
+          <input id="selfTestAnswer" type="number" min="0" max="359" step="1" inputmode="decimal" />
+          <span>° (±3° tiek ieskaitīti)</span>
+          <button id="btnCheckAnswer" class="toolbar-btn" type="button">Pārbaudīt</button>
+          <button id="btnNewTask" class="toolbar-btn secondary" type="button">Jauns mērķis</button>
+        </div>
+      </div>
+
+      <!-- 2. veids: objekta noteikšana pēc dotā azimuta -->
+      <div id="selfTestModeObjFromAz" style="display:none;">
+        <p>
+          Uzdevums: dotais azimuts ir
+          <strong><span id="selfTestGivenAz">0</span>°</strong>.
+          Aplūko panorāmu — tajā ir trīs mērķi ar numuriem 1, 2 un 3.
+          Nosaki, kurš mērķis atrodas dotajā virzienā.
+        </p>
+        <div class="selftest-input-row">
+          <span>Mērķa numurs:</span>
+          <input id="selfTestTargetNumber" type="number" min="1" max="3" step="1" inputmode="numeric" />
+          <button id="btnCheckTargetNumber" class="toolbar-btn" type="button">Pārbaudīt</button>
+          <button id="btnNewTaskObjFromAz" class="toolbar-btn secondary" type="button">Jauns uzdevums</button>
+        </div>
+        <p style="font-size:0.8rem; opacity:0.85;">
+          Padoms: izmanto kompasu un radaru, lai saprastu, kurš krustiņš atrodas dotajā azimutā.
+        </p>
+      </div>
+
       <div id="selfTestFeedback"></div>
       <div id="selfTestStats"></div>
+
       <div class="mode-panel-footer">
+        <button id="btnSelfTestBackToMenu" class="toolbar-btn secondary" type="button">Atpakaļ uz izvēlni</button>
         <button id="btnSelfTestClose" class="toolbar-btn secondary" type="button">Beigt paštestu</button>
       </div>
     </div>
+
 
   </div><!-- /.pano-block -->
 
@@ -1193,69 +1249,216 @@ function updateRadarViewFromYaw(yaw) {
       var btnTraining = document.getElementById('btnTraining');
       var btnSelfTest = document.getElementById('btnSelfTest');
 
+      // Apmācības elementi
+      var trainingTitle = document.getElementById('trainingTitle');
+      var trainingModeChooser = document.getElementById('trainingModeChooser');
+      var trainingContent = document.getElementById('trainingContent');
       var trainingText = document.getElementById('trainingText');
       var trainingStepInfo = document.getElementById('trainingStepInfo');
+      var btnTrainAzToObj = document.getElementById('btnTrainAzToObj');
+      var btnTrainObjFromAz = document.getElementById('btnTrainObjFromAz');
       var btnTrainingPrev = document.getElementById('btnTrainingPrev');
       var btnTrainingNext = document.getElementById('btnTrainingNext');
+      var btnTrainingBackToMenu = document.getElementById('btnTrainingBackToMenu');
       var btnTrainingClose = document.getElementById('btnTrainingClose');
 
-      var trainingSteps = [
-        "1. Pagriezies un atrodi mērķi tā, lai <strong>mērķis būtu tieši priekšā</strong>. izmanto raderu lai redzētu kur atrodas mērķis – zaļais sektors rāda, kurā virzienā šobrīd skaties. Dzeltenais punktiņš raderā norāda kur atrodas mērķis.",
-        "2. Precīzi notēmē uz mērķi ar <strong>kompasa pamatnes virzienbultu.</strong> Vari izmantot intigrēto sarkano līniju no virzienbultas, lai precīzi notēmētu. ",
-        "3. Pagriez <strong>kompasa skalu</strong>, līdz skalas Z bultiņa sakrīt ar magnētiskās adatas Z bultiņu. Tā tu norādi skalai reālos ziemeļus ko rāda magnētiskā adata. Ērtākai darbībai palielini labajā, augšējā stūrī redzamo 2d skalu nospiežot palielināšanas pogu.",
-        "4. Nolasi grādus <strong>tiesi pie atzīmes (sarkana līnija skalā kas nekustās)</strong> kura ir taisnā līnijā ar virzienu ko norāda kompasa pamatnes virziena bulta. Tā tu nolasīsi azimutu grādos (0–360°). Svarīgi grādus nelasīt no magnētiskās bultas.",
-        "5. Nolasītie grādi no skalas ir azimuts."
+      // Paštests – kopīgie elementi
+      var selfTestTitle = document.getElementById('selfTestTitle');
+      var selfTestModeChooser = document.getElementById('selfTestModeChooser');
+      var selfTestModeAzToObj = document.getElementById('selfTestModeAzToObj');
+      var selfTestModeObjFromAz = document.getElementById('selfTestModeObjFromAz');
+      var btnSelfAzToObj = document.getElementById('btnSelfAzToObj');
+      var btnSelfObjFromAz = document.getElementById('btnSelfObjFromAz');
+      var btnSelfTestBackToMenu = document.getElementById('btnSelfTestBackToMenu');
+
+      var selfTestAnswer = document.getElementById('selfTestAnswer');
+      var btnCheckAnswer = document.getElementById('btnCheckAnswer');
+      var btnNewTask = document.getElementById('btnNewTask');
+
+      var selfTestGivenAzSpan = document.getElementById('selfTestGivenAz');
+      var selfTestTargetNumberInput = document.getElementById('selfTestTargetNumber');
+      var btnCheckTargetNumber = document.getElementById('btnCheckTargetNumber');
+      var btnNewTaskObjFromAz = document.getElementById('btnNewTaskObjFromAz');
+
+      var btnSelfTestClose = document.getElementById('btnSelfTestClose');
+      var selfTestFeedback = document.getElementById('selfTestFeedback');
+      var selfTestStats = document.getElementById('selfTestStats');
+
+      // Apmācības soļi – 2 varianti
+      var trainingStepsAzToObj = [
+        "1. Pagriezies un atrodi mērķi tā, lai <strong>mērķis būtu tieši priekšā</strong>. Izmanto radaru, lai redzētu, kur atrodas mērķis – zaļais sektors rāda, kurā virzienā šobrīd skaties. Dzeltenais punktiņš radarā norāda, kur atrodas mērķis.",
+        "2. Precīzi notēmē uz mērķi ar <strong>kompasa pamatnes virzienbultu</strong>. Vari izmantot integrēto sarkano līniju no virzienbultas, lai precīzi notēmētu.",
+        "3. Pagriez <strong>kompasa skalu</strong>, līdz skalas Z bultiņa sakrīt ar magnētiskās adatas Z bultiņu. Tā tu norādi skalai reālos ziemeļus, ko rāda magnētiskā adata. Ērtākai darbībai palielini labajā, augšējā stūrī redzamo 2D skalu, nospiežot palielināšanas pogu.",
+        "4. Nolasi grādus <strong>tieši pie atzīmes (sarkanā līnija skalā, kas nekustas)</strong>, kura ir taisnā līnijā ar virzienu, ko norāda kompasa pamatnes virzienbulta. Tā tu nolasīsi azimutu grādos (0–360°). Svarīgi – grādus nelasīt no magnētiskās adatas.",
+        "5. Nolasītie grādi no skalas ir azimuts līdz mērķim."
       ];
+
+      var trainingStepsObjFromAz = [
+        "1. Iedomājies, ka tev tiek dots konkrēts azimuts (piemēram, 130°) uz kādu objektu apkārtējā vidē.",
+        "2. Ar kompasu uzstādi skalu tā, lai Z bultiņa sakristu ar magnētisko adatu – kā parasti, lai skala rāda ziemeļus.",
+        "3. Pagriezies tā, lai kompasa pamatnes virzienbulta rādītu dotajā azimutā (piemēram, 130°). Tagad skaties, uz kuru objektu šī virzienbulta norāda.",
+        "4. Aplūko panorāmu un sameklē objektu, kas atrodas tieši šajā virzienā. Tas ir objekts, kas atrodas dotajā azimutā.",
+        "5. Reālajā vidē šo pašu principu izmanto, lai pēc dotā azimuta atrastu objektu dabā vai kartē."
+      ];
+
       var trainingIndex = 0;
+      var trainingVariant = null; // 'azToObj' vai 'objFromAz'
+
+      var selfTestVariant = null;  // 'azToObj' vai 'objFromAz'
+      var selfTestTargets = [];    // 3 mērķi 2. variantam
+      var selfTestGivenAz = null;  // dotais azimuts 2. variantam
 
       function renderTrainingStep() {
-        if (!trainingText || !trainingStepInfo) return;
-        trainingText.innerHTML = trainingSteps[trainingIndex];
-        trainingStepInfo.textContent = "Solis " + (trainingIndex + 1) + " no " + trainingSteps.length;
+        if (!trainingText || !trainingStepInfo || !trainingVariant) return;
+
+        var steps = (trainingVariant === 'objFromAz')
+          ? trainingStepsObjFromAz
+          : trainingStepsAzToObj;
+
+        trainingText.innerHTML = steps[trainingIndex];
+        trainingStepInfo.textContent = "Solis " + (trainingIndex + 1) + " no " + steps.length;
       }
 
-     function setMode(mode) {
-  trainingMode = (mode === 'training');
-  selfTestMode = (mode === 'selftest');
+      function openTrainingMenu() {
+        trainingVariant = null;
+        trainingIndex = 0;
+        if (trainingTitle) trainingTitle.textContent = "Apmācība";
+        if (trainingModeChooser) trainingModeChooser.style.display = "block";
+        if (trainingContent) trainingContent.style.display = "none";
+        if (trainingText) trainingText.innerHTML = "";
+        if (trainingStepInfo) trainingStepInfo.textContent = "";
 
-  document.body.classList.toggle('selftest-active', selfTestMode);
+        // Notīram mērķi un radaru
+        if (currentTarget && currentTarget.id) {
+          try { viewer.removeHotSpot(currentTarget.id); } catch (e) {}
+        }
+        currentTarget = null;
+        setRadarTarget(null);
+      }
 
-  if (btnTraining) btnTraining.classList.toggle('active', trainingMode);
-  if (btnSelfTest) btnSelfTest.classList.toggle('active', selfTestMode);
+      function startTrainingVariant(variant) {
+        trainingVariant = variant;
+        trainingIndex = 0;
 
-if (trainingPanel) trainingPanel.style.display = trainingMode ? 'flex' : 'none';
-if (selfTestPanel) selfTestPanel.style.display = selfTestMode ? 'flex' : 'none';
+        if (trainingModeChooser) trainingModeChooser.style.display = "none";
+        if (trainingContent) trainingContent.style.display = "block";
 
+        if (trainingTitle) {
+          trainingTitle.textContent =
+            (variant === 'objFromAz')
+              ? "Apmācība: objekta noteikšana pēc dotā azimuta"
+              : "Apmācība: azimuta noteikšana objektam";
+        }
 
-  // Vispirms notīram iepriekšējo mērķi
-  if (currentTarget && currentTarget.id) {
-    try { viewer.removeHotSpot(currentTarget.id); } catch (e) { }
-  }
-  currentTarget = null;
-  setRadarTarget(null);
+        // Noņemam iepriekšējo mērķi
+        if (currentTarget && currentTarget.id) {
+          try { viewer.removeHotSpot(currentTarget.id); } catch (e) {}
+        }
+        currentTarget = null;
+        setRadarTarget(null);
 
-  if (selfTestMode) {
-    // sākam jaunu paštestu
-    correctCount = 0;
-    totalCount = 0;
-    if (selfTestStats) selfTestStats.textContent = "";
-    startNewSelfTestTask();
-  } else if (trainingMode) {
-    // apmācība: viens fiksēts mērķis
-    trainingIndex = 0;
-    renderTrainingStep();
-    placeTrainingTarget();
-  } else {
-    // neviens režīms – viss tīrs
-    currentCorrectAzimuth = null;
-    correctCount = 0;
-    totalCount = 0;
-    if (selfTestStats) selfTestStats.textContent = "";
-    if (selfTestFeedback) selfTestFeedback.textContent = "";
-  }
-}
+        if (variant === 'azToObj') {
+          // fiksēts mācību mērķis azimuta noteikšanai
+          placeTrainingTarget();
+        }
 
+        renderTrainingStep();
+      }
 
+      function clearSelfTestTargets() {
+        if (selfTestTargets && selfTestTargets.length) {
+          selfTestTargets.forEach(function (t) {
+            try { viewer.removeHotSpot(t.id); } catch (e) {}
+          });
+        }
+        selfTestTargets = [];
+      }
+
+      function openSelfTestMenu() {
+        selfTestVariant = null;
+        selfTestGivenAz = null;
+        clearSelfTestTargets();
+
+        if (selfTestTitle) selfTestTitle.textContent = "Paštests";
+        if (selfTestModeChooser) selfTestModeChooser.style.display = "block";
+        if (selfTestModeAzToObj) selfTestModeAzToObj.style.display = "none";
+        if (selfTestModeObjFromAz) selfTestModeObjFromAz.style.display = "none";
+
+        if (selfTestFeedback) selfTestFeedback.textContent = "";
+        if (selfTestStats) selfTestStats.textContent = "";
+
+        if (selfTestAnswer) selfTestAnswer.value = "";
+        if (selfTestTargetNumberInput) selfTestTargetNumberInput.value = "";
+
+        // notīram mērķi un radaru
+        if (currentTarget && currentTarget.id) {
+          try { viewer.removeHotSpot(currentTarget.id); } catch (e) {}
+        }
+        currentTarget = null;
+        setRadarTarget(null);
+
+        correctCount = 0;
+        totalCount = 0;
+      }
+
+      function startSelfTestVariant(variant) {
+        selfTestVariant = variant;
+        correctCount = 0;
+        totalCount = 0;
+
+        if (selfTestModeChooser) selfTestModeChooser.style.display = "none";
+
+        if (variant === 'azToObj') {
+          if (selfTestTitle) selfTestTitle.textContent = "Paštests: azimuta noteikšana objektam";
+          if (selfTestModeAzToObj) selfTestModeAzToObj.style.display = "block";
+          if (selfTestModeObjFromAz) selfTestModeObjFromAz.style.display = "none";
+          if (selfTestStats) selfTestStats.textContent = "";
+          startNewSelfTestTask(); // esošais variants
+        } else {
+          if (selfTestTitle) selfTestTitle.textContent = "Paštests: objekta noteikšana pēc dotā azimuta";
+          if (selfTestModeAzToObj) selfTestModeAzToObj.style.display = "none";
+          if (selfTestModeObjFromAz) selfTestModeObjFromAz.style.display = "block";
+          if (selfTestStats) selfTestStats.textContent = "";
+          startNewSelfTestTaskObjFromAz();
+        }
+      }
+
+      function setMode(mode) {
+        trainingMode = (mode === 'training');
+        selfTestMode = (mode === 'selftest');
+
+        document.body.classList.toggle('selftest-active', selfTestMode);
+
+        if (btnTraining) btnTraining.classList.toggle('active', trainingMode);
+        if (btnSelfTest) btnSelfTest.classList.toggle('active', selfTestMode);
+
+        if (trainingPanel) trainingPanel.style.display = trainingMode ? 'flex' : 'none';
+        if (selfTestPanel) selfTestPanel.style.display = selfTestMode ? 'flex' : 'none';
+
+        // Notīram visus mērķus
+        if (currentTarget && currentTarget.id) {
+          try { viewer.removeHotSpot(currentTarget.id); } catch (e) {}
+        }
+        currentTarget = null;
+        clearSelfTestTargets();
+        setRadarTarget(null);
+
+        if (selfTestMode) {
+          openSelfTestMenu();
+        } else if (trainingMode) {
+          openTrainingMenu();
+        } else {
+          trainingVariant = null;
+          selfTestVariant = null;
+          currentCorrectAzimuth = null;
+          correctCount = 0;
+          totalCount = 0;
+          if (selfTestStats) selfTestStats.textContent = "";
+          if (selfTestFeedback) selfTestFeedback.textContent = "";
+        }
+      }
+
+      // Apmācības pogas
       if (btnTraining) {
         btnTraining.addEventListener('click', function () {
           if (trainingMode) {
@@ -1266,6 +1469,51 @@ if (selfTestPanel) selfTestPanel.style.display = selfTestMode ? 'flex' : 'none';
         });
       }
 
+      if (btnTrainAzToObj) {
+        btnTrainAzToObj.addEventListener('click', function () {
+          startTrainingVariant('azToObj');
+        });
+      }
+
+      if (btnTrainObjFromAz) {
+        btnTrainObjFromAz.addEventListener('click', function () {
+          startTrainingVariant('objFromAz');
+        });
+      }
+
+      if (btnTrainingPrev) {
+        btnTrainingPrev.addEventListener('click', function () {
+          var steps = (trainingVariant === 'objFromAz')
+            ? trainingStepsObjFromAz
+            : trainingStepsAzToObj;
+          trainingIndex = (trainingIndex - 1 + steps.length) % steps.length;
+          renderTrainingStep();
+        });
+      }
+
+      if (btnTrainingNext) {
+        btnTrainingNext.addEventListener('click', function () {
+          var steps = (trainingVariant === 'objFromAz')
+            ? trainingStepsObjFromAz
+            : trainingStepsAzToObj;
+          trainingIndex = (trainingIndex + 1) % steps.length;
+          renderTrainingStep();
+        });
+      }
+
+      if (btnTrainingBackToMenu) {
+        btnTrainingBackToMenu.addEventListener('click', function () {
+          openTrainingMenu();
+        });
+      }
+
+      if (btnTrainingClose) {
+        btnTrainingClose.addEventListener('click', function () {
+          setMode('none');
+        });
+      }
+
+      // Paštests – pogas
       if (btnSelfTest) {
         btnSelfTest.addEventListener('click', function () {
           if (selfTestMode) {
@@ -1276,101 +1524,27 @@ if (selfTestPanel) selfTestPanel.style.display = selfTestMode ? 'flex' : 'none';
         });
       }
 
-      if (btnTrainingPrev) {
-        btnTrainingPrev.addEventListener('click', function () {
-          trainingIndex = (trainingIndex - 1 + trainingSteps.length) % trainingSteps.length;
-          renderTrainingStep();
-        });
-      }
-      if (btnTrainingNext) {
-        btnTrainingNext.addEventListener('click', function () {
-          trainingIndex = (trainingIndex + 1) % trainingSteps.length;
-          renderTrainingStep();
-        });
-      }
-      if (btnTrainingClose) {
-        btnTrainingClose.addEventListener('click', function () {
-          setMode('none');
+      if (btnSelfAzToObj) {
+        btnSelfAzToObj.addEventListener('click', function () {
+          startSelfTestVariant('azToObj');
         });
       }
 
-      /* ===== Paštests ===== */
-      var selfTestAnswer = document.getElementById('selfTestAnswer');
-      var btnCheckAnswer = document.getElementById('btnCheckAnswer');
-      var btnNewTask = document.getElementById('btnNewTask');
-      var btnSelfTestClose = document.getElementById('btnSelfTestClose');
-      var selfTestFeedback = document.getElementById('selfTestFeedback');
-      var selfTestStats = document.getElementById('selfTestStats');
-
-      function yawFromAzimuth(az) {
-        // Pannellum yaw diapazons -180..180; uzskatām, ka azimuts 0° = yaw 0°.
-        var yaw = az;
-        if (yaw > 180) yaw = yaw - 360;
-        return yaw;
+      if (btnSelfObjFromAz) {
+        btnSelfObjFromAz.addEventListener('click', function () {
+          startSelfTestVariant('objFromAz');
+        });
       }
-function placeTrainingTarget() {
-  // FIKSĒTS apmācības mērķa azimuts, piem. 60°
-  var az = 60;
-  currentCorrectAzimuth = az; // lai zinām "pareizo" virzienu, ja vajag
 
-  var yaw = yawFromAzimuth(az);
-  var pitch = 0; // horizontā līmenī
-
-  // Noņemam iepriekšējo mērķi, ja bija
-  if (currentTarget && currentTarget.id) {
-    try { viewer.removeHotSpot(currentTarget.id); } catch (e) { }
-  }
-
-  var hotspotId = 'training-target';
-  currentTarget = { id: hotspotId, yaw: yaw, pitch: pitch };
-
-viewer.addHotSpot({
-  id: hotspotId,
-  pitch: pitch,
-  yaw: yaw,
-  type: 'info',
-  text: '',
-  cssClass: 'target-hotspot'
-});
-
-  // Radars rāda mērķa azimutu (dzeltenais punkts uz radara)
-  setRadarTarget(az);
-}
-
-      function startNewSelfTestTask() {
-        if (!selfTestMode) return;
-
-        // nejaušs azimuts 0–359
-        var az = Math.floor(Math.random() * 360);
-        currentCorrectAzimuth = az;
-
-        // novieto mērķi panorāmā (neliels nejaušs pacēlums, lai nav tieši centrā)
-        var yaw = yawFromAzimuth(az);
-        var pitch = (Math.random() * 20) - 10; // -10..10
-
-        if (currentTarget && currentTarget.id) {
-          try { viewer.removeHotSpot(currentTarget.id); } catch (e) { }
-        }
-
-        var hotspotId = 'target-' + Date.now();
-        currentTarget = { id: hotspotId, yaw: yaw, pitch: pitch };
-
-viewer.addHotSpot({
-  id: hotspotId,
-  pitch: pitch,
-  yaw: yaw,
-  type: 'info',
-  text: '',
-  cssClass: 'target-hotspot'
-});
-
-        setRadarTarget(az);
-
-        if (selfTestAnswer) selfTestAnswer.value = "";
-        if (selfTestFeedback) {
-          selfTestFeedback.textContent = "Uzdevums ielādēts. Sameklē mērķīti panorāmā un nosaki azimutu.";
-        }
+      if (btnSelfTestBackToMenu) {
+        btnSelfTestBackToMenu.addEventListener('click', function () {
+          if (selfTestMode) {
+            openSelfTestMenu();
+          }
+        });
       }
+
+      /* ===== Paštests 1. variants – azimuta noteikšana objektam ===== */
 
       function normalizeDeg(val) {
         var n = ((val % 360) + 360) % 360;
@@ -1379,6 +1553,7 @@ viewer.addHotSpot({
 
       if (btnCheckAnswer && selfTestAnswer) {
         btnCheckAnswer.addEventListener('click', function () {
+          if (selfTestVariant !== 'azToObj') return;
           if (currentCorrectAzimuth == null) return;
 
           var val = parseFloat(selfTestAnswer.value.replace(',', '.'));
@@ -1406,8 +1581,8 @@ viewer.addHotSpot({
             if (selfTestFeedback) {
               selfTestFeedback.innerHTML =
                 "❌ Nepareizi. Mērķa azimuts ir apmēram <strong>" + currentCorrectAzimuth +
-                "°</strong>. " +
-                "Atceries:<br>1) pagriez panorāmu, lai mērķis ir tieši priekšā; " +
+                "°</strong>." +
+                "<br>Atceries:<br>1) pagriez panorāmu, lai mērķis ir tieši priekšā; " +
                 "2) pielīdzini kompasa skalu magnētiskajai adatai; " +
                 "3) nolasī grādus no skalas virzienā uz mērķi.";
             }
@@ -1421,7 +1596,117 @@ viewer.addHotSpot({
 
       if (btnNewTask) {
         btnNewTask.addEventListener('click', function () {
-          startNewSelfTestTask();
+          if (selfTestVariant === 'azToObj') {
+            startNewSelfTestTask();
+          }
+        });
+      }
+
+      /* ===== Paštests 2. variants – objekta noteikšana pēc dotā azimuta ===== */
+
+      function startNewSelfTestTaskObjFromAz() {
+        if (!selfTestMode || selfTestVariant !== 'objFromAz') return;
+
+        clearSelfTestTargets();
+
+        // Izveidojam 3 nejaušus mērķus ar dažādiem azimutiem
+        var used = {};
+        selfTestTargets = [];
+        for (var i = 1; i <= 3; i++) {
+          var az;
+          do {
+            az = Math.floor(Math.random() * 360);
+          } while (used[az]);
+          used[az] = true;
+
+          var yaw = yawFromAzimuth(az);
+          var pitch = (Math.random() * 20) - 10; // -10..10
+
+          var hotspotId = 'objaz-target-' + i + '-' + Date.now();
+          selfTestTargets.push({
+            id: hotspotId,
+            number: i,
+            azimuth: az,
+            yaw: yaw,
+            pitch: pitch
+          });
+
+          viewer.addHotSpot({
+            id: hotspotId,
+            pitch: pitch,
+            yaw: yaw,
+            type: 'info',
+            text: String(i),
+            cssClass: 'target-hotspot'
+          });
+        }
+
+        // izvēlamies vienu no trim kā "pareizo"
+        var idx = Math.floor(Math.random() * selfTestTargets.length);
+        var correctTarget = selfTestTargets[idx];
+        selfTestGivenAz = correctTarget.azimuth;
+
+        if (selfTestGivenAzSpan) {
+          selfTestGivenAzSpan.textContent = Math.round(selfTestGivenAz);
+        }
+
+        if (selfTestTargetNumberInput) {
+          selfTestTargetNumberInput.value = "";
+        }
+
+        if (selfTestFeedback) {
+          selfTestFeedback.textContent =
+            "Uzdevums ielādēts. Aplūko panorāmu un nosaki, kurš no trim mērķiem atrodas dotajā azimutā.";
+        }
+      }
+
+      if (btnCheckTargetNumber && selfTestTargetNumberInput) {
+        btnCheckTargetNumber.addEventListener('click', function () {
+          if (selfTestVariant !== 'objFromAz') return;
+          if (selfTestGivenAz == null || !selfTestTargets.length) return;
+
+          var val = parseInt(selfTestTargetNumberInput.value, 10);
+          if (isNaN(val) || val < 1 || val > 3) {
+            if (selfTestFeedback) {
+              selfTestFeedback.textContent = "Ievadi mērķa numuru 1, 2 vai 3.";
+            }
+            return;
+          }
+
+          var correctTarget = selfTestTargets.find(function (t) {
+            return t.azimuth === selfTestGivenAz;
+          });
+
+          totalCount++;
+          var isCorrect = correctTarget && (val === correctTarget.number);
+          if (isCorrect) {
+            correctCount++;
+            if (selfTestFeedback) {
+              selfTestFeedback.innerHTML =
+                "✅ Pareizi! Dotais azimuts " + Math.round(selfTestGivenAz) +
+                "° atbilst mērķim nr. " + correctTarget.number + ".";
+            }
+            startNewSelfTestTaskObjFromAz();
+          } else {
+            if (selfTestFeedback) {
+              selfTestFeedback.innerHTML =
+                "❌ Nepareizi. Dotais azimuts " + Math.round(selfTestGivenAz) +
+                "° atbilst citam mērķim. Aplūko panorāmu vēlreiz un salīdzini virzienus.";
+            }
+          }
+
+          if (selfTestStats) {
+            selfTestStats.textContent =
+              "Rezultāts: " + correctCount + "/" + totalCount + " pareizas atbildes.";
+          }
+        });
+      }
+
+      if (btnNewTaskObjFromAz) {
+        btnNewTaskObjFromAz.addEventListener('click', function () {
+          if (selfTestVariant === 'objFromAz') {
+            startNewSelfTestTaskObjFromAz();
+          }
         });
       }
 
@@ -1430,6 +1715,7 @@ viewer.addHotSpot({
           setMode('none');
         });
       }
+
 
       /* ===== toggleCamera kā iepriekš (ja vajadzēs) ===== */
       window.toggleCamera = function () {
