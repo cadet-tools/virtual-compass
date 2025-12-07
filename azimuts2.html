@@ -304,6 +304,13 @@
       filter: drop-shadow(0 0 8px rgba(255, 235, 59, 1));
       transition: opacity 0.2s ease;
     }
+.radar-target-multi {
+  fill: #ffeb3b;
+  stroke: rgba(0, 0, 0, 0.9);
+  stroke-width: 1.2;
+  filter: drop-shadow(0 0 6px rgba(255, 235, 59, 0.9));
+  opacity: 0.9;
+}
 
     .radar-target.hidden {
       opacity: 0;
@@ -370,12 +377,16 @@
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  font-size: 18px;
-  font-weight: 700;
-  color: #000;
-  text-shadow: 0 0 4px rgba(255, 255, 255, 0.9);
+  font-size: 26px;           /* lielāks numurs */
+  font-weight: 800;
+  color: #ff3b3b;            /* spilgti sarkans */
+  text-shadow:
+    0 0 4px rgba(0, 0, 0, 0.9),
+    0 0 10px rgba(0, 0, 0, 0.9);  /* melns oreols, lai labi redzams uz fona */
   pointer-events: none;
+  z-index: 11;               /* virs krustiņa (pseudo-elementiem) */
 }
+
 
     /* ========= APakšējā pogu josla ========= */
 
@@ -1163,9 +1174,24 @@
       var radarTargetEl = document.getElementById('radarTarget');
       var radarAzLabel = document.getElementById('radarAzLabel');
       var radarSweepEl = document.querySelector('.radar-sweep');
+      var radarSvg = document.querySelector('.radar-svg');
+      var radarMultiTargets = [];
+
+function clearRadarMultiTargets() {
+  if (!radarMultiTargets.length) return;
+  radarMultiTargets.forEach(function (el) {
+    if (el && el.parentNode) {
+      el.parentNode.removeChild(el);
+    }
+  });
+  radarMultiTargets = [];
+}
 
 function setRadarTarget(azimuthDeg) {
   if (!radarTargetEl) return;
+
+  // Ja pārslēdzamies uz vienu mērķi – notīrām daudzos punktus
+  clearRadarMultiTargets();
 
   if (azimuthDeg == null) {
     radarTargetEl.classList.add('hidden');
@@ -1181,6 +1207,36 @@ function setRadarTarget(azimuthDeg) {
   radarTargetEl.setAttribute('cy', cy.toFixed(2));
   radarTargetEl.classList.remove('hidden');
 }
+
+/* Zīmē VISUS mērķus radarā – tiek izmantots apmācībai un paštesta 2. variantam */
+function renderRadarTargetsFromList(list) {
+  if (!radarSvg || !list || !list.length) return;
+
+  // Vispirms iztīrām iepriekšējos punktus
+  clearRadarMultiTargets();
+
+  var radius = 60; // pikseļi no centra
+  list.forEach(function (t) {
+    var az = ((t.azimuth % 360) + 360) % 360;
+    var rad = (az - 90) * Math.PI / 180;
+    var cx = 100 + Math.cos(rad) * radius;
+    var cy = 100 + Math.sin(rad) * radius;
+
+    var c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', cx.toFixed(2));
+    c.setAttribute('cy', cy.toFixed(2));
+    c.setAttribute('r', 4);
+    c.setAttribute('class', 'radar-target-multi');
+    radarSvg.appendChild(c);
+    radarMultiTargets.push(c);
+  });
+
+  // Viena-mērķa punkts šajā režīmā nav vajadzīgs
+  if (radarTargetEl) {
+    radarTargetEl.classList.add('hidden');
+  }
+}
+
 
 function updateRadarViewFromYaw(yaw) {
   if (!radarSweepEl || !radarAzLabel) return;
@@ -1225,6 +1281,7 @@ function clearTrainingObjFromAzTargets() {
   }
   trainingTargetsObjFromAz = [];
   trainingGivenAz = null;
+  clearRadarMultiTargets();
 }
 
 // === Mācību režīma mērķis (Azimuta noteikšana objektam) ===
@@ -1470,44 +1527,45 @@ function startNewSelfTestTask() {
       }
 
       // Apmācības 2. variants – uzstāda 3 numurētus mērķus un vienu "dotu" azimutu
-      function setupTrainingObjFromAzScene() {
-        clearTrainingObjFromAzTargets();
+function setupTrainingObjFromAzScene() {
+  clearTrainingObjFromAzTargets();
 
-        // Fiksēti, labi izkliedēti azimuti mācību piemēram
-        var azList = [60, 150, 260];
-        trainingTargetsObjFromAz = [];
+  // Fiksēti, labi izkliedēti azimuti mācību piemēram
+  var azList = [60, 150, 260];
+  trainingTargetsObjFromAz = [];
 
-        azList.forEach(function (az, index) {
-          var yaw = yawFromAzimuth(az);
-          var pitch = (Math.random() * 20) - 10; // neliels pacēlums
-          var num = index + 1;
-          var hotspotId = 'train-objaz-' + num;
+  azList.forEach(function (az, index) {
+    var yaw = yawFromAzimuth(az);
+    var pitch = (Math.random() * 20) - 10; // neliels pacēlums
+    var num = index + 1;
+    var hotspotId = 'train-objaz-' + num;
 
-          trainingTargetsObjFromAz.push({
-            id: hotspotId,
-            number: num,
-            azimuth: az,
-            yaw: yaw,
-            pitch: pitch
-          });
+    trainingTargetsObjFromAz.push({
+      id: hotspotId,
+      number: num,
+      azimuth: az,
+      yaw: yaw,
+      pitch: pitch
+    });
 
-          viewer.addHotSpot({
-            id: hotspotId,
-            pitch: pitch,
-            yaw: yaw,
-            cssClass: '',
-            createTooltipFunc: createNumberedTargetHotspot,
-            createTooltipArgs: { number: num }
-          });
-        });
+    viewer.addHotSpot({
+      id: hotspotId,
+      pitch: pitch,
+      yaw: yaw,
+      cssClass: '',
+      createTooltipFunc: createNumberedTargetHotspot,
+      createTooltipArgs: { number: num }
+    });
+  });
 
-        // Šajā apmācības piemērā izmantojam mērķi nr.2 kā "doto azimutu"
-        var correct = trainingTargetsObjFromAz[1];
-        trainingGivenAz = correct.azimuth;
+  // Šajā apmācības piemērā izmantojam mērķi nr.2 kā "doto azimutu"
+  var correct = trainingTargetsObjFromAz[1];
+  trainingGivenAz = correct.azimuth;
 
-        // Radarā parādām dota azimuta virzienu
-        setRadarTarget(trainingGivenAz);
-      }
+  // Radarā parādām visus 3 mērķus (pareizais nav speciāli izcelts)
+  renderRadarTargetsFromList(trainingTargetsObjFromAz);
+}
+
 
       function startTrainingVariant(variant) {
         trainingVariant = variant;
@@ -1543,14 +1601,16 @@ function startNewSelfTestTask() {
       }
 
 
-      function clearSelfTestTargets() {
-        if (selfTestTargets && selfTestTargets.length) {
-          selfTestTargets.forEach(function (t) {
-            try { viewer.removeHotSpot(t.id); } catch (e) {}
-          });
-        }
-        selfTestTargets = [];
-      }
+function clearSelfTestTargets() {
+  if (selfTestTargets && selfTestTargets.length) {
+    selfTestTargets.forEach(function (t) {
+      try { viewer.removeHotSpot(t.id); } catch (e) {}
+    });
+  }
+  selfTestTargets = [];
+  clearRadarMultiTargets();
+}
+
 
       function openSelfTestMenu() {
         selfTestVariant = null;
@@ -1783,66 +1843,66 @@ function startNewSelfTestTask() {
       }
 
       /* ===== Paštests 2. variants – objekta noteikšana pēc dotā azimuta ===== */
+function startNewSelfTestTaskObjFromAz() {
+  if (!selfTestMode || selfTestVariant !== 'objFromAz') return;
 
-      function startNewSelfTestTaskObjFromAz() {
-        if (!selfTestMode || selfTestVariant !== 'objFromAz') return;
+  clearSelfTestTargets();
+  setRadarTarget(null); // paslēpjam vienīgo “lielo” punktu
 
-        clearSelfTestTargets();
-        setRadarTarget(null);
+  // Izveidojam 3 nejaušus mērķus ar dažādiem azimutiem
+  var used = {};
+  selfTestTargets = [];
+  for (var i = 1; i <= 3; i++) {
+    var az;
+    do {
+      az = Math.floor(Math.random() * 360);
+    } while (used[az]);
+    used[az] = true;
 
-        // Izveidojam 3 nejaušus mērķus ar dažādiem azimutiem
-        var used = {};
-        selfTestTargets = [];
-        for (var i = 1; i <= 3; i++) {
-          var az;
-          do {
-            az = Math.floor(Math.random() * 360);
-          } while (used[az]);
-          used[az] = true;
+    var yaw = yawFromAzimuth(az);
+    var pitch = (Math.random() * 20) - 10; // -10..10
 
-          var yaw = yawFromAzimuth(az);
-          var pitch = (Math.random() * 20) - 10; // -10..10
+    var hotspotId = 'objaz-target-' + i + '-' + Date.now();
+    selfTestTargets.push({
+      id: hotspotId,
+      number: i,
+      azimuth: az,
+      yaw: yaw,
+      pitch: pitch
+    });
 
-          var hotspotId = 'objaz-target-' + i + '-' + Date.now();
-          selfTestTargets.push({
-            id: hotspotId,
-            number: i,
-            azimuth: az,
-            yaw: yaw,
-            pitch: pitch
-          });
+    viewer.addHotSpot({
+      id: hotspotId,
+      pitch: pitch,
+      yaw: yaw,
+      cssClass: '',
+      createTooltipFunc: createNumberedTargetHotspot,
+      createTooltipArgs: { number: i }
+    });
+  }
 
-          viewer.addHotSpot({
-            id: hotspotId,
-            pitch: pitch,
-            yaw: yaw,
-            cssClass: '',
-            createTooltipFunc: createNumberedTargetHotspot,
-            createTooltipArgs: { number: i }
-          });
-        }
+  // izvēlamies vienu no trim kā "pareizo"
+  var idx = Math.floor(Math.random() * selfTestTargets.length);
+  var correctTarget = selfTestTargets[idx];
+  selfTestGivenAz = correctTarget.azimuth;
 
-        // izvēlamies vienu no trim kā "pareizo"
-        var idx = Math.floor(Math.random() * selfTestTargets.length);
-        var correctTarget = selfTestTargets[idx];
-        selfTestGivenAz = correctTarget.azimuth;
+  if (selfTestGivenAzSpan) {
+    selfTestGivenAzSpan.textContent = Math.round(selfTestGivenAz);
+  }
 
-        if (selfTestGivenAzSpan) {
-          selfTestGivenAzSpan.textContent = Math.round(selfTestGivenAz);
-        }
+  // Radarā – VISI trīs mērķi, bez izcelšanas
+  renderRadarTargetsFromList(selfTestTargets);
 
-        // Radarā rādām dotā azimuta virzienu
-        setRadarTarget(selfTestGivenAz);
+  if (selfTestTargetNumberInput) {
+    selfTestTargetNumberInput.value = "";
+  }
 
-        if (selfTestTargetNumberInput) {
-          selfTestTargetNumberInput.value = "";
-        }
+  if (selfTestFeedback) {
+    selfTestFeedback.textContent =
+      "Uzdevums ielādēts. Aplūko panorāmu un nosaki, kurš no trim mērķiem atrodas dotajā azimutā.";
+  }
+}
 
-        if (selfTestFeedback) {
-          selfTestFeedback.textContent =
-            "Uzdevums ielādēts. Aplūko panorāmu un nosaki, kurš no trim mērķiem atrodas dotajā azimutā.";
-        }
-      }
 
 
       if (btnCheckTargetNumber && selfTestTargetNumberInput) {
