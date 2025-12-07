@@ -1095,17 +1095,17 @@ function updateRadarViewFromYaw(yaw) {
   // Pannellum yaw (-180..180) → azimuts 0..359°
   var az = ((yaw % 360) + 360) % 360;
 
-  // Radara sektora platums ≈ 30° (no 0° līdz 30°)
-  // lai virzienu rāda VIDUS, nobīdam rotāciju par -15°
-  var SWEEP_WIDTH = 30;
-  var half = SWEEP_WIDTH / 2;
+  // sektors reāli ir apmēram 60° plats,
+  // tāpēc tā VIDUS ir ~30° no kreisās malas
+  var SWEEP_CENTER_OFFSET = 30; // grādi
 
-  // tagad sektora viduslīnija = skata virziens
-  radarSweepEl.style.transform = 'rotate(' + (az - half) + 'deg)';
+  // rotējam tā, lai sektora VIDUSLĪNIJA rāda skata virzienu
+  radarSweepEl.style.transform = 'rotate(' + (az - SWEEP_CENTER_OFFSET) + 'deg)';
 
   // skaitlis zem radara – skata azimuts
   radarAzLabel.textContent = Math.round(az) + '°';
 }
+
 
 
       /* ===== Grādu displeja toggling ===== */
