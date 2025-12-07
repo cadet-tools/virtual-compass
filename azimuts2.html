@@ -323,9 +323,8 @@
 
     /* ========= HOTSPOT MĒRĶĪTIS ========= */
 
-   /* ========= HOTSPOT MĒRĶĪTIS PANORĀMĀ ========= */
 /* ========= HOTSPOT MĒRĶĪTIS PANORĀMĀ ========= */
-.pnlm-hotspot.target-hotspot {
+.pnlm-hotspot-base.target-hotspot {
   width: 56px;
   height: 56px;
   margin-left: -28px;
@@ -341,13 +340,12 @@
     rgba(255, 235, 59, 0.3) 55%,
     transparent 70%
   );
-  position: absolute; /* ļaujam Pannellum korekti pozicionēt hotspotu */
-  z-index: 10;        /* ja gribi viņu virs panorāmas elementiem */
+  position: absolute;
+  z-index: 10;
 }
 
-
-.pnlm-hotspot.target-hotspot::before,
-.pnlm-hotspot.target-hotspot::after {
+.pnlm-hotspot-base.target-hotspot::before,
+.pnlm-hotspot-base.target-hotspot::after {
   content: "";
   position: absolute;
   left: 50%;
@@ -356,12 +354,12 @@
   transform: translate(-50%, -50%);
 }
 
-.pnlm-hotspot.target-hotspot::before {
+.pnlm-hotspot-base.target-hotspot::before {
   width: 34px;
   height: 3px;
 }
 
-.pnlm-hotspot.target-hotspot::after {
+.pnlm-hotspot-base.target-hotspot::after {
   width: 3px;
   height: 34px;
 }
