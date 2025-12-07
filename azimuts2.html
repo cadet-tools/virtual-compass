@@ -178,6 +178,62 @@
       pointer-events: none;
     }
 
+
+
+
+    /* ========= 2D kompasa palielināmais stikls ========= */
+
+    .compass-magnifier {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 3;
+      display: none; /* mazajā režīmā neredzams */
+    }
+
+    /* Lupas aktivizācija tikai palielinātajā režīmā */
+    .compass-2d-container.expanded .compass-magnifier {
+      display: block;
+    }
+
+    .compass-magnifier-lens {
+      position: absolute;
+      left: 50%;
+      top: 11%;                 /* vertikālā pozīcija – pieregulē pēc vajadzības */
+      transform: translate(-50%, -50%);
+      width: 34%;               /* lupas diametrs – pieregulē */
+      aspect-ratio: 1 / 1;
+      border-radius: 50%;
+      overflow: hidden;
+
+      border: 3px solid rgba(210, 170, 50, 0.95);  /* “zelta” riņķis */
+      box-shadow:
+        0 0 10px rgba(0, 0, 0, 0.8),
+        0 0 20px rgba(0, 0, 0, 0.9);
+
+      background:
+        radial-gradient(circle at 30% 15%,
+          rgba(255, 255, 255, 0.4),
+          transparent 55%),
+        radial-gradient(circle at 50% 60%,
+          rgba(0, 0, 0, 0.7),
+          rgba(0, 0, 0, 0.95) 85%);
+    }
+
+    .compass-magnifier-scale {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 84%;               /* tā pati bāze kā .compass-2d-scale */
+      transform-origin: center center;
+      filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.9));
+      pointer-events: none;
+    }
+
+
+
+
+    
     /* Grādu displejs virs kompasa */
     .degree-display {
       position: absolute;
@@ -819,19 +875,31 @@
 
     <!-- 2D Kompass -->
     <div class="compass-2d-container" id="compass2dContainer">
-      <div class="compass-2d-core">
-        <img src="./img/KOMPASA_SKALA_BACKGROUND.png"
-             class="compass-2d-scale-Background"
-             alt="Kompass fons (2D)">
-        <img src="./img/skala.png"
-             class="compass-2d-scale"
-             alt="Kompass skala (2D)">
-        <img src="./img/adata.png"
-             class="compass-2d-needle"
-             alt="Kompass adata (2D)">
+         <div class="compass-2d-core">
+      <img src="./img/KOMPASA_SKALA_BACKGROUND.png"
+           class="compass-2d-scale-Background"
+           alt="Kompass fons (2D)">
 
-        <div id="degreeDisplay" class="degree-display">0°</div>
+      <img src="./img/skala.png"
+           class="compass-2d-scale"
+           alt="Kompass skala (2D)">
+
+      <!-- Palielināmais stikls – strādā tikai .expanded režīmā -->
+      <div class="compass-magnifier">
+        <div class="compass-magnifier-lens">
+          <img src="./img/skala.png"
+               class="compass-magnifier-scale"
+               alt="Palielināta kompasa skala">
+        </div>
       </div>
+
+      <img src="./img/adata.png"
+           class="compass-2d-needle"
+           alt="Kompass adata (2D)">
+
+      <div id="degreeDisplay" class="degree-display">0°</div>
+    </div>
+
 
       <div class="arc-buttons">
         <svg viewBox="0 0 300 300">
@@ -1080,11 +1148,20 @@
             'translate(-50%, -50%) rotate(' + angle + 'deg)';
         }
 
+        // Palielinātā skala zem lupas (tikai .expanded režīmā redzama)
+        var magnifierScale = document.querySelector('.compass-magnifier-scale');
+        if (magnifierScale) {
+          var magnifyFactor = 3.0; // 2–4x palielinājums
+          magnifierScale.style.transform =
+            'translate(-50%, -50%) rotate(' + angle + 'deg) scale(' + magnifyFactor + ')';
+        }
+
         var degreeDisplay = document.getElementById('degreeDisplay');
         if (degreeDisplay && degreeDisplay.style.display !== 'none') {
           var displayAngle = (360 - angle) % 360;
           degreeDisplay.innerText = Math.round(displayAngle) + "°";
         }
+
       }
 
       function calculateAngle(clientX, clientY, element) {
