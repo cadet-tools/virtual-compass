@@ -324,6 +324,7 @@
     /* ========= HOTSPOT MĒRĶĪTIS ========= */
 
    /* ========= HOTSPOT MĒRĶĪTIS PANORĀMĀ ========= */
+/* ========= HOTSPOT MĒRĶĪTIS PANORĀMĀ ========= */
 .pnlm-hotspot.target-hotspot {
   width: 56px;
   height: 56px;
@@ -339,10 +340,11 @@
     rgba(255, 235, 59, 0.95) 0%,
     rgba(255, 235, 59, 0.3) 55%,
     transparent 70%
-    z-index: 100;
   );
-  position: relative;
+  position: absolute; /* ļaujam Pannellum korekti pozicionēt hotspotu */
+  z-index: 10;        /* ja gribi viņu virs panorāmas elementiem */
 }
+
 
 .pnlm-hotspot.target-hotspot::before,
 .pnlm-hotspot.target-hotspot::after {
