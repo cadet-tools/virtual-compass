@@ -1149,12 +1149,18 @@
         }
 
         // Palielinātā skala zem lupas (tikai .expanded režīmā redzama)
-        var magnifierScale = document.querySelector('.compass-magnifier-scale');
-        if (magnifierScale) {
-          var magnifyFactor = 3.0; // 2–4x palielinājums
-          magnifierScale.style.transform =
-            'translate(-50%, -50%) rotate(' + angle + 'deg) scale(' + magnifyFactor + ')';
-        }
+       var magnifierScale = document.querySelector('.compass-magnifier-scale');
+if (magnifierScale) {
+  var magnifyFactor = 3.0;   // palielinājums
+  var radialOffset = -15;    // nobīde % uz augšu (pielāgo pēc sajūtas)
+
+  magnifierScale.style.transform =
+    'translate(-50%, -50%) ' +
+    'translate(0,' + radialOffset + '%) ' +   // ← pabīdam skalu uz augšu lupas iekšpusē
+    'rotate(' + angle + 'deg) ' +
+    'scale(' + magnifyFactor + ')';
+}
+
 
         var degreeDisplay = document.getElementById('degreeDisplay');
         if (degreeDisplay && degreeDisplay.style.display !== 'none') {
