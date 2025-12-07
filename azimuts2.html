@@ -1091,15 +1091,22 @@ function setRadarTarget(azimuthDeg) {
 
 function updateRadarViewFromYaw(yaw) {
   if (!radarSweepEl || !radarAzLabel) return;
-  // Pārvēršam Pannellum yaw (-180..180) uz azimutu 0..359°
+
+  // Pannellum yaw (-180..180) → azimuts 0..359°
   var az = ((yaw % 360) + 360) % 360;
 
-  // Pagriežam radara sektoru skata virzienā
-  radarSweepEl.style.transform = 'rotate(' + az + 'deg)';
+  // Radara sektora platums ≈ 30° (no 0° līdz 30°)
+  // lai virzienu rāda VIDUS, nobīdam rotāciju par -15°
+  var SWEEP_WIDTH = 30;
+  var half = SWEEP_WIDTH / 2;
 
-  // Parādām skata azimutu skaitliski
+  // tagad sektora viduslīnija = skata virziens
+  radarSweepEl.style.transform = 'rotate(' + (az - half) + 'deg)';
+
+  // skaitlis zem radara – skata azimuts
   radarAzLabel.textContent = Math.round(az) + '°';
 }
+
 
       /* ===== Grādu displeja toggling ===== */
       window.toggleDegrees = function () {
