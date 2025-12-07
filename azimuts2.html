@@ -323,33 +323,46 @@
 
     /* ========= HOTSPOT MĒRĶĪTIS ========= */
 
-    .pnlm-hotspot.target-hotspot {
-      width: 32px;
-      height: 32px;
-      margin-left: -16px;
-      margin-top: -16px;
-      border-radius: 50%;
-      border: 2px solid #ffeb3b;
-      box-shadow: 0 0 16px rgba(255, 235, 59, 0.9);
-      background: radial-gradient(circle, rgba(255, 235, 59, 0.85) 0%, rgba(255, 235, 59, 0.25) 55%, transparent 70%);
-    }
+   /* ========= HOTSPOT MĒRĶĪTIS PANORĀMĀ ========= */
+.pnlm-hotspot.target-hotspot {
+  width: 56px;
+  height: 56px;
+  margin-left: -28px;
+  margin-top: -28px;
+  border-radius: 50%;
+  border: 3px solid #ffeb3b;
+  box-shadow:
+    0 0 16px rgba(255, 235, 59, 1),
+    0 0 32px rgba(255, 235, 59, 0.9);
+  background: radial-gradient(
+    circle,
+    rgba(255, 235, 59, 0.95) 0%,
+    rgba(255, 235, 59, 0.3) 55%,
+    transparent 70%
+  );
+  position: relative;
+}
 
-    .pnlm-hotspot.target-hotspot::before,
-    .pnlm-hotspot.target-hotspot::after {
-      content: "";
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 24px;
-      height: 2px;
-      background: rgba(0, 0, 0, 0.85);
-      transform: translate(-50%, -50%);
-    }
+.pnlm-hotspot.target-hotspot::before,
+.pnlm-hotspot.target-hotspot::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: rgba(0, 0, 0, 0.85);
+  transform: translate(-50%, -50%);
+}
 
-    .pnlm-hotspot.target-hotspot::after {
-      width: 2px;
-      height: 24px;
-    }
+.pnlm-hotspot.target-hotspot::before {
+  width: 34px;
+  height: 3px;
+}
+
+.pnlm-hotspot.target-hotspot::after {
+  width: 3px;
+  height: 34px;
+}
+
 
     /* ========= APakšējā pogu josla ========= */
 
@@ -1188,39 +1201,46 @@ function updateRadarViewFromYaw(yaw) {
         trainingStepInfo.textContent = "Solis " + (trainingIndex + 1) + " no " + trainingSteps.length;
       }
 
-      function setMode(mode) {
-        trainingMode = (mode === 'training');
-        selfTestMode = (mode === 'selftest');
+     function setMode(mode) {
+  trainingMode = (mode === 'training');
+  selfTestMode = (mode === 'selftest');
 
-        document.body.classList.toggle('selftest-active', selfTestMode);
+  document.body.classList.toggle('selftest-active', selfTestMode);
 
-        if (btnTraining) btnTraining.classList.toggle('active', trainingMode);
-        if (btnSelfTest) btnSelfTest.classList.toggle('active', selfTestMode);
+  if (btnTraining) btnTraining.classList.toggle('active', trainingMode);
+  if (btnSelfTest) btnSelfTest.classList.toggle('active', selfTestMode);
 
-        if (trainingPanel) trainingPanel.style.display = trainingMode ? 'block' : 'none';
-        if (selfTestPanel) selfTestPanel.style.display = selfTestMode ? 'block' : 'none';
+  if (trainingPanel) trainingPanel.style.display = trainingMode ? 'block' : 'none';
+  if (selfTestPanel) selfTestPanel.style.display = selfTestMode ? 'block' : 'none';
 
-        if (trainingMode) {
-          trainingIndex = 0;
-          renderTrainingStep();
-        }
+  // Vispirms notīram iepriekšējo mērķi
+  if (currentTarget && currentTarget.id) {
+    try { viewer.removeHotSpot(currentTarget.id); } catch (e) { }
+  }
+  currentTarget = null;
+  setRadarTarget(null);
 
-        if (!selfTestMode) {
-          // Izslēdz paštestu, notīra mērķi
-          if (currentTarget && currentTarget.id) {
-            try { viewer.removeHotSpot(currentTarget.id); } catch (e) { }
-          }
-          currentTarget = null;
-          currentCorrectAzimuth = null;
-          setRadarTarget(null);
-          correctCount = 0;
-          totalCount = 0;
-          var stats = document.getElementById('selfTestStats');
-          if (stats) stats.textContent = "";
-        } else {
-          startNewSelfTestTask();
-        }
-      }
+  if (selfTestMode) {
+    // sākam jaunu paštestu
+    correctCount = 0;
+    totalCount = 0;
+    if (selfTestStats) selfTestStats.textContent = "";
+    startNewSelfTestTask();
+  } else if (trainingMode) {
+    // apmācība: viens fiksēts mērķis
+    trainingIndex = 0;
+    renderTrainingStep();
+    placeTrainingTarget();
+  } else {
+    // neviens režīms – viss tīrs
+    currentCorrectAzimuth = null;
+    correctCount = 0;
+    totalCount = 0;
+    if (selfTestStats) selfTestStats.textContent = "";
+    if (selfTestFeedback) selfTestFeedback.textContent = "";
+  }
+}
+
 
       if (btnTraining) {
         btnTraining.addEventListener('click', function () {
@@ -1274,6 +1294,32 @@ function updateRadarViewFromYaw(yaw) {
         if (yaw > 180) yaw = yaw - 360;
         return yaw;
       }
+function placeTrainingTarget() {
+  // FIKSĒTS apmācības mērķa azimuts, piem. 60°
+  var az = 60;
+  currentCorrectAzimuth = az; // lai zinām "pareizo" virzienu, ja vajag
+
+  var yaw = yawFromAzimuth(az);
+  var pitch = 0; // horizontā līmenī
+
+  // Noņemam iepriekšējo mērķi, ja bija
+  if (currentTarget && currentTarget.id) {
+    try { viewer.removeHotSpot(currentTarget.id); } catch (e) { }
+  }
+
+  var hotspotId = 'training-target';
+  currentTarget = { id: hotspotId, yaw: yaw, pitch: pitch };
+
+  viewer.addHotSpot({
+    id: hotspotId,
+    pitch: pitch,
+    yaw: yaw,
+    cssClass: 'target-hotspot'
+  });
+
+  // Radars rāda mērķa azimutu (dzeltenais punkts uz radara)
+  setRadarTarget(az);
+}
 
       function startNewSelfTestTask() {
         if (!selfTestMode) return;
