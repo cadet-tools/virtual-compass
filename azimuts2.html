@@ -1030,7 +1030,7 @@
 
       <!-- 1. veids: azimuta noteikšana objektam -->
       <div id="selfTestModeAzToObj" style="display:none;">
-        <p>Uzdevums: sameklē mērķīti panorāmā (dzeltenais krustiņš) un nosaki azimutu līdz tam, izmantojot kompasu.</p>
+        <p>Uzdevums: Griezies un meklē mērķi panorāmā (krustiņš dzeltenā aplī) un nosaki azimutu līdz tam, izmantojot kompasu. <br>Ieteikums: izmanto pietuvināšanu ar pelīti, lai precīzi notēmētu uz krustiņa centru.</p>
         <div class="selftest-input-row">
           <span>Tava atbilde:</span>
           <input id="selfTestAnswer" type="number" min="0" max="359" step="1" inputmode="decimal" />
@@ -1055,7 +1055,7 @@
           <button id="btnNewTaskObjFromAz" class="toolbar-btn secondary" type="button">Jauns uzdevums</button>
         </div>
         <p style="font-size:0.8rem; opacity:0.85;">
-          Padoms: izmanto kompasu un radaru, lai saprastu, kurš krustiņš atrodas dotajā azimutā.
+          Padoms: izmanto kompasa skalu un uzstādi grādus, lai noteiktu, kurš mērķis atrodas dotajā azimutā.
         </p>
       </div>
 
@@ -1951,8 +1951,8 @@ function clearSelfTestTargets() {
                 "❌ Nepareizi. Mērķa azimuts ir apmēram <strong>" + currentCorrectAzimuth +
                 "°</strong>." +
                 "<br>Atceries:<br>1) pagriez panorāmu, lai mērķis ir tieši priekšā; " +
-                "2) pielīdzini kompasa skalu magnētiskajai adatai; " +
-                "3) nolasī grādus no skalas virzienā uz mērķi.";
+                "<br>2) pielīdzini kompasa skalu magnētiskajai adatai; " +
+                "<br>3) nolasī grādus no skalas virzienā uz mērķi. <br> Pietuvini, lai notēmētu precīzi.";
             }
           }
 
