@@ -220,15 +220,28 @@
           rgba(0, 0, 0, 0.95) 85%);
     }
 
+/* Kopīgie parametri abiem (novietojums / izmērs) */
 .compass-magnifier-bg,
 .compass-magnifier-scale {
-    position: absolute;
-    left: 50%;
-    top: 255%;          /* šī vērtība – tā, kas tev jau “trāpīja” pareizi */
-    width: 100%;
-    transform-origin: center center;
-    pointer-events: none;
+  position: absolute;
+  left: 50%;
+  top: 255%;
+  width: 100%;
+  transform-origin: center center;
+  pointer-events: none;
 }
+
+/* Fons lupā – tāds pats palielinājums kā skalai, tikai NEROTĒJAS */
+.compass-magnifier-bg {
+  /* palielinājums + centrēšana tāpat kā skalai */
+  transform: translateX(-50%) scale(3);
+}
+
+/* Skala – ēna, rotācija nāk no JS */
+.compass-magnifier-scale {
+  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.9));
+}
+
 
 
 
