@@ -998,52 +998,60 @@ body.preloading{ overflow: hidden; }
 
 
 /* ===== Jaunais dropdown rokturis (pilnā platumā) ===== */
-/* iekšējais konteiners ar pogām, ko slēpj rokturis */
-.dropdown-menu .dropdown-pages {
-  overflow: hidden;
-  max-height: 500px;              /* pietiek liela, lai viss ietilptu */
-  transition: max-height .35s ease;
+/* iekšējais konteiners ar pogām – saglabā esošo dizainu */
+.dropdown-menu .dropdown-nav {
+  /* dizainu ņem no tā, kas tev jau bija .dropdown-menu vai .dropdown-menu a */
+  /* speciāli nemainu layout, tikai animācijas iespēja */
+  transition: max-height .3s ease, opacity .3s ease,
+              padding-top .3s ease, padding-bottom .3s ease;
 }
 
-/* kad rokturis to aizver */
-.dropdown-menu .dropdown-pages.is-collapsed {
+/* kad ir paslēpts (klase uzlikta no JS) – pazūd tikai pogas */
+.dropdown-menu.nav-collapsed .dropdown-nav {
   max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
-/* pats rokturis – pilnā dropdown platumā */
+/* jaunais rokturis – atsevišķs, nelien esošajās pogu klasēs */
 .dropdown-collapse-handle {
   width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 4px 0;
-  background: #660000;            /* pielāgo, ja gribi citu toni */
-  border-top: 1px solid rgba(0,0,0,0.4);
-  cursor: pointer;
+  background: #990000; /* tā pati sarkanā josla, vajadzības gadījumā pieskaņo */
+  border-top: 1px solid rgba(0,0,0,.5);
+  border-bottom: 1px solid rgba(0,0,0,.5);
 }
 
 .dropdown-collapse-handle button {
+  width: 100%;
   border: none;
   background: transparent;
   color: #fff;
-  font-family: inherit;
-  font-size: 13px;
+  padding: 4px 10px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 0;
+  justify-content: center;
+  gap: 8px;
   cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  letter-spacing: 0.03em;
+}
+
+.dropdown-collapse-handle .label {
+  text-transform: uppercase;
 }
 
 .dropdown-collapse-handle .icon {
-  font-size: 11px;
+  font-size: 0.8em;
   transform: translateY(-1px);
-  transition: transform .2s ease;
 }
 
-.dropdown-collapse-handle.is-collapsed .icon {
-  transform: rotate(180deg) translateY(1px);
-}
 
 
 
