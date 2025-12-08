@@ -6673,65 +6673,59 @@ function ensureDockOpen(){
 
 
 
-
 document.addEventListener('DOMContentLoaded', function () {
-  function setupHandle(handle) {
-    const targetId = handle.dataset.target;
-    if (!targetId) return;
+  const groups = document.querySelectorAll('.dropdown-menu .dropdown-pages');
 
-    const target = document.getElementById(targetId);
-    if (!target) return;
+  groups.forEach(function (pages) {
+    const handle = pages.nextElementSibling;
+    if (!handle || !handle.classList.contains('dropdown-collapse-handle')) return;
 
-    const btn  = handle.querySelector('button');
-    const icon = handle.querySelector('.icon');
+    function updateLabel(collapsed) {
+      const label = handle.querySelector('.label');
+      const icon  = handle.querySelector('.icon');
 
-    function toggle() {
-      const willCollapse = !target.classList.contains('is-collapsed');
-
-      target.classList.toggle('is-collapsed', willCollapse);
-      handle.classList.toggle('is-collapsed', willCollapse);
-
-      if (icon) icon.textContent = willCollapse ? '▼' : '▲';
-
-      // lai karte/kompass zina, ka mainījušies drošie laukumi
-      if (window.__updateMapSafeAreas) {
-        try { window.__updateMapSafeAreas(); } catch (e) {}
+      if (label) {
+        if (pages.dataset.menu === 'instruction') {
+          label.textContent = collapsed
+            ? 'Rādīt ceļveža pogas'
+            : 'Slēpt ceļveža pogas';
+        } else {
+          label.textContent = collapsed
+            ? 'Rādīt lapas izvēlni'
+            : 'Slēpt lapas izvēlni';
+        }
+      }
+      if (icon) {
+        icon.textContent = collapsed ? '▼' : '▲';
       }
     }
 
-    if (btn) {
-      btn.addEventListener('click', function (e) {
-        e.preventDefault();
-        toggle();
-      });
+    function togglePages() {
+      const collapsed = pages.classList.toggle('collapsed');
+      updateLabel(collapsed);
+
+      // lai karte uzzina, ka augšā mainījies brīvais augstums
+      if (typeof window.__updateMapSafeAreas === 'function') {
+        window.__updateMapSafeAreas();
+      }
     }
-  }
 
-  // Inicializē abus rokturus (ceļveža + materiālu)
-  document.querySelectorAll('.dropdown-collapse-handle').forEach(setupHandle);
+    // klikšķis uz roktura
+    handle.addEventListener('click', togglePages);
 
-  // Kad izvēlas kādu lapu – automātiski aizver tikai konkrētā dropdown pogas
-  document.querySelectorAll('#dropdownInstruction .dropdown-pages a, #dropdownMaterials .dropdown-pages a')
-    .forEach(function (link) {
+    // Kad lietotājs izvēlas kādu lapu – var (ja gribi) automātiski paslēpt pogas
+    pages.querySelectorAll('a').forEach(function (link) {
       link.addEventListener('click', function () {
-        const menu   = link.closest('.dropdown-menu');
-        if (!menu) return;
+        // ja negribi auto-slēpšanu pēc izvēles, izdzēs nākamo rindu
+        pages.classList.add('collapsed');
+        updateLabel(true);
 
-        const target = menu.querySelector('.dropdown-pages');
-        const handle = menu.querySelector('.dropdown-collapse-handle');
-        const icon   = handle && handle.querySelector('.icon');
-
-        if (!target || !handle) return;
-
-        target.classList.add('is-collapsed');
-        handle.classList.add('is-collapsed');
-        if (icon) icon.textContent = '▼';
-
-        if (window.__updateMapSafeAreas) {
-          try { window.__updateMapSafeAreas(); } catch (e) {}
+        if (typeof window.__updateMapSafeAreas === 'function') {
+          window.__updateMapSafeAreas();
         }
       });
     });
+  });
 });
 
 
