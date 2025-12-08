@@ -1347,29 +1347,25 @@ body.preloading { overflow: hidden; }
 
   <!-- LIETOTĀJA CEĻVEDIS -->
   <div class="dropdown-menu" id="dropdownInstruction">
-    <!-- tikai pogas -->
-    <div class="dropdown-nav">
+    <!-- 👇 jaunais wrappers tikai linkiem -->
+    <div class="dropdown-links">
       <a href="./coming-soon.html">DARBAM AR DATORU</a>
       <a href="./coming-soon.html">DARBAM AR SKĀRIENJŪTĪGĀM IERĪCĒM</a>
       <a href="./coming-soon.html">LIETOŠANAS NOTEIKUMI</a>
     </div>
 
-    <!-- rokturis šeit, PILNĀ dropdown platumā -->
-    <div class="dropdown-collapse-handle" data-menu="instruction">
-      <button type="button">
-        <span class="label">Ceļveža sadaļas</span>
-        <span class="icon">▲</span>
-      </button>
-    </div>
+    <!-- 👇 rokturis, kas slēpj tikai .dropdown-links -->
+    <button class="dropdown-collapse-handle" type="button">
+      Paslēpt navigācijas pogas ⬆
+    </button>
 
-    <!-- saturs zem roktura paliek vienmēr redzams -->
-    <iframe id="instructionFrame" name="contentFrame" style="width: 100%; height: 85vh; border: none;"></iframe>  
+    <iframe id="instructionFrame" name="contentFrame"
+            style="width: 100%; height: 85vh; border: none;"></iframe>
   </div>
 
   <!-- MĀCĪBU MATERIĀLI -->
   <div class="dropdown-menu" id="dropdownMaterials">
-    <!-- tikai pogas -->
-    <div class="dropdown-nav">
+    <div class="dropdown-links">
       <a href="./coming-soon.html" class="dropdown-link">TOPOGRĀFISKĀS KARTES</a>
       <a href="merogs-un-attalumi.html" class="dropdown-link">MĒROGS UN ATTĀLUMI</a>
       <a href="./coming-soon.html" class="dropdown-link">APZĪMĒJUMI KARTĒS</a>
@@ -1378,17 +1374,15 @@ body.preloading { overflow: hidden; }
       <a href="./coming-soon.html" class="dropdown-link">KOORDINĀTES</a>
     </div>
 
-    <!-- rokturis tieši zem pogām -->
-    <div class="dropdown-collapse-handle" data-menu="materials">
-      <button type="button">
-        <span class="label">Lapas izvēlne</span>
-        <span class="icon">▲</span>
-      </button>
-    </div>
+    <button class="dropdown-collapse-handle" type="button">
+      Paslēpt navigācijas pogas ⬆
+    </button>
 
-    <iframe id="contentFrame" name="contentFrame" style="width: 100%; height: 75vh; border: none;"></iframe>
+    <iframe id="contentFrame" name="contentFrame"
+            style="width: 100%; height: 75vh; border: none;"></iframe>
   </div>
 </div>
+
 
 
 							
