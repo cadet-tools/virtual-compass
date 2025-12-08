@@ -953,6 +953,7 @@ body.preloading{ overflow: hidden; }
 }
 
 /* Pats dropdown – vairs NAV flex container */
+/* Panelis, kas aizsedz ekrānu */
 .dropdown-menu {
   position: fixed;
   top: -100%;
@@ -960,11 +961,14 @@ body.preloading{ overflow: hidden; }
   width: 100%;
   height: calc(100vh - 40px);
   background-color: rgba(0, 0, 0, 1);
-  padding: 20px;
-  display: block; /* <- svarīgi */
+  padding: 20px 20px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
   opacity: 0;
   visibility: hidden;
+  transition: top 0.4s ease-in-out, opacity 0.4s ease-in-out;
 }
 
 /* Atvērts stāvoklis */
@@ -1063,7 +1067,7 @@ body.preloading{ overflow: hidden; }
 /* Jaunais rokturis – tagad tas ir pats <button class="dropdown-collapse-handle"> */
 .dropdown-collapse-handle {
   margin: 6px auto 4px;
-  display: inline-flex;
+  display: none;
   align-items: center;
   justify-content: center;
   gap: 8px;
@@ -1080,6 +1084,10 @@ body.preloading{ overflow: hidden; }
 	bottom: -56px;
 	position: relative;
 	z-index: 100;
+}
+/* Parādās tikai tad, kad .dropdown-menu ir “shrink” režīmā (t.i., iframe ir aktīvs) */
+.dropdown-menu.shrink .dropdown-collapse-handle {
+  display: flex;
 }
 
 /* Mobilais izkārtojums */
