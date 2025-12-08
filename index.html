@@ -1339,48 +1339,49 @@ body.preloading { overflow: hidden; }
 							</div>						
 							
 
-							<div class="dropdown-container">
+<div class="dropdown-container">
   <div class="top-bar">
     <span class="dropdown-toggle" id="toggleInstruction">Lietotāja ceļvedis ⬇</span>
     <span class="dropdown-toggle" id="toggleMaterials">Mācību materiāli ⬇</span>
   </div>
 
-  <!-- ================= LIETOTĀJA CEĻVEDIS ================= -->
+  <!-- LIETOTĀJA CEĻVEDIS -->
   <div class="dropdown-menu" id="dropdownInstruction">
-    <!-- iekšējais konteiners ar ceļveža pogām, ko slēps rokturis -->
-    <div class="dropdown-pages" id="instructionPages">
-      <a href="./coming-soon.html" target="instructionFrame">DARBAM AR DATORU</a>
-      <a href="./coming-soon.html" target="instructionFrame">DARBAM AR SKĀRIENJŪTĪGĀM IERĪCĒM</a>
-      <a href="./coming-soon.html" target="instructionFrame">LIETOŠANAS NOTEIKUMI</a>
+    <!-- Iekšējais konteiners POGĀM -->
+    <div class="dropdown-pages" data-menu="instruction">
+      <a href="./coming-soon.html">DARBAM AR DATORU</a>
+      <a href="./coming-soon.html">DARBAM AR SKĀRIENJŪTĪGĀM IERĪCĒM</a>
+      <a href="./coming-soon.html">LIETOŠANAS NOTEIKUMI</a>
     </div>
 
-    <!-- rokturis tieši zem ceļveža pogām -->
-    <div class="dropdown-collapse-handle" data-target="instructionPages">
+    <!-- ROKTURIS, kas slēpj / rāda tikai šīs pogas -->
+    <div class="dropdown-collapse-handle" data-target="instruction">
       <button type="button">
         <span class="label">Slēpt / rādīt ceļveža pogas</span>
         <span class="icon">▲</span>
       </button>
     </div>
 
+    <!-- Saturs zem pogām paliek kā bija -->
     <iframe id="instructionFrame"
-            name="instructionFrame"
-            style="width:100%;height:85vh;border:none;"></iframe>
+            name="contentFrame"
+            style="width: 100%; height: 85vh; border: none;"></iframe>
   </div>
 
-  <!-- ================= MĀCĪBU MATERIĀLI ================= -->
+  <!-- MĀCĪBU MATERIĀLI -->
   <div class="dropdown-menu" id="dropdownMaterials">
-    <!-- iekšējais konteiners ar materiālu pogām, ko slēps rokturis -->
-    <div class="dropdown-pages" id="materialsPages">
-      <a href="./coming-soon.html" class="dropdown-link" target="contentFrame">TOPOGRĀFISKĀS KARTES</a>
-      <a href="merogs-un-attalumi.html" class="dropdown-link" target="contentFrame">MĒROGS UN ATTĀLUMI</a>
-      <a href="./coming-soon.html" class="dropdown-link" target="contentFrame">APZĪMĒJUMI KARTĒS</a>
-      <a href="azimuts2.html" class="dropdown-link" target="contentFrame">AZIMUTS</a>
-      <a href="./coming-soon.html" class="dropdown-link" target="contentFrame">DIREKCIJAS LENĶIS</a>
-      <a href="./coming-soon.html" class="dropdown-link" target="contentFrame">KOORDINĀTES</a>
+    <!-- Iekšējais konteiners POGĀM -->
+    <div class="dropdown-pages" data-menu="materials">
+      <a href="./coming-soon.html" class="dropdown-link">TOPOGRĀFISKĀS KARTES</a>
+      <a href="merogs-un-attalumi.html" class="dropdown-link">MĒROGS UN ATTĀLUMI</a>
+      <a href="./coming-soon.html" class="dropdown-link">APZĪMĒJUMI KARTĒS</a>
+      <a href="azimuts2.html" class="dropdown-link">AZIMUTS</a>
+      <a href="./coming-soon.html" class="dropdown-link">DIREKCIJAS LENĶIS</a>
+      <a href="./coming-soon.html" class="dropdown-link">KOORDINĀTES</a>
     </div>
 
-    <!-- rokturis iekš dropdown, zem pogām -->
-    <div class="dropdown-collapse-handle" data-target="materialsPages">
+    <!-- ROKTURIS šim blokam -->
+    <div class="dropdown-collapse-handle" data-target="materials">
       <button type="button">
         <span class="label">Lapas izvēlne</span>
         <span class="icon">▲</span>
@@ -1389,7 +1390,7 @@ body.preloading { overflow: hidden; }
 
     <iframe id="contentFrame"
             name="contentFrame"
-            style="width:100%;height:75vh;border:none;"></iframe>
+            style="width: 100%; height: 75vh; border: none;"></iframe>
   </div>
 </div>
 
