@@ -6681,7 +6681,65 @@ function ensureDockOpen(){
 
 
 
-	
+document.addEventListener('DOMContentLoaded', function () {
+  var dropdownContainer = document.querySelector('.dropdown-container');
+  var handleWrap        = document.getElementById('dropdownCollapseHandle');
+  if (!dropdownContainer || !handleWrap) return;
+
+  var handleButton = handleWrap.querySelector('button');
+  var handleLabel  = document.getElementById('dropdownCollapseText');
+  var handleShown  = false;
+
+  function showHandleOnce(labelText) {
+    if (handleShown) return;
+    handleShown = true;
+    if (labelText && handleLabel) {
+      handleLabel.textContent = labelText;
+    }
+    handleWrap.style.display = 'block';
+  }
+
+  function collapse() {
+    document.body.classList.add('dropdown-collapsed');
+  }
+
+  function expand() {
+    document.body.classList.remove('dropdown-collapsed');
+  }
+
+  // Uzspiež saiti Mācību materiālos vai Lietotāja ceļvedī
+  dropdownContainer.addEventListener('click', function (e) {
+    var link = e.target.closest('.dropdown-menu a');
+    if (!link) return;
+
+    // parādām rokturi (ja vēl nav) un saklapējam izvēlni
+    var txt = (link.textContent || '').trim();
+    showHandleOnce(txt ? ('Lapa: ' + txt) : 'Lapas izvēlne');
+    collapse();
+  });
+
+  // Ja saturs tiek ielādēts iframe'os (instructionFrame / contentFrame),
+  // automātiski parādām rokturi + saklapējam
+  ['contentFrame', 'instructionFrame'].forEach(function (id) {
+    var iframe = document.getElementById(id);
+    if (!iframe) return;
+    iframe.addEventListener('load', function () {
+      showHandleOnce();
+      collapse();
+    });
+  });
+
+  // Roktura poga – pārslēdz redzams/paslēpts
+  if (handleButton) {
+    handleButton.addEventListener('click', function () {
+      if (document.body.classList.contains('dropdown-collapsed')) {
+        expand();
+      } else {
+        collapse();
+      }
+    });
+  }
+});	
 
 	
 
