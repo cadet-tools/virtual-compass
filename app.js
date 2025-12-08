@@ -271,63 +271,6 @@ function checkWindowSize() {
 						  window.visualViewport.addEventListener('scroll', debounce(handleResize, 50));
 						}
 
-// === Dropdown navigācijas rokturis (Lietotāja ceļvedis / Mācību materiāli) ===
-onDomReady(() => {
-  const dropdownHost = document.querySelector('.dropdown-container');
-  if (!dropdownHost) return; // šajā lapā nav dropdowna → ejam tālāk
-
-  const menus = dropdownHost.querySelectorAll('.dropdown-menu');
-
-  menus.forEach((menu) => {
-    const linksWrap = menu.querySelector('.dropdown-links');
-    const iframe    = menu.querySelector('iframe');
-    const handle    = menu.querySelector('.dropdown-collapse-handle');
-
-    if (!linksWrap || !handle || !iframe) return;
-
-    const COLLAPSED_CLASS = 'nav-collapsed';
-
-    const collapseNav = () => {
-      if (!menu.classList.contains(COLLAPSED_CLASS)) {
-        menu.classList.add(COLLAPSED_CLASS);
-      }
-    };
-
-    const expandNav = () => {
-      if (menu.classList.contains(COLLAPSED_CLASS)) {
-        menu.classList.remove(COLLAPSED_CLASS);
-      }
-    };
-
-    // 1) Kad iframe ielādē saturu → automātiski saklopē navigāciju
-    iframe.addEventListener('load', () => {
-      const src = iframe.getAttribute('src');
-      if (src && src.trim() !== '') {
-        collapseNav();
-      }
-    });
-
-    // 2) Klikšķis uz jebkuras saites navigācijā
-    linksWrap.addEventListener('click', (ev) => {
-      const link = ev.target.closest('a');
-      if (!link) return;
-      // dodam laikus esošajam handlerim nomainīt iframe.src, tad saklopējam
-      setTimeout(collapseNav, 250);
-    });
-
-    // 3) Roktura klikšķis — pārslēdz starp “saklopēts / atvērts”
-    handle.addEventListener('click', () => {
-      if (menu.classList.contains(COLLAPSED_CLASS)) {
-        // atveram navigāciju atpakaļ
-        expandNav();
-      } else {
-        // saklopējam, atstājam tikai rokturi
-        collapseNav();
-      }
-    });
-  });
-});
-// === /Dropdown navigācijas rokturis ===
 
                         // Dinamiskās pogas konfigurācija: katrai pogai sākuma un alternatīvie attēli
 						const buttonImageMap = {
@@ -6733,6 +6676,12 @@ function ensureDockOpen(){
 
 
 
+
+
+
+
+
+	
 
 	
 
