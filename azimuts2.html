@@ -1580,7 +1580,7 @@ function startNewSelfTestTask() {
       // Apmācības soļi – 2 varianti
       var trainingStepsAzToObj = [
         "1. Pagriezies un atrodi mērķi tā, lai <strong>mērķis būtu tieši priekšā</strong>. Izmanto radaru, lai redzētu, kur atrodas mērķis – zaļais sektors rāda, kurā virzienā šobrīd skaties. Dzeltenais punktiņš radarā norāda, kur atrodas mērķis.",
-        "2. Precīzi notēmē uz mērķi ar <strong>kompasa pamatnes virzienbultu</strong>. Vari izmantot integrēto sarkano līniju no virzienbultas, lai precīzi notēmētu.",
+        "2. Precīzi notēmē uz mērķi ar <strong>kompasa pamatnes virzienbultu</strong>. Vari izmantot integrēto sarkano līniju no virzienbultas, lai precīzi notēmētu. Pietuvini mērķi ar pelīti, lai precīzi notēmētu uz mērķki.",
         "3. Pagriez <strong>kompasa skalu</strong>, līdz skalas Z bultiņa sakrīt ar magnētiskās adatas Z bultiņu. Tā tu norādi skalai reālos ziemeļus, ko rāda magnētiskā adata. Ērtākai darbībai palielini labajā, augšējā stūrī redzamo 2D skalu, nospiežot palielināšanas pogu.",
         "4. Nolasi grādus <strong>tieši pie atzīmes (sarkanā līnija skalā, kas nekustas)</strong>, kura ir taisnā līnijā ar virzienu, ko norāda kompasa pamatnes virzienbulta. Tā tu nolasīsi azimutu grādos (0–360°). Svarīgi – grādus nelasīt no magnētiskās adatas.",
         "5. Nolasītie grādi no skalas ir azimuts līdz mērķim."
@@ -1593,18 +1593,18 @@ function startNewSelfTestTask() {
                  azText + "°</strong>) uz kādu objektu apkārtējā vidē.";
         },
         function () {
-          return "2. Ar kompasu uzstādi skalu tā, lai Z bultiņa sakristu ar magnētisko adatu – kā parasti, lai skala rāda ziemeļus.";
+          return "2. Kompasa skalu sagriez uz dotajiem grādiem. grādi tiek lasīti skalā tieši pamatnes vrziena bultas līnijas turpinājuma vietā. Šī līnija nekad nekustās ar skalu.";
         },
         function () {
           var azText = (trainingGivenAz != null) ? Math.round(trainingGivenAz) : 130;
-          return "3. Pagriezies tā, lai kompasa pamatnes virzienbulta rādītu dotajā azimutā (piemēram, " +
-                 azText + "°). Tagad skaties, uz kuru objektu šī virzienbulta norāda.";
+          return "3. Šaja gadījumā tev doti (piemēram, " +
+                 azText + "°).";
         },
         function () {
-          return "4. Aplūko panorāmu un sameklē objektu ar numuru, kas atrodas tieši šajā virzienā. Tas ir objekts, kas atrodas dotajā azimutā.";
+          return "4. Kad uzstādīti dotie grādi griezies ap savu asi līdz kompasa skalas Z bulta savienojas ar magnētiskās adatas Z bultu. Ta tu precīzi noteiksi objektu, kas atrodas tieši šajā virzienā, kāds azimuts ir uzstādīts kompasa skalā.";
         },
         function () {
-          return "5. Reālajā vidē šo pašu principu izmanto, lai pēc dotā azimuta atrastu objektu dabā vai kartē.";
+          return "5. Reālajā vidē šo pašu principu izmanto, lai pēc dotā azimuta atrastu objektu dabā.";
         }
       ];
 
