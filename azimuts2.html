@@ -220,15 +220,18 @@
           rgba(0, 0, 0, 0.95) 85%);
     }
 
-    .compass-magnifier-scale {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 84%;               /* tā pati bāze kā .compass-2d-scale */
-      transform-origin: center center;
-      filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.9));
-      pointer-events: none;
-    }
+.compass-magnifier-bg,
+.compass-magnifier-scale {
+    position: absolute;
+    left: 50%;
+    top: 255%;          /* šī vērtība – tā, kas tev jau “trāpīja” pareizi */
+    width: 100%;
+    transform-origin: center center;
+    pointer-events: none;
+}
+
+
+
 
 
 
@@ -885,13 +888,20 @@
            alt="Kompass skala (2D)">
 
       <!-- Palielināmais stikls – strādā tikai .expanded režīmā -->
-      <div class="compass-magnifier">
-        <div class="compass-magnifier-lens">
-          <img src="./img/skala.png"
-               class="compass-magnifier-scale"
-               alt="Palielināta kompasa skala">
-        </div>
-      </div>
+<div class="compass-magnifier">
+  <div class="compass-magnifier-lens">
+    <!-- Fons ar grādu skaitļiem -->
+    <img src="./img/KOMPASA_SKALA_BACKGROUND.png"
+         class="compass-magnifier-bg"
+         alt="Palielināts kompasa fons">
+
+    <!-- Skala (tā pati, kas 2D) -->
+    <img src="./img/skala.png"
+         class="compass-magnifier-scale"
+         alt="Palielināta kompasa skala">
+  </div>
+</div>
+
 
       <img src="./img/adata.png"
            class="compass-2d-needle"
