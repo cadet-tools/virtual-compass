@@ -6673,62 +6673,6 @@ function ensureDockOpen(){
 
 
 
-document.addEventListener('DOMContentLoaded', function () {
-  const groups = document.querySelectorAll('.dropdown-menu .dropdown-pages');
-
-  groups.forEach(function (pages) {
-    const handle = pages.nextElementSibling;
-    if (!handle || !handle.classList.contains('dropdown-collapse-handle')) return;
-
-    function updateLabel(collapsed) {
-      const label = handle.querySelector('.label');
-      const icon  = handle.querySelector('.icon');
-
-      if (label) {
-        if (pages.dataset.menu === 'instruction') {
-          label.textContent = collapsed
-            ? 'Rādīt ceļveža pogas'
-            : 'Slēpt ceļveža pogas';
-        } else {
-          label.textContent = collapsed
-            ? 'Rādīt lapas izvēlni'
-            : 'Slēpt lapas izvēlni';
-        }
-      }
-      if (icon) {
-        icon.textContent = collapsed ? '▼' : '▲';
-      }
-    }
-
-    function togglePages() {
-      const collapsed = pages.classList.toggle('collapsed');
-      updateLabel(collapsed);
-
-      // lai karte uzzina, ka augšā mainījies brīvais augstums
-      if (typeof window.__updateMapSafeAreas === 'function') {
-        window.__updateMapSafeAreas();
-      }
-    }
-
-    // klikšķis uz roktura
-    handle.addEventListener('click', togglePages);
-
-    // Kad lietotājs izvēlas kādu lapu – var (ja gribi) automātiski paslēpt pogas
-    pages.querySelectorAll('a').forEach(function (link) {
-      link.addEventListener('click', function () {
-        // ja negribi auto-slēpšanu pēc izvēles, izdzēs nākamo rindu
-        pages.classList.add('collapsed');
-        updateLabel(true);
-
-        if (typeof window.__updateMapSafeAreas === 'function') {
-          window.__updateMapSafeAreas();
-        }
-      });
-    });
-  });
-});
-
-
 
 
 
