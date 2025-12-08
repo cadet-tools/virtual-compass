@@ -997,7 +997,63 @@ body.preloading{ overflow: hidden; }
 							}
 
 
+/* ===== Jaunais dropdown rokturis (pilnā platumā) ===== */
+.dropdown-collapse-handle {
+  position: fixed;       /* rokturis pie ekrāna augšas */
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2050;         /* zem devtool, virs satura */
+  display: none;         /* JS ieslēgs, kad vajadzēs */
+  pointer-events: none;  /* klikot tikai uz pogas iekšā */
+}
 
+.dropdown-collapse-handle button {
+  width: 100%;
+  max-width: 100%;
+  height: 32px;
+
+  border: none;
+  border-radius: 0 0 12px 12px;
+  margin: 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  background: rgba(7, 12, 30, 0.96);
+  color: #f9fafb;
+  font: 500 13px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+
+  pointer-events: auto;
+}
+
+.dropdown-collapse-handle .icon {
+  font-size: 10px;
+  transform: translateY(-1px);
+}
+
+/* Lai dropdown var pabīdīt uz augšu/lejup */
+.dropdown-container {
+  transition: transform 0.3s ease;
+}
+
+/* Kad saklapēts – visu dropdown aizstumjam uz augšu */
+body.dropdown-collapsed .dropdown-container {
+  transform: translateY(-100%);
+}
+
+/* Bultas virziens rokturī */
+body.dropdown-collapsed #dropdownCollapseHandle .icon {
+  transform: rotate(180deg);
+}
+
+body:not(.dropdown-collapsed) #dropdownCollapseHandle .icon {
+  transform: rotate(0deg);
+}
 
 
 							/* Kad aizveras */
