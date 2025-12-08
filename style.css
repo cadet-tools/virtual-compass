@@ -969,7 +969,7 @@ body.preloading{ overflow: hidden; }
 
 /* Atvērts stāvoklis */
 .dropdown-menu.visible {
-  top: -20px;
+  top: 0px;
   margin-left: -18px;
   opacity: 1;
   visibility: visible;
@@ -1031,9 +1031,9 @@ body.preloading{ overflow: hidden; }
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30%;
+  width: 40%;
   height: 50px;
-  margin: 10px;
+  margin: 50px;
   background-color: rgba(50, 50, 50, 0.8);
   border-radius: 5px;
 }
@@ -1067,16 +1067,20 @@ body.preloading{ overflow: hidden; }
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.35);
+  padding: 6px 12px;
+  border-radius: 0px 0px 10px 10px;
+  border: 0px;
   background: rgba(153, 0, 0, .85);
   color: #fff;
   font-family: inherit;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 1.1rem;
   letter-spacing: 0.03em;
   cursor: pointer;
+	width: 100%;
+	bottom: -56px;
+	position: relative;
+	z-index: 100;
 }
 
 /* Mobilais izkārtojums */
