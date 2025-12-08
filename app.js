@@ -6674,72 +6674,70 @@ function ensureDockOpen(){
 
 
 
-
-
-
-
-
-
-
 document.addEventListener('DOMContentLoaded', function () {
-  var dropdownContainer = document.querySelector('.dropdown-container');
-  var handleWrap        = document.getElementById('dropdownCollapseHandle');
-  if (!dropdownContainer || !handleWrap) return;
+  function setupHandle(handle) {
+    const targetId = handle.dataset.target;
+    if (!targetId) return;
 
-  var handleButton = handleWrap.querySelector('button');
-  var handleLabel  = document.getElementById('dropdownCollapseText');
-  var handleShown  = false;
+    const target = document.getElementById(targetId);
+    if (!target) return;
 
-  function showHandleOnce(labelText) {
-    if (handleShown) return;
-    handleShown = true;
-    if (labelText && handleLabel) {
-      handleLabel.textContent = labelText;
-    }
-    handleWrap.style.display = 'block';
-  }
+    const btn  = handle.querySelector('button');
+    const icon = handle.querySelector('.icon');
 
-  function collapse() {
-    document.body.classList.add('dropdown-collapsed');
-  }
+    function toggle() {
+      const willCollapse = !target.classList.contains('is-collapsed');
 
-  function expand() {
-    document.body.classList.remove('dropdown-collapsed');
-  }
+      target.classList.toggle('is-collapsed', willCollapse);
+      handle.classList.toggle('is-collapsed', willCollapse);
 
-  // Uzspiež saiti Mācību materiālos vai Lietotāja ceļvedī
-  dropdownContainer.addEventListener('click', function (e) {
-    var link = e.target.closest('.dropdown-menu a');
-    if (!link) return;
+      if (icon) icon.textContent = willCollapse ? '▼' : '▲';
 
-    // parādām rokturi (ja vēl nav) un saklapējam izvēlni
-    var txt = (link.textContent || '').trim();
-    showHandleOnce(txt ? ('Lapa: ' + txt) : 'Lapas izvēlne');
-    collapse();
-  });
-
-  // Ja saturs tiek ielādēts iframe'os (instructionFrame / contentFrame),
-  // automātiski parādām rokturi + saklapējam
-  ['contentFrame', 'instructionFrame'].forEach(function (id) {
-    var iframe = document.getElementById(id);
-    if (!iframe) return;
-    iframe.addEventListener('load', function () {
-      showHandleOnce();
-      collapse();
-    });
-  });
-
-  // Roktura poga – pārslēdz redzams/paslēpts
-  if (handleButton) {
-    handleButton.addEventListener('click', function () {
-      if (document.body.classList.contains('dropdown-collapsed')) {
-        expand();
-      } else {
-        collapse();
+      // lai karte/kompass zina, ka mainījušies drošie laukumi
+      if (window.__updateMapSafeAreas) {
+        try { window.__updateMapSafeAreas(); } catch (e) {}
       }
-    });
+    }
+
+    if (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        toggle();
+      });
+    }
   }
-});	
+
+  // Inicializē abus rokturus (ceļveža + materiālu)
+  document.querySelectorAll('.dropdown-collapse-handle').forEach(setupHandle);
+
+  // Kad izvēlas kādu lapu – automātiski aizver tikai konkrētā dropdown pogas
+  document.querySelectorAll('#dropdownInstruction .dropdown-pages a, #dropdownMaterials .dropdown-pages a')
+    .forEach(function (link) {
+      link.addEventListener('click', function () {
+        const menu   = link.closest('.dropdown-menu');
+        if (!menu) return;
+
+        const target = menu.querySelector('.dropdown-pages');
+        const handle = menu.querySelector('.dropdown-collapse-handle');
+        const icon   = handle && handle.querySelector('.icon');
+
+        if (!target || !handle) return;
+
+        target.classList.add('is-collapsed');
+        handle.classList.add('is-collapsed');
+        if (icon) icon.textContent = '▼';
+
+        if (window.__updateMapSafeAreas) {
+          try { window.__updateMapSafeAreas(); } catch (e) {}
+        }
+      });
+    });
+});
+
+
+
+
+
 
 	
 
