@@ -998,62 +998,53 @@ body.preloading{ overflow: hidden; }
 
 
 /* ===== Jaunais dropdown rokturis (pilnā platumā) ===== */
+/* iekšējais konteiners ar pogām, ko slēpj rokturis */
+.dropdown-menu .dropdown-pages {
+  overflow: hidden;
+  max-height: 500px;              /* pietiek liela, lai viss ietilptu */
+  transition: max-height .35s ease;
+}
+
+/* kad rokturis to aizver */
+.dropdown-menu .dropdown-pages.is-collapsed {
+  max-height: 0;
+}
+
+/* pats rokturis – pilnā dropdown platumā */
 .dropdown-collapse-handle {
-  position: fixed;       /* rokturis pie ekrāna augšas */
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 2050;         /* zem devtool, virs satura */
-  display: none;         /* JS ieslēgs, kad vajadzēs */
-  pointer-events: none;  /* klikot tikai uz pogas iekšā */
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 4px 0;
+  background: #660000;            /* pielāgo, ja gribi citu toni */
+  border-top: 1px solid rgba(0,0,0,0.4);
+  cursor: pointer;
 }
 
 .dropdown-collapse-handle button {
-  width: 100%;
-  max-width: 100%;
-  height: 32px;
-
   border: none;
-  border-radius: 0 0 12px 12px;
-  margin: 0 auto;
-
+  background: transparent;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-
-  background: rgba(7, 12, 30, 0.96);
-  color: #f9fafb;
-  font: 500 13px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
+  gap: 6px;
+  padding: 4px 0;
   cursor: pointer;
-
-  pointer-events: auto;
 }
 
 .dropdown-collapse-handle .icon {
-  font-size: 10px;
+  font-size: 11px;
   transform: translateY(-1px);
+  transition: transform .2s ease;
 }
 
-/* Lai dropdown var pabīdīt uz augšu/lejup */
-.dropdown-container {
-  transition: transform 0.3s ease;
+.dropdown-collapse-handle.is-collapsed .icon {
+  transform: rotate(180deg) translateY(1px);
 }
 
-/* Kad saklapēts – visu dropdown aizstumjam uz augšu */
-body.dropdown-collapsed .dropdown-container {
-  transform: translateY(-100%);
-}
-
-/* Bultas virziens rokturī */
-body.dropdown-collapsed #dropdownCollapseHandle .icon {
-  transform: rotate(180deg);
-}
-
-body:not(.dropdown-collapsed) #dropdownCollapseHandle .icon {
-  transform: rotate(0deg);
-}
 
 
 							/* Kad aizveras */
