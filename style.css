@@ -998,52 +998,82 @@ body.preloading{ overflow: hidden; }
 
 
 /* ===== Jaunais dropdown rokturis (pilnā platumā) ===== */
-/* iekšējais konteiners ar pogām, ko slēpj rokturis */
+/* Iekšējais konteiners pogām dropdownā */
 .dropdown-menu .dropdown-pages {
-  overflow: hidden;
-  max-height: 500px;              /* pietiek liela, lai viss ietilptu */
-  transition: max-height .35s ease;
-}
-
-/* kad rokturis to aizver */
-.dropdown-menu .dropdown-pages.is-collapsed {
-  max-height: 0;
-}
-
-/* pats rokturis – pilnā dropdown platumā */
-.dropdown-collapse-handle {
-  width: 100%;
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  align-items: center;
-  padding: 4px 0;
-  background: #660000;            /* pielāgo, ja gribi citu toni */
-  border-top: 1px solid rgba(0,0,0,0.4);
-  cursor: pointer;
+  gap: 0.9rem 2.2rem;
+  padding: 1.1rem 4vw 0.9rem;
+  background: rgba(0, 0, 0, 0.9); /* var nomainīt uz tavu melno/dzelteno */
+  max-height: 420px;              /* pietiek 2 rindām pogu */
+  overflow: hidden;
+  transition:
+    max-height 0.35s ease,
+    opacity 0.25s ease,
+    transform 0.25s ease,
+    padding-top 0.25s ease,
+    padding-bottom 0.25s ease;
+}
+
+/* Slēpts stāvoklis — tikai pogu josla, nevis viss dropdown */
+.dropdown-menu .dropdown-pages.collapsed {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  padding-top: 0;
+  padding-bottom: 0;
+  pointer-events: none;
+}
+
+/* Lai pogas saglabā savu dizainu, bet rindo 3x rindā uz plata ekrāna */
+.dropdown-menu .dropdown-pages a {
+  flex: 1 1 30%;
+  max-width: 340px;
+}
+
+/* Roktura josla */
+.dropdown-collapse-handle {
+  background: #990000; /* pieskaņo savam headera sarkanajam */
+  border-top: 1px solid rgba(0, 0, 0, 0.7);
 }
 
 .dropdown-collapse-handle button {
+  width: 100%;
+  padding: 0.35rem 0.75rem;
   border: none;
   background: transparent;
   color: #fff;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 0;
+  justify-content: center;
+  gap: 0.5rem;
   cursor: pointer;
 }
 
+/* Bultiņas animācija */
 .dropdown-collapse-handle .icon {
-  font-size: 11px;
-  transform: translateY(-1px);
-  transition: transform .2s ease;
+  display: inline-block;
+  transition: transform 0.25s ease;
 }
 
-.dropdown-collapse-handle.is-collapsed .icon {
-  transform: rotate(180deg) translateY(1px);
+/* Kad pogas paslēptas, bultiņa uz leju */
+.dropdown-menu .dropdown-pages.collapsed + .dropdown-collapse-handle .icon {
+  transform: rotate(180deg);
 }
+
+
+
+
+
+
+
+
 
 
 
