@@ -184,39 +184,58 @@ onDomReady(() => {
   }));
 
 
+
 function setupCompassArrowKeysOnce(){
   if (window.__compassKeysBound) return;
   window.__compassKeysBound = true;
 
-  window.__compassRotateTarget    = window.__compassRotateTarget || 'base';  // 'base' | 'scale'
-  window.__compassRotationLocked  = window.__compassRotationLocked || false;
+  window.__compassRotationLocked = window.__compassRotationLocked || false;
 
   const getBaseEl  = () => document.getElementById('compassBase')  || document.querySelector('.compass-base');
   const getScaleEl = () => document.getElementById('compassScale') || document.querySelector('.compass-scale');
 
   const norm = (d) => ((d % 360) + 360) % 360;
 
-  function rotateFallback(el, delta){
+  // Saglabā "bāzes" transformu (translate/scale/utt), un tikai pievieno rotate
+  function rotateFallbackSafe(el, delta){
     if (!el) return;
+
     const cur  = +(el.dataset.deg || 0);
     const next = norm(cur + delta);
     el.dataset.deg = String(next);
 
-    // drošākais: CSS mainīgais, ja tev CSS jau lieto --rot
+    // 1) Vienmēr uzliekam arī CSS mainīgo (ja tev CSS jau izmanto --rot)
     el.style.setProperty('--rot', next + 'deg');
 
-    // fallback: ja tev NAV sarežģītu transformu
-    el.style.transform = `rotate(${next}deg)`;
+    // 2) DROŠAIS fallback: nepazaudē translate/scale, kas tur elementu vietā
+    //    - ja inline transform ir tukšs, paņemam computed (var būt matrix/matrix3d)
+    //    - ja inline transform satur rotate(), noņemam rotate() un atstājam pārējo kā bāzi
+    if (!el.dataset.t0) {
+      const inlineT = (el.style && el.style.transform) ? el.style.transform : '';
+      const baseInline = inlineT ? inlineT.replace(/rotate\([^)]+\)/g, '').trim() : '';
+
+      // Ja inline nav, ņemam computed (lai nepazūd translate no CSS)
+      const computedT = getComputedStyle(el).transform;
+      const baseComputed = (computedT && computedT !== 'none') ? computedT : '';
+
+      // Prioritāte: inline bez rotate (ja ir), citādi computed
+      el.dataset.t0 = baseInline || baseComputed || '';
+    }
+
+    // Uzliekam: (bāze) + rotate(...)
+    // NB: tas novērš nobīdi, jo translate/pozicionēšana paliek spēkā
+    el.style.transform = (el.dataset.t0 ? (el.dataset.t0 + ' ') : '') + `rotate(${next}deg)`;
   }
 
+  // Ja tev kaut kur citur jau ir "īstās" funkcijas (kā peles rotācijai),
+  // tad bultiņas izmantos tās; ja nav — kritīs uz drošo fallback.
   const rotateBaseBy = (deg) => {
     if (typeof window.rotateCompassBaseBy === 'function') return window.rotateCompassBaseBy(deg);
-    rotateFallback(getBaseEl(), deg);
+    rotateFallbackSafe(getBaseEl(), deg);
   };
-
   const rotateScaleBy = (deg) => {
     if (typeof window.rotateCompassScaleBy === 'function') return window.rotateCompassScaleBy(deg);
-    rotateFallback(getScaleEl(), deg);
+    rotateFallbackSafe(getScaleEl(), deg);
   };
 
   function isTypingTarget(t){
@@ -224,37 +243,40 @@ function setupCompassArrowKeysOnce(){
     const tag = (t.tagName || '').toUpperCase();
     return t.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
   }
-
   function normalizeKey(e){
     return e.key || ({37:'ArrowLeft',38:'ArrowUp',39:'ArrowRight',40:'ArrowDown'}[e.keyCode]);
   }
+
+  // Ja mainās layout/izmēri, ļaujam pārrēķināt "bāzes" transformu nākamajā rotācijā
+  const clearBaseCache = () => {
+    const b = getBaseEl();  if (b) delete b.dataset.t0;
+    const s = getScaleEl(); if (s) delete s.dataset.t0;
+  };
+  window.addEventListener('resize', clearBaseCache, { passive:true });
+  window.addEventListener('orientationchange', clearBaseCache, { passive:true });
 
   window.addEventListener('keydown', (e) => {
     if (window.__compassRotationLocked) return;
     if (isTypingTarget(e.target)) return;
 
     const k = normalizeKey(e);
-    if (!k || k.indexOf('Arrow') !== 0) return;
+    if (k !== 'ArrowLeft' && k !== 'ArrowRight' && k !== 'ArrowUp' && k !== 'ArrowDown') return;
 
-    // lai Pannellum/Leaflet/scroll neapēd
+    // lai Pannellum/Leaflet/scroll neapēd bultiņas
     e.preventDefault();
     e.stopPropagation();
 
-    // ✅ TIEŠI tas, ko tu gribi:
-    // Arrow = 5°, Shift = 10°, Alt = 1° (smalki)
-    const step = e.altKey ? 1 : (e.shiftKey ? 10 : 5);
+    const step = 5; // ✅ vienmēr pa 5°
 
-    const delta =
-      (k === 'ArrowLeft' || k === 'ArrowDown') ? -step :
-      (k === 'ArrowRight' || k === 'ArrowUp')  ?  step : 0;
-
-    if (!delta) return;
-
-    if (window.__compassRotateTarget === 'scale') rotateScaleBy(delta);
-    else rotateBaseBy(delta);
+    // ✅ Tava prasītā loģika:
+    // Left/Right → compassScale
+    // Up/Down    → compassBase
+    if (k === 'ArrowLeft')  rotateScaleBy(-step);
+    if (k === 'ArrowRight') rotateScaleBy(+step);
+    if (k === 'ArrowUp')    rotateBaseBy(+step);
+    if (k === 'ArrowDown')  rotateBaseBy(-step);
   }, { capture: true });
 }
-
 
 
 	
@@ -380,10 +402,23 @@ function toggleButtonImage(buttonId) {
 
 						// Pievienojam notikumus pogām
 var _tgl = document.getElementById('toggleRotationMode');
-if (_tgl) _tgl.addEventListener('click', function(){ toggleButtonImage('toggleRotationMode'); });
+if (_tgl && !_tgl.dataset.bound) {
+  _tgl.dataset.bound = '1';
+  _tgl.addEventListener('click', function(){
+    toggleButtonImage('toggleRotationMode');
+    window.__compassRotateTarget = (window.__compassRotateTarget === 'base') ? 'scale' : 'base';
+  });
+}
 
 var _lck = document.getElementById('lockRotationMode');
-if (_lck) _lck.addEventListener('click', function(){ toggleButtonImage('lockRotationMode'); });
+if (_lck && !_lck.dataset.bound) {
+  _lck.dataset.bound = '1';
+  _lck.addEventListener('click', function(){
+    toggleButtonImage('lockRotationMode');
+    window.__compassRotationLocked = !window.__compassRotationLocked;
+  });
+}
+
 
 
 
