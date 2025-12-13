@@ -185,98 +185,135 @@ onDomReady(() => {
 
 
 
-function setupCompassArrowKeysOnce(){
+function setupCompassArrowKeysOnce() {
   if (window.__compassKeysBound) return;
   window.__compassKeysBound = true;
 
   window.__compassRotationLocked = window.__compassRotationLocked || false;
 
-  const getBaseEl  = () => document.getElementById('compassBase')  || document.querySelector('.compass-base');
-  const getScaleEl = () => document.getElementById('compassScale') || document.querySelector('.compass-scale');
+  // ✅ pēc tavām definīcijām:
+  // base = IMG#compassBase (tam ir data-deg un inline rotate)
+  const getBaseEl = () =>
+    document.getElementById("compassBase") ||
+    document.querySelector(".compass-base");
+
+  // ✅ scale rotācija pie tevis ir uz DIV#compassScaleInner (nevis uz IMG#compassScale)
+  const getScaleEl = () =>
+    document.getElementById("compassScaleInner") ||
+    document.getElementById("compassScale") ||
+    document.querySelector(".compass-scale");
 
   const norm = (d) => ((d % 360) + 360) % 360;
 
-  // Saglabā "bāzes" transformu (translate/scale/utt), un tikai pievieno rotate
-  function rotateFallbackSafe(el, delta){
+  const parseDeg = (v) => {
+    const n = parseFloat(String(v || "").replace("deg", "").trim());
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const parseRotateFromTransform = (t) => {
+    if (!t) return null;
+    const m = String(t).match(/rotate\(\s*(-?\d+(?:\.\d+)?)deg\s*\)/i);
+    return m ? parseFloat(m[1]) : null;
+  };
+
+  // matrix(a,b,c,d,tx,ty) → leņķis = atan2(b,a)
+  const angleFromMatrix = (m) => {
+    if (!m || m === "none") return null;
+    const mm = String(m).match(/matrix\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,/i);
+    if (!mm) return null;
+    const a = parseFloat(mm[1]);
+    const b = parseFloat(mm[2]);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+    return (Math.atan2(b, a) * 180) / Math.PI;
+  };
+
+  function getCurrentDeg(el) {
+    if (!el) return 0;
+
+    // 1) data-deg (tev base jau ir)
+    const d1 = parseDeg(el.dataset.deg);
+    if (d1 !== null) return d1;
+
+    // 2) CSS var --rot (tev base jau ir)
+    const d2 = parseDeg(el.style.getPropertyValue("--rot"));
+    if (d2 !== null) return d2;
+
+    // 3) inline transform rotate(...)
+    const d3 = parseRotateFromTransform(el.style.transform);
+    if (d3 !== null) return d3;
+
+    // 4) computed (ja tomēr nav inline)
+    const d4 = angleFromMatrix(getComputedStyle(el).transform);
+    if (d4 !== null) return d4;
+
+    return 0;
+  }
+
+  function ensureDeg(el) {
+    if (!el) return 0;
+    if (!el.dataset.deg) el.dataset.deg = String(norm(getCurrentDeg(el)));
+    return parseFloat(el.dataset.deg) || 0;
+  }
+
+  // saglabā visu transformu, kas nav rotate(), un pārraksta tikai rotate(...)
+  function setRotateDeg(el, nextDeg, alsoSetCssVar = false) {
     if (!el) return;
 
-    const cur  = +(el.dataset.deg || 0);
-    const next = norm(cur + delta);
+    const next = norm(nextDeg);
     el.dataset.deg = String(next);
 
-    // 1) Vienmēr uzliekam arī CSS mainīgo (ja tev CSS jau izmanto --rot)
-    el.style.setProperty('--rot', next + 'deg');
+    if (alsoSetCssVar) el.style.setProperty("--rot", next + "deg");
 
-    // 2) DROŠAIS fallback: nepazaudē translate/scale, kas tur elementu vietā
-    //    - ja inline transform ir tukšs, paņemam computed (var būt matrix/matrix3d)
-    //    - ja inline transform satur rotate(), noņemam rotate() un atstājam pārējo kā bāzi
-    if (!el.dataset.t0) {
-      const inlineT = (el.style && el.style.transform) ? el.style.transform : '';
-      const baseInline = inlineT ? inlineT.replace(/rotate\([^)]+\)/g, '').trim() : '';
+    const inlineT = (el.style && el.style.transform) ? el.style.transform : "";
+    const baseT = inlineT.replace(/rotate\([^)]+\)/gi, "").trim();
 
-      // Ja inline nav, ņemam computed (lai nepazūd translate no CSS)
-      const computedT = getComputedStyle(el).transform;
-      const baseComputed = (computedT && computedT !== 'none') ? computedT : '';
-
-      // Prioritāte: inline bez rotate (ja ir), citādi computed
-      el.dataset.t0 = baseInline || baseComputed || '';
-    }
-
-    // Uzliekam: (bāze) + rotate(...)
-    // NB: tas novērš nobīdi, jo translate/pozicionēšana paliek spēkā
-    el.style.transform = (el.dataset.t0 ? (el.dataset.t0 + ' ') : '') + `rotate(${next}deg)`;
+    el.style.transform = (baseT ? baseT + " " : "") + `rotate(${next}deg)`;
   }
 
-  // Ja tev kaut kur citur jau ir "īstās" funkcijas (kā peles rotācijai),
-  // tad bultiņas izmantos tās; ja nav — kritīs uz drošo fallback.
-  const rotateBaseBy = (deg) => {
-    if (typeof window.rotateCompassBaseBy === 'function') return window.rotateCompassBaseBy(deg);
-    rotateFallbackSafe(getBaseEl(), deg);
-  };
-  const rotateScaleBy = (deg) => {
-    if (typeof window.rotateCompassScaleBy === 'function') return window.rotateCompassScaleBy(deg);
-    rotateFallbackSafe(getScaleEl(), deg);
-  };
+  function rotateBy(el, delta, alsoSetCssVar = false) {
+    const cur = ensureDeg(el);
+    setRotateDeg(el, cur + delta, alsoSetCssVar);
+  }
 
-  function isTypingTarget(t){
+  const rotateBaseBy = (deg) => rotateBy(getBaseEl(), deg, true);   // base → arī --rot
+  const rotateScaleBy = (deg) => rotateBy(getScaleEl(), deg, false); // scale → wrapper rotācija
+
+  function isTypingTarget(t) {
     if (!t) return false;
-    const tag = (t.tagName || '').toUpperCase();
-    return t.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-  }
-  function normalizeKey(e){
-    return e.key || ({37:'ArrowLeft',38:'ArrowUp',39:'ArrowRight',40:'ArrowDown'}[e.keyCode]);
+    const tag = (t.tagName || "").toUpperCase();
+    return t.isContentEditable || tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
   }
 
-  // Ja mainās layout/izmēri, ļaujam pārrēķināt "bāzes" transformu nākamajā rotācijā
-  const clearBaseCache = () => {
-    const b = getBaseEl();  if (b) delete b.dataset.t0;
-    const s = getScaleEl(); if (s) delete s.dataset.t0;
-  };
-  window.addEventListener('resize', clearBaseCache, { passive:true });
-  window.addEventListener('orientationchange', clearBaseCache, { passive:true });
+  function normalizeKey(e) {
+    return e.key || ({ 37: "ArrowLeft", 38: "ArrowUp", 39: "ArrowRight", 40: "ArrowDown" }[e.keyCode]);
+  }
 
-  window.addEventListener('keydown', (e) => {
-    if (window.__compassRotationLocked) return;
-    if (isTypingTarget(e.target)) return;
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      if (window.__compassRotationLocked) return;
+      if (isTypingTarget(e.target)) return;
 
-    const k = normalizeKey(e);
-    if (k !== 'ArrowLeft' && k !== 'ArrowRight' && k !== 'ArrowUp' && k !== 'ArrowDown') return;
+      const k = normalizeKey(e);
+      if (k !== "ArrowLeft" && k !== "ArrowRight" && k !== "ArrowUp" && k !== "ArrowDown") return;
 
-    // lai Pannellum/Leaflet/scroll neapēd bultiņas
-    e.preventDefault();
-    e.stopPropagation();
+      e.preventDefault();
+      e.stopPropagation();
 
-    const step = 5; // ✅ vienmēr pa 5°
+      const step = 5; // ✅ vienmēr pa 5°
 
-    // ✅ Tava prasītā loģika:
-    // Left/Right → compassScale
-    // Up/Down    → compassBase
-    if (k === 'ArrowLeft')  rotateScaleBy(-step);
-    if (k === 'ArrowRight') rotateScaleBy(+step);
-    if (k === 'ArrowUp')    rotateBaseBy(+step);
-    if (k === 'ArrowDown')  rotateBaseBy(-step);
-  }, { capture: true });
+      // ✅ tava loģika:
+      // Left/Right → compassScaleInner
+      // Up/Down    → compassBase
+      if (k === "ArrowLeft")  rotateScaleBy(-step);
+      if (k === "ArrowRight") rotateScaleBy(+step);
+      if (k === "ArrowUp")    rotateBaseBy(+step);
+      if (k === "ArrowDown")  rotateBaseBy(-step);
+    },
+    { capture: true }
+  );
 }
+
 
 
 	
