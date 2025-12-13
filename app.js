@@ -181,6 +181,74 @@ onDomReady(() => {
       img.addEventListener('load', done, { once:true });
       img.addEventListener('error', done, { once:true });
     });
+
+
+  // === Kompasa rotācija ar bultiņām ===
+  // 1) Saglabājam stāvokli (uz ko rotējam)
+  window.__compassRotateTarget = window.__compassRotateTarget || 'base'; // 'base' | 'scale'
+  window.__compassRotationLocked = window.__compassRotationLocked || false;
+
+  // 2) (Pielāgo šos selektorus saviem elementiem!)
+  const baseEl  = document.getElementById('compassBase')  || document.querySelector('.compass-base');
+  const scaleEl = document.getElementById('compassScale') || document.querySelector('.compass-scale');
+
+  // ja tev rotācija jau tiek darīta ar savām funkcijām, šeit pieslēdz tās:
+  const rotateBaseBy  = (deg) => {
+    if (typeof window.rotateCompassBaseBy === 'function') return window.rotateCompassBaseBy(deg);
+
+    // fallback: tieša CSS rotate (UZMANĪGI: ja elementam jau ir translate/scale transformi, labāk lieto CSS mainīgos)
+    if (!baseEl) return;
+    const cur = +(baseEl.dataset.deg || 0);
+    const next = (cur + deg) % 360;
+    baseEl.dataset.deg = String(next);
+    baseEl.style.setProperty('--rot', next + 'deg');     // ieteikums
+    baseEl.style.transform = `rotate(${next}deg)`;       // fallback, ja nav citu transformu
+  };
+
+  const rotateScaleBy = (deg) => {
+    if (typeof window.rotateCompassScaleBy === 'function') return window.rotateCompassScaleBy(deg);
+    if (!scaleEl) return;
+    const cur = +(scaleEl.dataset.deg || 0);
+    const next = (cur + deg) % 360;
+    scaleEl.dataset.deg = String(next);
+    scaleEl.style.setProperty('--rot', next + 'deg');
+    scaleEl.style.transform = `rotate(${next}deg)`;
+  };
+
+  function isTypingTarget(t){
+    if (!t) return false;
+    const tag = (t.tagName || '').toUpperCase();
+    return t.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  }
+
+  function normalizeKey(e){
+    return e.key || ({37:'ArrowLeft',38:'ArrowUp',39:'ArrowRight',40:'ArrowDown'}[e.keyCode]);
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (window.__compassRotationLocked) return;
+    if (isTypingTarget(e.target)) return;
+
+    const k = normalizeKey(e);
+    if (!k || k.indexOf('Arrow') !== 0) return;
+
+    // lai Leaflet / pannellum / scroll neapēd
+    e.preventDefault();
+    e.stopPropagation();
+
+    const step = e.shiftKey ? 10 : 1; // Shift = ātrāk
+    let delta = 0;
+    if (k === 'ArrowLeft')  delta = -step;
+    if (k === 'ArrowRight') delta =  step;
+    if (k === 'ArrowUp')    delta =  step;
+    if (k === 'ArrowDown')  delta = -step;
+
+    if (window.__compassRotateTarget === 'scale') rotateScaleBy(delta);
+    else rotateBaseBy(delta);
+  }, { capture: true });
+
+
+	  
   }));
   Promise.race([domReady, imgPromises]).then(() => setTimeout(() => finish('dom-or-img'), 250));
 
