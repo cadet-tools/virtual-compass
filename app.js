@@ -252,7 +252,7 @@ function bindCompassArrowKeys(win = window) {
   const norm = (d) => ((d % 360) + 360) % 360;
 
   // ✅ Meklē elementus tieši tajā dokumentā, kurā notiek keydown (parent vai iframe)
-  const getBaseEl  = () => doc.getElementById('compassBase');
+  const getBaseEl  = () => doc.getElementById('compassInner');
   const getScaleEl = () => doc.getElementById('compassScaleInner');
 
   function parseRotateDeg(transformStr) {
