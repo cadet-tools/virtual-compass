@@ -181,38 +181,42 @@ onDomReady(() => {
       img.addEventListener('load', done, { once:true });
       img.addEventListener('error', done, { once:true });
     });
+  }));
 
 
-  // === Kompasa rotācija ar bultiņām ===
-  // 1) Saglabājam stāvokli (uz ko rotējam)
-  window.__compassRotateTarget = window.__compassRotateTarget || 'base'; // 'base' | 'scale'
-  window.__compassRotationLocked = window.__compassRotationLocked || false;
+function setupCompassArrowKeysOnce(){
+  if (window.__compassKeysBound) return;
+  window.__compassKeysBound = true;
 
-  // 2) (Pielāgo šos selektorus saviem elementiem!)
-  const baseEl  = document.getElementById('compassBase')  || document.querySelector('.compass-base');
-  const scaleEl = document.getElementById('compassScale') || document.querySelector('.compass-scale');
+  window.__compassRotateTarget    = window.__compassRotateTarget || 'base';  // 'base' | 'scale'
+  window.__compassRotationLocked  = window.__compassRotationLocked || false;
 
-  // ja tev rotācija jau tiek darīta ar savām funkcijām, šeit pieslēdz tās:
-  const rotateBaseBy  = (deg) => {
+  const getBaseEl  = () => document.getElementById('compassBase')  || document.querySelector('.compass-base');
+  const getScaleEl = () => document.getElementById('compassScale') || document.querySelector('.compass-scale');
+
+  const norm = (d) => ((d % 360) + 360) % 360;
+
+  function rotateFallback(el, delta){
+    if (!el) return;
+    const cur  = +(el.dataset.deg || 0);
+    const next = norm(cur + delta);
+    el.dataset.deg = String(next);
+
+    // drošākais: CSS mainīgais, ja tev CSS jau lieto --rot
+    el.style.setProperty('--rot', next + 'deg');
+
+    // fallback: ja tev NAV sarežģītu transformu
+    el.style.transform = `rotate(${next}deg)`;
+  }
+
+  const rotateBaseBy = (deg) => {
     if (typeof window.rotateCompassBaseBy === 'function') return window.rotateCompassBaseBy(deg);
-
-    // fallback: tieša CSS rotate (UZMANĪGI: ja elementam jau ir translate/scale transformi, labāk lieto CSS mainīgos)
-    if (!baseEl) return;
-    const cur = +(baseEl.dataset.deg || 0);
-    const next = (cur + deg) % 360;
-    baseEl.dataset.deg = String(next);
-    baseEl.style.setProperty('--rot', next + 'deg');     // ieteikums
-    baseEl.style.transform = `rotate(${next}deg)`;       // fallback, ja nav citu transformu
+    rotateFallback(getBaseEl(), deg);
   };
 
   const rotateScaleBy = (deg) => {
     if (typeof window.rotateCompassScaleBy === 'function') return window.rotateCompassScaleBy(deg);
-    if (!scaleEl) return;
-    const cur = +(scaleEl.dataset.deg || 0);
-    const next = (cur + deg) % 360;
-    scaleEl.dataset.deg = String(next);
-    scaleEl.style.setProperty('--rot', next + 'deg');
-    scaleEl.style.transform = `rotate(${next}deg)`;
+    rotateFallback(getScaleEl(), deg);
   };
 
   function isTypingTarget(t){
@@ -232,24 +236,28 @@ onDomReady(() => {
     const k = normalizeKey(e);
     if (!k || k.indexOf('Arrow') !== 0) return;
 
-    // lai Leaflet / pannellum / scroll neapēd
+    // lai Pannellum/Leaflet/scroll neapēd
     e.preventDefault();
     e.stopPropagation();
 
-    const step = e.shiftKey ? 10 : 1; // Shift = ātrāk
-    let delta = 0;
-    if (k === 'ArrowLeft')  delta = -step;
-    if (k === 'ArrowRight') delta =  step;
-    if (k === 'ArrowUp')    delta =  step;
-    if (k === 'ArrowDown')  delta = -step;
+    // ✅ TIEŠI tas, ko tu gribi:
+    // Arrow = 5°, Shift = 10°, Alt = 1° (smalki)
+    const step = e.altKey ? 1 : (e.shiftKey ? 10 : 5);
+
+    const delta =
+      (k === 'ArrowLeft' || k === 'ArrowDown') ? -step :
+      (k === 'ArrowRight' || k === 'ArrowUp')  ?  step : 0;
+
+    if (!delta) return;
 
     if (window.__compassRotateTarget === 'scale') rotateScaleBy(delta);
     else rotateBaseBy(delta);
   }, { capture: true });
+}
 
 
-	  
-  }));
+
+	
   Promise.race([domReady, imgPromises]).then(() => setTimeout(() => finish('dom-or-img'), 250));
 
   // Kļūdas arī aizver, kā iepriekš
@@ -270,6 +278,9 @@ onDomReady(() => {
     console.debug('[preloader] finish:', reason, { done, total });
     setTimeout(()=> pre.remove(), 480);
   }
+
+	setupCompassArrowKeysOnce();
+
 });
 // ===== /PRELOADER =====
 
@@ -369,10 +380,22 @@ function toggleButtonImage(buttonId) {
 
 						// Pievienojam notikumus pogām
 var _tgl = document.getElementById('toggleRotationMode');
-if (_tgl) _tgl.addEventListener('click', function(){ toggleButtonImage('toggleRotationMode'); });
+if (_tgl && !_tgl.dataset.bound) {
+  _tgl.dataset.bound = '1';
+  _tgl.addEventListener('click', function(){
+    toggleButtonImage('toggleRotationMode');
+    window.__compassRotateTarget = (window.__compassRotateTarget === 'base') ? 'scale' : 'base';
+  });
+}
 
 var _lck = document.getElementById('lockRotationMode');
-if (_lck) _lck.addEventListener('click', function(){ toggleButtonImage('lockRotationMode'); });
+if (_lck && !_lck.dataset.bound) {
+  _lck.dataset.bound = '1';
+  _lck.addEventListener('click', function(){
+    toggleButtonImage('lockRotationMode');
+    window.__compassRotationLocked = !window.__compassRotationLocked;
+  });
+}
 
 
 
