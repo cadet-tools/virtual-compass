@@ -77,7 +77,7 @@ body.preloading{ overflow: hidden; }
                             body {
                                 margin: 0;
                                 padding: 0;
-                                background-color: #000000fc
+                                background-color: #000000fc;
                                 display: flex;
                                 align-items: center;
                                 justify-content: center;
