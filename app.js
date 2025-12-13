@@ -244,124 +244,64 @@ function bindCompassArrowKeys(win = window) {
 
   const doc = win.document;
 
+  // stāvokļi – katram window savi (tas ir svarīgi iframe gadījumā)
   win.__compassRotationLocked = !!win.__compassRotationLocked;
   win.__compassRotateTarget = win.__compassRotateTarget || 'base'; // 'base' | 'scale'
 
   const ROT_RE = /rotate\(\s*[-\d.]+deg\s*\)/gi;
   const norm = (d) => ((d % 360) + 360) % 360;
 
-  // ✅ tolerantāks ID lookup (mazais/lielais burts)
-  const byAnyId = (ids) => {
-    for (const id of ids) {
-      const el = doc.getElementById(id);
-      if (el) return el;
-    }
-    return null;
-  };
+  // ✅ Meklē elementus tieši tajā dokumentā, kurā notiek keydown (parent vai iframe)
+  const getBaseEl  = () => doc.getElementById('compassInner');
+  const getScaleEl = () => doc.getElementById('compassScaleInner');
 
-  const getBaseEl  = () => byAnyId(['compassInner', 'CompassInner']);
-  const getScaleEl = () => byAnyId(['compassScaleInner', 'CompassScaleInner']);
-
-  function parseRotateDegFromRotateFn(str) {
-    const m = String(str || '').match(/rotate\(\s*([-\d.]+)deg\s*\)/i);
-    return m ? parseFloat(m[1]) : NaN;
+  function parseRotateDeg(transformStr) {
+    const m = String(transformStr || '').match(/rotate\(\s*([-\d.]+)deg\s*\)/i);
+    return m ? parseFloat(m[1]) : 0;
   }
 
-  // ✅ galvenais FIX: leņķis no matrix(...)
-  function parseRotateDegFromMatrix(transformStr) {
-    const t = String(transformStr || '');
-    if (!t || t === 'none') return NaN;
-
-    // DOMMatrix ir stabilākais (Chrome/Edge/FF)
-    try {
-      const m = new DOMMatrixReadOnly(t);
-      const ang = Math.atan2(m.b, m.a) * 180 / Math.PI;
-      return ang;
-    } catch (_) {}
-
-    // fallback: matrix(a,b,c,d,e,f)
-    const mm = t.match(/matrix\(\s*([-\d.e]+)\s*,\s*([-\d.e]+)\s*,\s*([-\d.e]+)\s*,\s*([-\d.e]+)\s*,/i);
-    if (mm) {
-      const a = parseFloat(mm[1]);
-      const b = parseFloat(mm[2]);
-      if (isFinite(a) && isFinite(b)) return Math.atan2(b, a) * 180 / Math.PI;
-    }
-    return NaN;
-  }
-
-  function readCssVarDeg(el, varName) {
-    if (!el) return NaN;
-    const v = getComputedStyle(el).getPropertyValue(varName).trim();
-    if (!v) return NaN;
-    const n = parseFloat(v);
-    return isFinite(n) ? n : NaN;
-  }
-
-  function ensureDeg(el, fallback = 0, cssVarName = '') {
+  function ensureDeg(el, fallback = 0) {
     if (!el) return fallback;
 
     const d = parseFloat(el.dataset.deg);
     if (isFinite(d)) return d;
 
-    // 1) ja ir CSS var (piem., --rot vai --rot-scale) – ņem to
-    if (cssVarName) {
-      const v = readCssVarDeg(el, cssVarName);
-      if (isFinite(v)) {
-        el.dataset.deg = String(norm(v));
-        return norm(v);
+    // base parasti glabājas CSS var --rot
+    const rotVar = getComputedStyle(el).getPropertyValue('--rot');
+
+    if (rotVar) {
+      const n = parseFloat(rotVar);
+      if (isFinite(n)) {
+        el.dataset.deg = String(norm(n));
+        return norm(n);
       }
     }
 
-    // 2) ja ir inline rotate(...)
-    const inline = parseRotateDegFromRotateFn(el.style.transform || '');
-    if (isFinite(inline)) {
-      el.dataset.deg = String(norm(inline));
-      return norm(inline);
-    }
+    // scale parasti glabājas inline rotate(...)
+    const r = parseRotateDeg(getComputedStyle(el).transform);
 
-    // 3) ja ir computed matrix(...)
-    const comp = parseRotateDegFromMatrix(getComputedStyle(el).transform);
-    if (isFinite(comp)) {
-      el.dataset.deg = String(norm(comp));
-      return norm(comp);
-    }
-
-    el.dataset.deg = String(norm(fallback));
-    return norm(fallback);
+    el.dataset.deg = String(norm(isFinite(r) ? r : fallback));
+    return parseFloat(el.dataset.deg);
   }
 
-  // ✅ Base: mainām tikai CSS var (nepārpis transformu → ass/origin paliek kā CSS’ā)
+  // ✅ Base: NEKAD nepārraksti style.transform ar matrix+rotate.
+  // Basei pie tevis jau ir pareizā ģeometrija CSS'ā; jāmaina tikai --rot.
   function setBaseDeg(nextDeg) {
     const el = getBaseEl();
     if (!el) return;
     const n = norm(nextDeg);
     el.dataset.deg = String(n);
-
-    // ja tavā CSS ir rotate(var(--rot)) → šis der
     el.style.setProperty('--rot', n + 'deg');
-
-    // (ja tev gadījumā CSS ir rotate(calc(var(--rot) * 1deg))) tad lieto šo, nevis rindu augstāk:
-    // el.style.setProperty('--rot', String(n));
   }
 
-  // ✅ Scale: prioritāri arī ar CSS var (lai neizjauc asi/origin).
-  // Ja CSS var nav, tikai tad fallback uz inline rotate().
+  // ✅ Scale: rotācija parasti ir tikai rotate(...).
+  // Ja ir vēl citi transform (reti), saglabā tos, nomainot tikai rotate().
   function setScaleDeg(nextDeg) {
     const el = getScaleEl();
     if (!el) return;
     const n = norm(nextDeg);
     el.dataset.deg = String(n);
 
-    const hasVar =
-      el.style.getPropertyValue('--rot-scale') ||
-      getComputedStyle(el).getPropertyValue('--rot-scale').trim();
-
-    if (hasVar) {
-      el.style.setProperty('--rot-scale', n + 'deg');
-      return;
-    }
-
-    // fallback (ja nav CSS var)
     const t = el.style.transform || '';
     const baseT = t.replace(ROT_RE, '').trim();
     el.style.transform = (baseT ? baseT + ' ' : '') + `rotate(${n}deg)`;
@@ -369,13 +309,13 @@ function bindCompassArrowKeys(win = window) {
 
   function rotateBaseBy(delta) {
     const el = getBaseEl();
-    const cur = ensureDeg(el, 0, '--rot');
+    const cur = ensureDeg(el, 0);
     setBaseDeg(cur + delta);
   }
 
   function rotateScaleBy(delta) {
     const el = getScaleEl();
-    const cur = ensureDeg(el, 0, '--rot-scale');
+    const cur = ensureDeg(el, parseRotateDeg(el?.style.transform || ''));
     setScaleDeg(cur + delta);
   }
 
@@ -392,12 +332,14 @@ function bindCompassArrowKeys(win = window) {
     const k = e.key || ({37:'ArrowLeft',38:'ArrowUp',39:'ArrowRight',40:'ArrowDown'}[e.keyCode]);
     if (!k || !k.startsWith('Arrow')) return;
 
+    // NEļaujam lapai scrollot ar bultām
     e.preventDefault();
     e.stopPropagation();
 
-    // ✅ bultiņas = 5 grādi (Shift = 1 grāds, ja gribi “smalko”)
     const step = e.shiftKey ? 1 : 5;
 
+    // ✅ Vecā loģika ar režīmu: rotē to, kas izvēlēts ar toggleRotationMode
+    // Left/Right = izvēlētais mērķis; Up/Down = otrs (ērti ātrai salāgošanai)
     const target = win.__compassRotateTarget === 'scale' ? 'scale' : 'base';
 
     if (k === 'ArrowLeft')  (target === 'scale' ? rotateScaleBy(-step) : rotateBaseBy(-step));
@@ -499,7 +441,7 @@ if (_lck && !_lck.dataset.bound) {
   });
 }
 
-bindCompassArrowKeys(window);
+//bindCompassArrowKeys(window);
 
 
 
@@ -5237,7 +5179,60 @@ if (resetCompassButton) {
   });
 }
 
+// ============================================================
+// JAUNĀ TASTATŪRAS VADĪBA (Fixed logic)
+// ============================================================
+window.addEventListener('keydown', (e) => {
+    // 1. Ignorējam, ja lietotājs raksta teksta laukā
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
 
+    // 2. Pārbaudām, vai nospiesta bultiņa
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+
+    // 3. Neļaujam lapai "skrollēties" ar bultiņām
+    e.preventDefault(); 
+
+    // 4. Bloķēšana: ja rotācija ir bloķēta ar piekaramo atslēgu, neko nedarām
+    if (isRotationLocked) return;
+
+    // 5. Solis: 5 grādi (vai 1 grāds, ja tur nospiestu Shift)
+    const step = e.shiftKey ? 1 : 5;
+
+    // 6. Nosakām, kuru riņķi grozīt, balstoties uz aktīvo režīmu
+    // (To maina sarkanā poga "Griezt bāzi / skalu")
+    const rotateBase = (activeRotationTarget === 'compassInner');
+
+    // Loģika: 
+    // Left/Right: griež pa pulksteni vai pret
+    // Up/Down: var izmantot, lai grieztu "otru" elementu vai to pašu
+    
+    if (e.key === 'ArrowLeft') {
+        if (rotateBase) baseRotation -= step;
+        else scaleRotation -= step;
+    }
+    
+    if (e.key === 'ArrowRight') {
+        if (rotateBase) baseRotation += step;
+        else scaleRotation += step;
+    }
+
+    // Papildus: Ar UP/DOWN var grozīt PRETĒJO elementu (ērti kalibrēšanai)
+    // Ja negribi šo, vari izdzēst UP/DOWN daļu.
+    if (e.key === 'ArrowDown') {
+        // Griežam to, kas NAV aktīvs
+        if (!rotateBase) baseRotation -= step; 
+        else scaleRotation -= step;
+    }
+    if (e.key === 'ArrowUp') {
+        // Griežam to, kas NAV aktīvs
+        if (!rotateBase) baseRotation += step; 
+        else scaleRotation += step;
+    }
+
+    // 7. SVARĪGI: Izsaucam centrālo funkciju, kas atjauno CSS un ņem vērā asis
+    updateCompassTransform();
+});
+// ============================================================
 
 						// Atjauno transformācijas
 // DROŠA versija: vienmēr pārvaicā DOM un iziet, ja kas nav gatavs
