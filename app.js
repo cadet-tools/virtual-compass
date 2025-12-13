@@ -267,7 +267,8 @@ function bindCompassArrowKeys(win = window) {
     if (isFinite(d)) return d;
 
     // base parasti glabājas CSS var --rot
-    const rotVar = el.style.getPropertyValue('--rot');
+    const rotVar = getComputedStyle(el).getPropertyValue('--rot');
+
     if (rotVar) {
       const n = parseFloat(rotVar);
       if (isFinite(n)) {
@@ -277,7 +278,8 @@ function bindCompassArrowKeys(win = window) {
     }
 
     // scale parasti glabājas inline rotate(...)
-    const r = parseRotateDeg(el.style.transform);
+    const r = parseRotateDeg(getComputedStyle(el).transform);
+
     el.dataset.deg = String(norm(isFinite(r) ? r : fallback));
     return parseFloat(el.dataset.deg);
   }
@@ -6807,7 +6809,7 @@ function ensureDockOpen(){
 
 // ======= Arrow keys: scale + base rotation =======
 
-function installArrowKeyRotation({
+/*function installArrowKeyRotation({
   baseId = "compassBase",
   scaleId = "compassScale",
   step = 1,          // grādi uz soli
@@ -6880,7 +6882,7 @@ document.addEventListener("DOMContentLoaded", () => {
     step: 1,
     stepFast: 5
   });
-});
+});*/
 
 
 
