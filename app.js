@@ -380,22 +380,10 @@ function toggleButtonImage(buttonId) {
 
 						// Pievienojam notikumus pogām
 var _tgl = document.getElementById('toggleRotationMode');
-if (_tgl && !_tgl.dataset.bound) {
-  _tgl.dataset.bound = '1';
-  _tgl.addEventListener('click', function(){
-    toggleButtonImage('toggleRotationMode');
-    window.__compassRotateTarget = (window.__compassRotateTarget === 'base') ? 'scale' : 'base';
-  });
-}
+if (_tgl) _tgl.addEventListener('click', function(){ toggleButtonImage('toggleRotationMode'); });
 
 var _lck = document.getElementById('lockRotationMode');
-if (_lck && !_lck.dataset.bound) {
-  _lck.dataset.bound = '1';
-  _lck.addEventListener('click', function(){
-    toggleButtonImage('lockRotationMode');
-    window.__compassRotationLocked = !window.__compassRotationLocked;
-  });
-}
+if (_lck) _lck.addEventListener('click', function(){ toggleButtonImage('lockRotationMode'); });
 
 
 
