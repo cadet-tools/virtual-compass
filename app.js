@@ -6670,6 +6670,82 @@ function ensureDockOpen(){
 
 
 
+// ======= Arrow keys: scale + base rotation =======
+
+function installArrowKeyRotation({
+  baseId = "compassBase",
+  scaleId = "compassScale",
+  step = 1,          // grādi uz soli
+  stepFast = 5,      // ar Shift
+  preventScroll = true
+} = {}) {
+  const baseEl = document.getElementById(baseId);
+  const scaleEl = document.getElementById(scaleId);
+
+  if (!baseEl || !scaleEl) {
+    console.warn("[keys] Nav atrasts base/scale elements:", { baseId, scaleId });
+    return;
+  }
+
+  // sākuma leņķi (ja vēlies – vari ielikt dataset.rot jau HTML)
+  let baseRot = Number(baseEl.dataset.rot || 0);
+  let scaleRot = Number(scaleEl.dataset.rot || 0);
+
+  const apply = () => {
+    baseEl.style.transform = `rotate(${baseRot}deg)`;
+    scaleEl.style.transform = `rotate(${scaleRot}deg)`;
+
+    baseEl.dataset.rot = String(baseRot);
+    scaleEl.dataset.rot = String(scaleRot);
+  };
+
+  // normalizē uz 0..360 (nav obligāti, bet ērti)
+  const norm360 = (d) => ((d % 360) + 360) % 360;
+
+  const isTypingTarget = (el) => {
+    if (!el) return false;
+    const tag = el.tagName?.toLowerCase();
+    return tag === "input" || tag === "textarea" || tag === "select" || el.isContentEditable;
+  };
+
+  apply();
+
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      // lai netraucē rakstīšanai ievadlauciņos
+      if (isTypingTarget(e.target)) return;
+
+      const k = e.key;
+      if (k !== "ArrowLeft" && k !== "ArrowRight" && k !== "ArrowUp" && k !== "ArrowDown") return;
+
+      if (preventScroll) e.preventDefault();
+
+      const s = e.shiftKey ? stepFast : step;
+
+      // ← / → rotē skalu
+      if (k === "ArrowLeft")  scaleRot = norm360(scaleRot - s);
+      if (k === "ArrowRight") scaleRot = norm360(scaleRot + s);
+
+      // ↑ / ↓ rotē bāzi
+      if (k === "ArrowUp")    baseRot = norm360(baseRot + s);
+      if (k === "ArrowDown")  baseRot = norm360(baseRot - s);
+
+      apply();
+    },
+    { passive: false }
+  );
+}
+
+// Palaid pēc DOM ielādes
+document.addEventListener("DOMContentLoaded", () => {
+  installArrowKeyRotation({
+    baseId: "compassBase",
+    scaleId: "compassScale",
+    step: 1,
+    stepFast: 5
+  });
+});
 
 
 
