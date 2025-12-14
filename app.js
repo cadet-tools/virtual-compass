@@ -5536,7 +5536,10 @@ on(byId('rotateCompass90'), 'click', function (ev) {
 
     const closePopup = () => { try { document.body.removeChild(popupMenu); } catch(_){} };
 
+    // --- POGA +90 ---
     b90.addEventListener('click', () => {
+      console.log('[DEBUG] Nospiests +90. Sāku rotāciju...');
+      
       compassInner.classList.add('with-transition');
       compassScaleInner.classList.add('with-transition');
 
@@ -5554,9 +5557,23 @@ on(byId('rotateCompass90'), 'click', function (ev) {
       }, 500);
 
       closePopup();
+
+      // 👇 ŠEIT BIJA TRŪKSTOŠĀ DAĻA!
+      console.log('[DEBUG] Gaidu 400ms un sāku kalibrēšanu...');
+      setTimeout(() => {
+          console.log('[DEBUG] Izsaucu startMapCalibration()');
+          if (typeof startMapCalibration === 'function') {
+              startMapCalibration();
+          } else {
+              console.error('[KĻŪDA] startMapCalibration funkcija nav atrasta!');
+          }
+      }, 400);
     });
 
+    // --- POGA -90 ---
     b_90.addEventListener('click', () => {
+      console.log('[DEBUG] Nospiests -90. Sāku rotāciju...');
+
       compassInner.classList.add('with-transition');
       compassScaleInner.classList.add('with-transition');
 
@@ -5574,6 +5591,17 @@ on(byId('rotateCompass90'), 'click', function (ev) {
       }, 500);
 
       closePopup();
+
+      // 👇 ŠEIT ARĪ BIJA TRŪKSTOŠĀ DAĻA!
+      console.log('[DEBUG] Gaidu 400ms un sāku kalibrēšanu...');
+      setTimeout(() => {
+          console.log('[DEBUG] Izsaucu startMapCalibration()');
+          if (typeof startMapCalibration === 'function') {
+              startMapCalibration();
+          } else {
+              console.error('[KĻŪDA] startMapCalibration funkcija nav atrasta!');
+          }
+      }, 400);
     });
 
     // klikšķis ārpus popup — aizver
@@ -5589,6 +5617,7 @@ on(byId('rotateCompass90'), 'click', function (ev) {
 
   } else {
     // atbloķējam
+    console.log('[DEBUG] Atbloķēju kompasu.');
     isRotationLocked = false;
     lockBtn.classList.remove('active');
     rotateBtn.classList.remove('active');
