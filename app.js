@@ -5349,89 +5349,130 @@ document.addEventListener('mouseup', () => { compassIsDragging = false; });
 
 
 // =========================================================
-// === GUDRĀ KALIBRĒŠANAS LOĢIKA (Auto-Scale) ===
-// Ievietots PIRMS 'rotateCompass90'
+// === UNIVERSĀLĀ KALIBRĒŠANAS LOĢIKA (Local & Online) ===
 // =========================================================
 
 let calibrationPoints = [];
+const COMPASS_GRID_RATIO = 0.523413; // Tavs iegūtais koeficients
 
-// ✅ TAVS IEGŪTAIS KOEFICIENTS
-const COMPASS_GRID_RATIO = 0.523413; 
-
-// Palīgfunkcija: aprēķina, cik pikseļi ir 1km dotajā brīdī uz konkrētā ekrāna
-function getCurrentCompass1kmPx() {
+// Palīgs: Aprēķina 1km platumu pikseļos uz KOMPASA (pie scale=1)
+function getBaseCompass1kmPx() {
     const scaleEl = document.querySelector('#compassScaleInner img') || document.getElementById('compassScaleInner');
     if (!scaleEl) return 100; 
-
-    const baseWidth = scaleEl.offsetWidth;
-    
-    // Mēģinām atrast 'globalScale' mainīgo
-    let currentScale = 1;
-    try {
-        if (typeof globalScale !== 'undefined') {
-            currentScale = globalScale;
-        } else if (typeof window.globalScale !== 'undefined') {
-            currentScale = window.globalScale;
-        }
-    } catch (e) {}
-
-    // Aprēķins: Bāzes platums * Mērogs * Tavs Koeficients
-    return baseWidth * currentScale * COMPASS_GRID_RATIO;
+    return scaleEl.offsetWidth * COMPASS_GRID_RATIO;
 }
 
 function startMapCalibration() {
     calibrationPoints = [];
-    const cvs = document.getElementById('mapCanvas');
-    if (!cvs) return;
+    
+    // 1. Nosakām, kurš režīms ir aktīvs
+    const onlineMap = document.getElementById('onlineMap');
+    const localCanvas = document.getElementById('mapCanvas');
+    
+    let activeEl = null;
+    let mode = '';
 
-    if (typeof showPopupMessage === 'function') {
-        showPopupMessage("IEZĪMĒ 1KM KARTĒ: Noklikšķini sākuma un beigu punktu vienai rūtiņai.", "popup-success");
-    } else {
-        alert("Kalibrēšana: Noklikšķini uz kartes divos punktos, kas apzīmē 1 KM (1 rūtiņu).");
+    // Pārbaudām redzamību
+    if (onlineMap && onlineMap.style.display !== 'none' && onlineMap.offsetParent !== null) {
+        mode = 'online';
+        activeEl = onlineMap;
+    } else if (localCanvas && getComputedStyle(localCanvas).display !== 'none') {
+        mode = 'local';
+        activeEl = localCanvas;
     }
 
-    const oldCursor = cvs.style.cursor;
-    cvs.style.cursor = 'crosshair';
+    if (!activeEl) {
+        alert("Kļūda: Nav aktīvas kartes, ko kalibrēt.");
+        return;
+    }
+
+    // Paziņojums
+    const msg = (mode === 'online') 
+        ? "ONLINE REŽĪMS: Iezīmē 1km (vai tīkla rūtiņu) uz kartes, lai PIELĀGOTU KOMPASU."
+        : "LOKĀLAIS REŽĪMS: Iezīmē 1km (vai tīkla rūtiņu) uz kartes, lai PIELĀGOTU KARTI.";
+
+    if (typeof showPopupMessage === 'function') {
+        showPopupMessage(msg, "popup-success");
+    } else {
+        alert(msg);
+    }
+
+    // Kursoru maiņa
+    const oldCursor = activeEl.style.cursor;
+    activeEl.style.cursor = 'crosshair';
     
     const calibHandler = (e) => {
+        // Apturam notikumu, lai online kartē neuzklikšķinātu uz POI vai nesāktu drag
+        // e.preventDefault(); // (Uzmanīgi ar šo online kartē, var bloķēt)
+        
         calibrationPoints.push({ x: e.clientX, y: e.clientY }); 
 
         if (calibrationPoints.length === 2) {
-            finishCalibration();
-            cvs.removeEventListener('click', calibHandler);
-            cvs.style.cursor = oldCursor;
+            finishCalibration(mode);
+            activeEl.removeEventListener('click', calibHandler);
+            activeEl.style.cursor = oldCursor;
         }
     };
 
-    cvs.addEventListener('click', calibHandler);
+    // Pievienojam klausītāju aktīvajam elementam
+    activeEl.addEventListener('click', calibHandler);
 }
 
-function finishCalibration() {
+function finishCalibration(mode) {
     const p1 = calibrationPoints[0];
     const p2 = calibrationPoints[1];
-    const distOnMap = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
 
-    if (distOnMap < 5) {
+    // Attālums ekrāna pikseļos, ko lietotājs iezīmēja
+    const distOnScreen = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+
+    if (distOnScreen < 10) {
         if (typeof showPopupMessage === 'function') showPopupMessage("Kļūda: Punkti pārāk tuvu!", "popup-error");
         return;
     }
 
-    const targetCompassPx = getCurrentCompass1kmPx();
-    const scaleFactor = targetCompassPx / distOnMap;
+    const baseCompassPx = getBaseCompass1kmPx(); // Cik plats ir 1km uz kompasa bez zoom
 
-    if (typeof imgScale !== 'undefined') {
-        imgScale *= scaleFactor;
-        if (typeof drawImage === 'function') drawImage();
+    if (mode === 'local') {
+        // --- LOKĀLAIS REŽĪMS (Mainām bildes izmēru) ---
+        // Mērķis: Kompass paliek kā ir, Bilde mainās.
         
-        const msg = `Karte salāgota!`;
-        if (typeof showPopupMessage === 'function') showPopupMessage(msg, "popup-success");
+        // Cik liels ŠOBRĪD ir 1km uz kompasa (ar esošo globalScale)
+        const currentCompassScale = (typeof globalScale !== 'undefined') ? globalScale : 1;
+        const targetPx = baseCompassPx * currentCompassScale;
         
-        if (typeof positionResizeHandle === 'function') positionResizeHandle(true);
+        const scaleFactor = targetPx / distOnScreen;
+
+        if (typeof imgScale !== 'undefined') {
+            imgScale *= scaleFactor;
+            if (typeof drawImage === 'function') drawImage();
+            if (typeof positionResizeHandle === 'function') positionResizeHandle(true);
+            
+            if (typeof showPopupMessage === 'function') showPopupMessage(`Karte mērogota (${scaleFactor.toFixed(2)}x)`, "popup-success");
+        }
+
+    } else if (mode === 'online') {
+        // --- ONLINE REŽĪMS (Mainām kompasa izmēru) ---
+        // Mērķis: Karte ir fiksēta, Kompass mainās.
+        
+        // Mēs gribam, lai Kompasa 1km (baseCompassPx * newGlobalScale) būtu vienāds ar distOnScreen
+        // Tātad: newGlobalScale = distOnScreen / baseCompassPx
+        
+        const newGlobalScale = distOnScreen / baseCompassPx;
+        
+        // Iestatām globālo mainīgo
+        if (typeof globalScale !== 'undefined') {
+            globalScale = newGlobalScale;
+            
+            // Izsaucam funkciju, kas atjauno CSS transformāciju (tavā kodā)
+            if (typeof updateCompassTransform === 'function') {
+                updateCompassTransform();
+            }
+            
+            if (typeof showPopupMessage === 'function') showPopupMessage(`Kompass mērogots (${newGlobalScale.toFixed(2)}x)`, "popup-success");
+        }
     }
 }
 // =========================================================
-
-
 
 
 
