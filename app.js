@@ -262,6 +262,9 @@ function checkWindowSize() {
 						  checkWindowSize();
 						  // pārrēķini doku uzreiz (lai nepārklājas ar #about)
 						  window.__fitDock && window.__fitDock();
+						  // lai resizeHandle pēc izmēra maiņas paliek iekš kanvas
+						  try { window.requestAnimationFrame(() => positionResizeHandle(true)); } catch(_){}
+
 						}
 						
 						// Sākotnējais un klasiskie notikumi
@@ -4058,8 +4061,33 @@ const h = resizeHandle.offsetHeight || parseInt(cs.height) || 12;
   const imgCssX = pageX + (imgX * scaleX);
   const imgCssY = pageY + (imgY * scaleY);
 
-  let left = imgCssX + imgCssW - w;
-  let top  = imgCssY + imgCssH - h;
+  const imgRight  = imgCssX + imgCssW;
+  const imgBottom = imgCssY + imgCssH;
+
+  // Canvas robežas (lapas koordinātās)
+  const canvasX = pageX;
+  const canvasY = pageY;
+  const canvasRight  = pageX + rect.width;
+  const canvasBottom = pageY + rect.height;
+
+  // Redzamā daļa (attēls ∩ canvas)
+  const visRight  = Math.min(imgRight,  canvasRight);
+  const visBottom = Math.min(imgBottom, canvasBottom);
+  const visLeft   = Math.max(imgCssX,   canvasX);
+  const visTop    = Math.max(imgCssY,   canvasY);
+
+  let left, top;
+
+  // Ja attēls pilnībā nav redzams, liekam rokturi kanvas stūrī,
+  // lai var turpināt “vilkt” resize arī tad, ja karte aizbraukusi ārā.
+  if (visRight <= visLeft || visBottom <= visTop) {
+    left = canvasRight - w;
+    top  = canvasBottom - h;
+  } else {
+    // Rokturi liekam redzamās daļas apakšējā–labajā stūrī
+    left = visRight - w;
+    top  = visBottom - h;
+  }
 
   // Stingri iekš attēla robežām
   left = Math.max(imgCssX, Math.min(imgCssX + imgCssW - w, left));
