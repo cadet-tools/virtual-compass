@@ -5571,6 +5571,33 @@ function initMapMeasurementStep() {
     );
 }
 
+// Pievieno šo palīgfunkciju kaut kur pirms applyCalibration
+function showSafeMessage(msg, type='success') {
+    // Mēģinām atrast esošo popup elementu
+    let popup = document.getElementById('touchscreenPopup');
+    
+    // Ja nav, izveidojam jaunu (lai kods nenokristu)
+    if (!popup) {
+        popup = document.createElement('div');
+        popup.id = 'touchscreenPopup';
+        popup.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 5px; z-index: 10000; display: none;';
+        document.body.appendChild(popup);
+    }
+
+    popup.textContent = msg;
+    popup.className = type === 'success' ? 'popup-success' : 'popup-error'; // Pievieno klases, ja tās ir CSS
+    popup.style.display = 'block';
+    
+    // Nokrāsojam, ja nav CSS klašu
+    if (type === 'success') popup.style.border = '1px solid #4CAF50';
+    else popup.style.border = '1px solid #F44336';
+
+    setTimeout(() => {
+        popup.style.display = 'none';
+    }, 4000);
+}
+
+// Atjaunotā applyCalibration funkcija
 function applyCalibration(mode, mapDistPx) {
     if (mapDistPx < 10 || compassDistPx < 10) return;
 
@@ -5581,7 +5608,8 @@ function applyCalibration(mode, mapDistPx) {
             imgScale *= scaleFactor;
             if (typeof drawImage === 'function') drawImage();
             if (typeof positionResizeHandle === 'function') positionResizeHandle(true);
-            showPopupMessage("Lokālā karte kalibrēta!", "popup-success");
+            
+            showSafeMessage("Lokālā karte kalibrēta!", "success"); // <-- Izmantojam jauno funkciju
         }
     } 
     else if (mode === 'online') {
@@ -5591,7 +5619,7 @@ function applyCalibration(mode, mapDistPx) {
             globalScale *= inverseFactor;
             if (typeof updateCompassTransform === 'function') updateCompassTransform();
             
-            showPopupMessage("Kompass pielāgots kartei!", "popup-success");
+            showSafeMessage("Kompass pielāgots kartei!", "success"); // <-- Izmantojam jauno funkciju
             
             // IESLĒDZAM SINHRONIZĀCIJU (Zoom Tracking)
             startOnlineSync();
