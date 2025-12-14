@@ -6551,9 +6551,9 @@ if (bc) bc.setAttribute('data-no-gap-fix', '1'); // izmanto jau esošo 'var bc'
   const T = {
     compass: isTouch
       ? 'Skārienā: velc pārvieto; pincete — mērogs; 2 pirkstu grieziens — griež izvēlēto daļu.'
-      : 'Pele: velc pārvieto; ALT+rullītis — mērogs; SHIFT — griež bāzi, CTRL — griež skalu.',
-    base: 'Bāze griežas ap skalas centru (precīzi saskaņota). SHIFT+rullītis (pele) vai 2-pirkstu grieziens (skāriens).',
-    scale: 'Skala griežas neatkarīgi no bāzes. CTRL+rullītis (pele) vai 2-pirkstu grieziens (skāriens).'
+      : 'Peles kreisais taustiņš - pārvieto; ALT+peles rullītis — mērogs; SHIFT+peles rullītis 1° vai ← → 5° — griež bāzi, CTRL+peles rullītis 1° vai ↑ ↓ 5° — griež skalu.',
+    base: 'Bāze: pele SHIFT+rullītis 1°, klaviatūra ← → 5° vai 2-pirkstu grieziens (skāriens).',
+    scale: 'Skala: pele CTRL+rullītis 1°, klaviatūra ↑ ↓ 5° vai 2-pirkstu grieziens (skāriens).'
   };
 
   const STEPS = [
