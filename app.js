@@ -4072,9 +4072,9 @@ function positionResizeHandle(show) {
 
   // 4. Drošības zona apakšā (lai neuzbrauc virsū #about vai pogu panelim)
   // 80px ir aptuvens augstums dokam/about galvenei. Vari palielināt, ja vajag.
-  const bottomSafeArea = 85; 
+  const bottomSafeArea = 40; 
   const screenLimitBottom = viewportBottom - bottomSafeArea;
-  const screenLimitRight = viewportRight - 20; // Neliela atkāpe no labās malas
+  const screenLimitRight = viewportRight - 40; // Neliela atkāpe no labās malas
 
   // 5. Nosakām "Redzamo" stūri (Intersection)
   // Rokturim jābūt mazākajam no: Attēla malas, Kanvas malas VAI Ekrāna malas
