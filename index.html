@@ -989,13 +989,13 @@
     if (event && event.preventDefault) event.preventDefault();
     var el = document.getElementById('iframeContainerAbout');
     if (!el) return;
-	el.style.zIndex = '1'; 
+	
     // slēpts?
     var isHidden = (el.style.display !== 'block') || (el.style.bottom === '-620px');
 
     if (isHidden) {
       el.style.display = 'block';
-      setTimeout(function(){ el.style.bottom = '5px'; }, 10);
+      setTimeout(function(){ el.style.bottom = '35px'; }, 10);
     } else {
       el.style.bottom = '-620px';
       setTimeout(function(){ el.style.display = 'none'; }, 500);
