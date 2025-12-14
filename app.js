@@ -5341,6 +5341,228 @@ document.addEventListener('mouseup', () => { compassIsDragging = false; });
 
 
 
+
+
+
+
+
+
+
+// =========================================================
+// === GUDRĀ KALIBRĒŠANAS LOĢIKA (Auto-Scale) ===
+// Ievietots PIRMS 'rotateCompass90'
+// =========================================================
+
+let calibrationPoints = [];
+
+// ✅ TAVS IEGŪTAIS KOEFICIENTS
+const COMPASS_GRID_RATIO = 0.523413; 
+
+// Palīgfunkcija: aprēķina, cik pikseļi ir 1km dotajā brīdī uz konkrētā ekrāna
+function getCurrentCompass1kmPx() {
+    const scaleEl = document.querySelector('#compassScaleInner img') || document.getElementById('compassScaleInner');
+    if (!scaleEl) return 100; 
+
+    const baseWidth = scaleEl.offsetWidth;
+    
+    // Mēģinām atrast 'globalScale' mainīgo
+    let currentScale = 1;
+    try {
+        if (typeof globalScale !== 'undefined') {
+            currentScale = globalScale;
+        } else if (typeof window.globalScale !== 'undefined') {
+            currentScale = window.globalScale;
+        }
+    } catch (e) {}
+
+    // Aprēķins: Bāzes platums * Mērogs * Tavs Koeficients
+    return baseWidth * currentScale * COMPASS_GRID_RATIO;
+}
+
+function startMapCalibration() {
+    calibrationPoints = [];
+    const cvs = document.getElementById('mapCanvas');
+    if (!cvs) return;
+
+    if (typeof showPopupMessage === 'function') {
+        showPopupMessage("IEZĪMĒ 1KM KARTĒ: Noklikšķini sākuma un beigu punktu vienai rūtiņai.", "popup-success");
+    } else {
+        alert("Kalibrēšana: Noklikšķini uz kartes divos punktos, kas apzīmē 1 KM (1 rūtiņu).");
+    }
+
+    const oldCursor = cvs.style.cursor;
+    cvs.style.cursor = 'crosshair';
+    
+    const calibHandler = (e) => {
+        calibrationPoints.push({ x: e.clientX, y: e.clientY }); 
+
+        if (calibrationPoints.length === 2) {
+            finishCalibration();
+            cvs.removeEventListener('click', calibHandler);
+            cvs.style.cursor = oldCursor;
+        }
+    };
+
+    cvs.addEventListener('click', calibHandler);
+}
+
+function finishCalibration() {
+    const p1 = calibrationPoints[0];
+    const p2 = calibrationPoints[1];
+    const distOnMap = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+
+    if (distOnMap < 5) {
+        if (typeof showPopupMessage === 'function') showPopupMessage("Kļūda: Punkti pārāk tuvu!", "popup-error");
+        return;
+    }
+
+    const targetCompassPx = getCurrentCompass1kmPx();
+    const scaleFactor = targetCompassPx / distOnMap;
+
+    if (typeof imgScale !== 'undefined') {
+        imgScale *= scaleFactor;
+        if (typeof drawImage === 'function') drawImage();
+        
+        const msg = `Karte salāgota!`;
+        if (typeof showPopupMessage === 'function') showPopupMessage(msg, "popup-success");
+        
+        if (typeof positionResizeHandle === 'function') positionResizeHandle(true);
+    }
+}
+// =========================================================
+
+
+
+// ✅ Rotate 90° popup — droši ar helperi
+let isCompassLocked = false;
+
+on(byId('rotateCompass90'), 'click', function (ev) {
+  ev.preventDefault();
+  ev.stopPropagation();
+
+  const compassInner      = byId('compassInner');
+  const compassScaleInner = byId('compassScaleInner');
+  const lockBtn           = byId('lockRotationMode');
+  const rotateBtn         = byId('rotateCompass90');
+
+  if (!compassInner || !compassScaleInner || !lockBtn || !rotateBtn) return;
+
+  if (!isCompassLocked) {
+    // uztaisām popup
+    const popupMenu = document.createElement('div');
+    popupMenu.id = 'popupMenu';
+
+    const menuTitle = document.createElement('p');
+    menuTitle.textContent = 'Izvēlieties noteikšanas metodi:';
+    popupMenu.appendChild(menuTitle);
+
+    const row = document.createElement('div');
+    row.className = 'button-row';
+
+    // +90°
+    const b90 = document.createElement('button');
+    b90.id = 'rotateTo90';
+    b90.className = 'popup-button';
+    const img90 = document.createElement('img');
+    img90.src = './img/GRID_VIEW_1_OPTION.png';
+    img90.alt = 'Rotēt 90°';
+    b90.appendChild(img90);
+    row.appendChild(b90);
+
+    // -90°
+    const b_90 = document.createElement('button');
+    b_90.id = 'rotateToNegative90';
+    b_90.className = 'popup-button';
+    const img_90 = document.createElement('img');
+    img_90.src = './img/GRID_VIEW_2_OPTION.png';
+    img_90.alt = 'Rotēt -90°';
+    b_90.appendChild(img_90);
+    row.appendChild(b_90);
+
+    popupMenu.appendChild(row);
+    document.body.appendChild(popupMenu);
+
+    const closePopup = () => { try { document.body.removeChild(popupMenu); } catch(_){} };
+
+    // --- POGA +90 ---
+    b90.addEventListener('click', () => {
+      compassInner.classList.add('with-transition');
+      compassScaleInner.classList.add('with-transition');
+
+      baseRotation = 90;                  
+      updateCompassTransform();
+
+      isRotationLocked = true;            
+      lockBtn.classList.add('active');
+      rotateBtn.classList.add('active');
+      isCompassLocked = true;
+
+      setTimeout(() => {
+        compassInner.classList.remove('with-transition');
+        compassScaleInner.classList.remove('with-transition');
+      }, 500);
+
+      closePopup();
+      
+      // 👇 ŠEIT TIEK IZSAUKTA KALIBRĒŠANA
+      setTimeout(startMapCalibration, 400); 
+    });
+
+    // --- POGA -90 ---
+    b_90.addEventListener('click', () => {
+      compassInner.classList.add('with-transition');
+      compassScaleInner.classList.add('with-transition');
+
+      baseRotation = -90;
+      updateCompassTransform();
+
+      isRotationLocked = true;
+      lockBtn.classList.add('active');
+      rotateBtn.classList.add('active');
+      isCompassLocked = true;
+
+      setTimeout(() => {
+        compassInner.classList.remove('with-transition');
+        compassScaleInner.classList.remove('with-transition');
+      }, 500);
+
+      closePopup();
+
+      // 👇 ŠEIT ARĪ TIEK IZSAUKTA KALIBRĒŠANA
+      setTimeout(startMapCalibration, 400);
+    });
+
+    // klikšķis ārpus popup — aizver
+    setTimeout(() => {
+      const onDocClick = (e) => {
+        if (!popupMenu.contains(e.target)) {
+          document.removeEventListener('click', onDocClick, true);
+          closePopup();
+        }
+      };
+      document.addEventListener('click', onDocClick, true);
+    }, 0);
+
+  } else {
+    // atbloķējam
+    isRotationLocked = false;
+    lockBtn.classList.remove('active');
+    rotateBtn.classList.remove('active');
+    isCompassLocked = false;
+  }
+});
+
+
+
+
+
+
+
+
+
+	
+
+
 // ✅ Rotate 90° popup — droši ar helperi
 let isCompassLocked = false;
 
