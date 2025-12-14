@@ -4029,6 +4029,7 @@ function canvasTouchDistance(touch1, touch2) {
 						}
 
 						// Piesaiste rokturim pie attēla
+// Aizvieto šo funkciju savā kodā (ap rindiņu 2145)
 function positionResizeHandle(show) {
   if (!resizeHandle) return;
 
@@ -4038,65 +4039,77 @@ function positionResizeHandle(show) {
     return;
   }
 
-
-  // Padarām mērāmu, bet neredzamu, lai iegūtu pareizos offsetWidth/Height
-  const prevVis  = resizeHandle.style.visibility;
-  const prevDisp = resizeHandle.style.display;
+  // Sagatavo rokturi mērīšanai
+  const prevVis = resizeHandle.style.visibility;
   resizeHandle.style.visibility = 'hidden';
-  resizeHandle.style.display    = 'block';
+  resizeHandle.style.display = 'block';
 
-  const rect   = canvas.getBoundingClientRect();
-  const pageX  = rect.left + window.scrollX;
-  const pageY  = rect.top  + window.scrollY;
-  const scaleX = rect.width  / canvas.width;
+  // 1. Iegūstam kanvas un lapas koordinātas
+  const rect = canvas.getBoundingClientRect();
+  const pageX = rect.left + window.scrollX;
+  const pageY = rect.top + window.scrollY;
+  const scaleX = rect.width / canvas.width;
   const scaleY = rect.height / canvas.height;
 
-const cs = getComputedStyle(resizeHandle);
-const w = resizeHandle.offsetWidth  || parseInt(cs.width)  || 12;
-const h = resizeHandle.offsetHeight || parseInt(cs.height) || 12;
+  // Iegūstam roktura izmērus
+  const cs = getComputedStyle(resizeHandle);
+  const w = resizeHandle.offsetWidth || parseInt(cs.width) || 12;
+  const h = resizeHandle.offsetHeight || parseInt(cs.height) || 12;
 
-
-  const imgCssW = imgWidth  * imgScale * scaleX;
+  // 2. Aprēķinām attēla reālās robežas lapā
+  const imgCssW = imgWidth * imgScale * scaleX;
   const imgCssH = imgHeight * imgScale * scaleY;
   const imgCssX = pageX + (imgX * scaleX);
   const imgCssY = pageY + (imgY * scaleY);
 
-  const imgRight  = imgCssX + imgCssW;
+  const imgRight = imgCssX + imgCssW;
   const imgBottom = imgCssY + imgCssH;
 
-  // Canvas robežas (lapas koordinātās)
-  const canvasX = pageX;
-  const canvasY = pageY;
-  const canvasRight  = pageX + rect.width;
+  // 3. Aprēķinām EKRĀNA (Viewport) robežas + Scroll
+  // Mēs gribam, lai rokturis neiziet ārpus ekrāna labās malas un apakšas.
+  const viewportRight = window.scrollX + window.innerWidth;
+  const viewportBottom = window.scrollY + window.innerHeight;
+
+  // 4. Drošības zona apakšā (lai neuzbrauc virsū #about vai pogu panelim)
+  // 80px ir aptuvens augstums dokam/about galvenei. Vari palielināt, ja vajag.
+  const bottomSafeArea = 85; 
+  const screenLimitBottom = viewportBottom - bottomSafeArea;
+  const screenLimitRight = viewportRight - 20; // Neliela atkāpe no labās malas
+
+  // 5. Nosakām "Redzamo" stūri (Intersection)
+  // Rokturim jābūt mazākajam no: Attēla malas, Kanvas malas VAI Ekrāna malas
+  const canvasRight = pageX + rect.width;
   const canvasBottom = pageY + rect.height;
 
-  // Redzamā daļa (attēls ∩ canvas)
-  const visRight  = Math.min(imgRight,  canvasRight);
-  const visBottom = Math.min(imgBottom, canvasBottom);
-  const visLeft   = Math.max(imgCssX,   canvasX);
-  const visTop    = Math.max(imgCssY,   canvasY);
+  const visRight = Math.min(imgRight, canvasRight, screenLimitRight);
+  const visBottom = Math.min(imgBottom, canvasBottom, screenLimitBottom);
+
+  const visLeft = Math.max(imgCssX, pageX);
+  const visTop = Math.max(imgCssY, pageY);
 
   let left, top;
 
-  // Ja attēls pilnībā nav redzams, liekam rokturi kanvas stūrī,
-  // lai var turpināt “vilkt” resize arī tad, ja karte aizbraukusi ārā.
+  // Ja attēls vispār nav redzams ekrānā (aizskrollēts prom), 
+  // tad liekam rokturi pie ekrāna malas, lai lietotājs to var atrast.
   if (visRight <= visLeft || visBottom <= visTop) {
-    left = canvasRight - w;
-    top  = canvasBottom - h;
+     left = Math.min(canvasRight, screenLimitRight) - w;
+     top = Math.min(canvasBottom, screenLimitBottom) - h;
   } else {
-    // Rokturi liekam redzamās daļas apakšējā–labajā stūrī
+    // Standarta situācija: liekam redzamās zonas labajā apakšējā stūrī
     left = visRight - w;
-    top  = visBottom - h;
+    top = visBottom - h;
   }
 
-  // Stingri iekš attēla robežām
+  // 6. Pēdējā pārbaude: nekad neļaut rokturim iziet ĀRPUS paša attēla kreisās/augšējās daļas
+  // (ja nu lietotājs ir pašā bildes sākumā)
   left = Math.max(imgCssX, Math.min(imgCssX + imgCssW - w, left));
-  top  = Math.max(imgCssY, Math.min(imgCssY + imgCssH - h, top));
+  top = Math.max(imgCssY, Math.min(imgCssY + imgCssH - h, top));
 
-  resizeHandle.style.left       = left + 'px';
-  resizeHandle.style.top        = top  + 'px';
+  // Piemērojam stilus
+  resizeHandle.style.left = left + 'px';
+  resizeHandle.style.top = top + 'px';
   resizeHandle.style.visibility = prevVis || 'visible';
-  resizeHandle.style.display    = 'block';
+  resizeHandle.style.display = 'block';
 }
 
 
