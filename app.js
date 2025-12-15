@@ -5162,14 +5162,9 @@ window.addEventListener('keydown', (e) => {
 // === JAUNIE GLOBĀLIE MAINĪGIE ===
 let globalScaleX = 1; 
 let globalScaleY = 1;
-
-// Pārbaudām, vai globalScale jau eksistē. Ja nē, definējam.
-if (typeof globalScale === 'undefined') {
-    var globalScale = 1; // Izmantojam var vai window.globalScale, lai būtu droši
-} else {
-    globalScale = 1; // Tikai atiestatām vērtību
-}
-
+// Tikai piešķiram vērtību, nevis definējam no jauna
+globalScale = 1;
+	
 // Atjaunināta funkcija, kas atbalsta deformāciju (X vs Y)
 function updateCompassTransform() {
   const container   = document.getElementById('compassContainer');
