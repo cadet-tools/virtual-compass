@@ -4978,503 +4978,2076 @@ positionResizeHandle(getComputedStyle(canvas).display !== 'none');
 						window.addEventListener('resize', checkWindowSize);
 						
 // ===== START onDomReady wrapper for COMPASS =====
-onDomReady(() => {      
-    // 1. ATLASĀM ELEMENTUS
-    const compassContainer = document.getElementById('compassContainer');
-    const compassInner = document.getElementById('compassInner');
-    const compassScaleContainer = document.getElementById('compassScaleContainer');
-    const compassScaleInner = document.getElementById('compassScaleInner');
-    const toggleRotationModeButton = document.getElementById('toggleRotationMode');
-    const lockRotationModeButton = document.getElementById('lockRotationMode');
-    const resetCompassButton = document.getElementById('resetCompass');
+onDomReady(() => {		
+						// Pievienojam compassContainer funkcijas pēc tam, kad ir definēts canvas, mapImage utt.
 
-    // 2. GLOBĀLIE MAINĪGIE (Droša definīcija)
-    window.COMPASS_INIT = { left: 550, top: 60, scale: 1, base: 0, scaleRot: 70 };
+						// Atlasām compassContainer elementu
+							const compassContainer = document.getElementById('compassContainer');
+							const compassInner = document.getElementById('compassInner');
+							const compassScaleContainer = document.getElementById('compassScaleContainer');
+							const compassScaleInner = document.getElementById('compassScaleInner');
+							const compassNeedle = document.getElementById('compassNeedle');
+							const toggleRotationModeButton = document.getElementById('toggleRotationMode');
+							const lockRotationModeButton = document.getElementById('lockRotationMode');
+							const resetCompassButton = document.getElementById('resetCompass');
+//							// Sākotnējās vērtības, lai atjaunotu kompasu
+//							const initialCompassLeft = 550; // Sākotnējā X pozīcija
+//							const initialCompassTop = 60; // Sākotnējā Y pozīcija
+//							const initialGlobalScale = 1; // Sākotnējais mērogs
+//							const initialBaseRotation = 0; // Sākotnējā bāzes rotācija
+//							const initialScaleRotation = 70; // Sākotnējā skalas rotācija
+
+
+						// Sākotnējie mainīgie priekš pārvietošanas, rotācijas, mēroga
+							let compassIsDragging = false;
+							let compassDragStartX = 0;
+							let compassDragStartY = 0;
+							let compassStartLeft = 0;   // Sākotnējās pozīcijas - var mainīt pēc vajadzības
+							let compassStartTop = 0;    // Sākotnējās pozīcijas
+							let activeRotationTarget = 'compassInner'; //  Kontrolējam, vai rotējam bāzi vai skalu
+							let isTouchingCompass = false; // Lai sekotu līdzi, vai skar kompasu
+							let touchStartX = 0; // Pirmais pieskāriena punkts X koordinā
+							let touchStartY = 0; // Pirmais pieskāriena punkts Y koordinā
+							let isRotationLocked = false; // Vai rotācija ir bloķēta
+
+						// Jaunie mainīgie atsevišķām transformācijām
+							let globalScale = 1;      // mērogs visam kompasam (compassScaleContainer)
+							let baseRotation = 0;     // rotācija bāzei (compassInner)
+							let scaleRotation = 70;    // rotācija skalai (compassScaleInner)
+let lastRotation = 0;     // pinch/rotate aprēķinam
+
+
+
+
+// Sākumstāvoklis vienuviet
+// Jāatjauno arī reset funkcija, lai tā nodzēš X/Y
+function resetCompassToInitial(){
+  compassStartLeft = COMPASS_INIT.left;
+  compassStartTop  = COMPASS_INIT.top;
+  
+  globalScale      = COMPASS_INIT.scale;
+  globalScaleX     = COMPASS_INIT.scale; // Reset X
+  globalScaleY     = COMPASS_INIT.scale; // Reset Y
+  
+  baseRotation     = COMPASS_INIT.base;
+  scaleRotation    = COMPASS_INIT.scaleRot;
+  updateCompassTransform();
+}
+
+
+
+
+
+
+
+						// Helper funkcijas
+						function getDistance(touch1, touch2) {
+						  const dx = touch2.clientX - touch1.clientX;
+						  const dy = touch2.clientY - touch1.clientY;
+						  return Math.sqrt(dx * dx + dy * dy);
+						}
+
+						function getAngle(touch1, touch2) {
+						  const dx = touch2.clientX - touch1.clientX;
+						  const dy = touch2.clientY - touch1.clientY;
+						  return Math.atan2(dy, dx) * (180 / Math.PI);
+						}
+
+
+						// === FUNKCIJA POGAS NŪKOŠANAI (tikai skārienierīcēs) ===
+
+
+
+if (toggleRotationModeButton) {
+  toggleRotationModeButton.addEventListener('click', () => {
+    activeRotationTarget = (activeRotationTarget === 'compassInner')
+      ? 'compassScaleInner'
+      : 'compassInner';
+
+    toggleRotationModeButton.style.backgroundColor =
+      (activeRotationTarget === 'compassInner') ? 'rgba(91, 16, 16, 0.8)' : 'rgb(187, 1, 1)';
+  });
+}
+
+
+
+
+						// Notikumu klausītājs pogai, kas bloķē rotāciju
+						if (lockRotationModeButton) {
+							lockRotationModeButton.addEventListener('click', () => {
+								isRotationLocked = !isRotationLocked; // Mainām bloķēšanas statusu
+								lockRotationModeButton.classList.toggle('active', isRotationLocked); // Pievienojam vai noņemam aktīvo klasi
+							});
+						}
+
+						// Pārbaudām, vai poga eksistē
+if (resetCompassButton) {
+  resetCompassButton.addEventListener('click', () => {
+    // gludai animācijai
+    compassContainer.classList.add('with-transition');
+    compassInner.classList.add('with-transition');
+    compassScaleInner.classList.add('with-transition');
+    compassScaleContainer.classList.add('with-transition');
+
+    // reāli atjauno sākumstāvokli
+    resetCompassToInitial();
+
+    // pēc pārejas noņem klases
+    setTimeout(() => {
+      compassContainer.classList.remove('with-transition');
+      compassInner.classList.remove('with-transition');
+      compassScaleInner.classList.remove('with-transition');
+      compassScaleContainer.classList.remove('with-transition');
+    }, 500);
+  });
+}
+
+// ============================================================
+// JAUNĀ TASTATŪRAS VADĪBA (Fixed logic)
+// ============================================================
+window.addEventListener('keydown', (e) => {
+    // 1. Ignorējam, ja lietotājs raksta teksta laukā
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+
+    // 2. Pārbaudām, vai nospiesta bultiņa
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+
+    // 3. Neļaujam lapai "skrollēties" ar bultiņām
+    e.preventDefault(); 
+
+    // 4. Bloķēšana: ja rotācija ir bloķēta ar piekaramo atslēgu, neko nedarām
+    if (isRotationLocked) return;
+
+    // 5. Solis: 5 grādi (vai 1 grāds, ja tur nospiestu Shift)
+    const step = e.shiftKey ? 1 : 5;
+
+    // 6. Nosakām, kuru riņķi grozīt, balstoties uz aktīvo režīmu
+    // (To maina sarkanā poga "Griezt bāzi / skalu")
+    const rotateBase = (activeRotationTarget === 'compassInner');
+
+    // Loģika: 
+    // Left/Right: griež pa pulksteni vai pret
+    // Up/Down: var izmantot, lai grieztu "otru" elementu vai to pašu
     
-    // Inicializējam X un Y, ja tie vēl nav
-    if (typeof window.globalScaleX === 'undefined') window.globalScaleX = 1;
-    if (typeof window.globalScaleY === 'undefined') window.globalScaleY = 1;
+    if (e.key === 'ArrowLeft') {
+        if (rotateBase) baseRotation -= step;
+        else scaleRotation -= step;
+    }
     
-    // Lokālie mainīgie interakcijai
-    let compassIsDragging = false;
-    let compassDragStartX = 0;
-    let compassDragStartY = 0;
-    let compassStartLeft = COMPASS_INIT.left;
-    let compassStartTop = COMPASS_INIT.top;
-    
-    let activeRotationTarget = 'compassInner';
-    let isRotationLocked = false;
-    
-    let baseRotation = COMPASS_INIT.base;
-    let scaleRotation = COMPASS_INIT.scaleRot;
-
-    // Touch mainīgie
-    let isTouchingCompass = false;
-    let lastTouchDistance = 0;
-    let lastRotation = 0;
-
-    // 3. ATJAUNINĀŠANAS FUNKCIJA (Core)
-    window.updateCompassTransform = function() {
-        if (!compassContainer || !compassInner || !compassScaleContainer || !compassScaleInner) return;
-
-        // Pozīcija
-        compassContainer.style.left = compassStartLeft + 'px';
-        compassContainer.style.top  = compassStartTop  + 'px';
-        compassContainer.style.transform = 'translate(0,0)'; // Reset transform interference
-
-        // Mērogs (ņemam X un Y)
-        const sx = window.globalScaleX || 1;
-        const sy = window.globalScaleY || 1;
-        
-        // Pielietojam
-        const s = `scale(${sx}, ${sy})`;
-        compassScaleContainer.style.transform = s;
-        compassScaleContainer.style.webkitTransform = s;
-
-        // Rotācija
-        compassInner.style.transform = `rotate(${baseRotation}deg)`;
-        compassScaleInner.style.transform = `rotate(${scaleRotation}deg)`;
-        
-        // Saderība ar veco kodu (ja nu kas to izmanto)
-        if (typeof globalScale !== 'undefined') globalScale = sx;
-    };
-
-    // 4. RESET FUNKCIJA
-    window.resetCompassToInitial = function() {
-        compassStartLeft = window.COMPASS_INIT.left;
-        compassStartTop  = window.COMPASS_INIT.top;
-        window.globalScaleX = window.COMPASS_INIT.scale;
-        window.globalScaleY = window.COMPASS_INIT.scale;
-        baseRotation     = window.COMPASS_INIT.base;
-        scaleRotation    = window.COMPASS_INIT.scaleRot;
-        
-        window.updateCompassTransform();
-        
-        // Noņemam animācijas klases
-        setTimeout(() => {
-            const els = [compassContainer, compassInner, compassScaleInner, compassScaleContainer];
-            els.forEach(el => el && el.classList.remove('with-transition'));
-        }, 500);
-    };
-
-    // 5. POGU KLAUSĪTĀJI
-    if (toggleRotationModeButton) {
-        toggleRotationModeButton.addEventListener('click', () => {
-            activeRotationTarget = (activeRotationTarget === 'compassInner') ? 'compassScaleInner' : 'compassInner';
-            toggleRotationModeButton.style.backgroundColor = (activeRotationTarget === 'compassInner') ? 'rgba(91, 16, 16, 0.8)' : 'rgb(187, 1, 1)';
-        });
+    if (e.key === 'ArrowRight') {
+        if (rotateBase) baseRotation += step;
+        else scaleRotation += step;
     }
 
-    if (lockRotationModeButton) {
-        lockRotationModeButton.addEventListener('click', () => {
-            isRotationLocked = !isRotationLocked;
-            lockRotationModeButton.classList.toggle('active', isRotationLocked);
-        });
+    // Papildus: Ar UP/DOWN var grozīt PRETĒJO elementu (ērti kalibrēšanai)
+    // Ja negribi šo, vari izdzēst UP/DOWN daļu.
+    if (e.key === 'ArrowDown') {
+        // Griežam to, kas NAV aktīvs
+        if (!rotateBase) baseRotation -= step; 
+        else scaleRotation -= step;
+    }
+    if (e.key === 'ArrowUp') {
+        // Griežam to, kas NAV aktīvs
+        if (!rotateBase) baseRotation += step; 
+        else scaleRotation += step;
     }
 
-    if (resetCompassButton) {
-        resetCompassButton.addEventListener('click', () => {
-            [compassContainer, compassInner, compassScaleInner, compassScaleContainer].forEach(el => el.classList.add('with-transition'));
-            window.resetCompassToInitial();
-        });
-    }
+    // 7. SVARĪGI: Izsaucam centrālo funkciju, kas atjauno CSS un ņem vērā asis
+    updateCompassTransform();
+});
+// ============================================================
 
-    // 6. TASTATŪRAS VADĪBA
-    window.addEventListener('keydown', (e) => {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
-        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
-        
-        e.preventDefault(); 
-        if (isRotationLocked) return;
+						// Atjauno transformācijas
+// DROŠA versija: vienmēr pārvaicā DOM un iziet, ja kas nav gatavs
+// === JAUNIE GLOBĀLIE MAINĪGIE ===
+// === SĀKUMA VĒRTĪBAS (PIEVIENO ŠO BLOKU) ===
+// === SĀKUMA VĒRTĪBAS ===
+const COMPASS_INIT = { 
+    left: 550, 
+    top: 60, 
+    scale: 1, 
+    base: 0, 
+    scaleRot: 70 
+};
+window.COMPASS_INIT = COMPASS_INIT;
 
-        const step = e.shiftKey ? 1 : 5;
-        const rotateBase = (activeRotationTarget === 'compassInner');
+// === GLOBĀLIE MAINĪGIE (Droša definīcija) ===
+// Pārbaudām, vai jau eksistē, lai nebūtu "Identifier already declared" kļūdu
+if (typeof globalScaleX === 'undefined') var globalScaleX = 1;
+if (typeof globalScaleY === 'undefined') var globalScaleY = 1;
+// globalScale izmantojam tikai kā atskaites punktu
+if (typeof globalScale === 'undefined') var globalScale = 1; 
 
-        if (e.key === 'ArrowLeft') {
-            if (rotateBase) baseRotation -= step; else scaleRotation -= step;
-        }
-        if (e.key === 'ArrowRight') {
-            if (rotateBase) baseRotation += step; else scaleRotation += step;
-        }
-        window.updateCompassTransform();
-    });
+// Atjaunināta funkcija: Zīmē kompasu
+function updateCompassTransform() {
+  const container   = document.getElementById('compassContainer');
+  const inner       = document.getElementById('compassInner');
+  const scaleWrap   = document.getElementById('compassScaleContainer');
+  const scaleInner  = document.getElementById('compassScaleInner');
+  if (!container || !inner || !scaleWrap || !scaleInner) return;
 
-    // 7. PELE UN TOUCH (ZOOM FIX)
-    if (compassContainer) {
-        // --- PELE ---
-        compassContainer.addEventListener('mousedown', (e) => {
-            e.preventDefault(); e.stopPropagation();
-            const rect = compassContainer.getBoundingClientRect();
-            compassIsDragging = true;
-            compassDragStartX = e.clientX - rect.left;
-            compassDragStartY = e.clientY - rect.top;
-        });
+  // 1) Pozīcija
+  container.style.left = compassStartLeft + 'px';
+  container.style.top  = compassStartTop  + 'px';
+  container.style.transform = 'translate(0,0)';
 
-        document.addEventListener('mousemove', (e) => {
-            if (compassIsDragging) {
-                compassStartLeft = e.clientX - compassDragStartX;
-                compassStartTop  = e.clientY - compassDragStartY;
-                window.updateCompassTransform();
-            }
-        });
-        document.addEventListener('mouseup', () => { compassIsDragging = false; });
+  // 2) Mērogs - ņemam X un Y. Ja tie ir 0 vai undefined, ņemam 1.
+  const sx = globalScaleX || 1;
+  const sy = globalScaleY || 1;
+  
+  const s = `scale(${sx}, ${sy})`;
+  scaleWrap.style.transform = s;
+  scaleWrap.style.webkitTransform = s;
 
-        // --- RULLĪTIS (ZOOM FIX) ---
-        compassContainer.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            
-            if (e.shiftKey) {
-                baseRotation += e.deltaY * 0.05;
-            } else if (e.ctrlKey) {
-                scaleRotation += e.deltaY * 0.05;
-            } else if (e.altKey) {
-                // ALT + Rullītis = Tālummaiņa (X un Y vienādi)
-                const zoomFactor = (e.deltaY > 0) ? 0.95 : 1.05;
-                let newX = window.globalScaleX * zoomFactor;
-                let newY = window.globalScaleY * zoomFactor;
-                
-                // Ierobežojumi
-                if (newX > 0.1 && newX < 10) {
-                    window.globalScaleX = newX;
-                    window.globalScaleY = newY;
-                }
-            }
-            window.updateCompassTransform();
-        }, { passive:false });
+  // 3) Rotācija bāzei
+  const r1 = `rotate(${baseRotation}deg)`;
+  inner.style.transform = r1;
 
-        // --- TOUCH ---
-        function getDistance(t1, t2) {
-            const dx = t2.clientX - t1.clientX;
-            const dy = t2.clientY - t1.clientY;
-            return Math.sqrt(dx*dx + dy*dy);
-        }
-        function getAngle(t1, t2) {
-            const dx = t2.clientX - t1.clientX;
-            const dy = t2.clientY - t1.clientY;
-            return Math.atan2(dy, dx) * 180 / Math.PI;
-        }
+  // 4) Rotācija skalai
+  const r2 = `rotate(${scaleRotation}deg)`;
+  scaleInner.style.transform = r2;
+}
 
-        compassContainer.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (e.touches.length === 1) {
-                isTouchingCompass = true;
-                const touch = e.touches[0];
-                compassDragStartX = touch.clientX - compassStartLeft;
-                compassDragStartY = touch.clientY - compassStartTop;
-            } else if (e.touches.length === 2) {
-                lastTouchDistance = getDistance(e.touches[0], e.touches[1]);
-                lastRotation = getAngle(e.touches[0], e.touches[1]);
-            }
-        }, {passive:false});
+// Reset funkcija
+function resetCompassToInitial(){
+  compassStartLeft = COMPASS_INIT.left;
+  compassStartTop  = COMPASS_INIT.top;
+  
+  globalScale      = COMPASS_INIT.scale;
+  globalScaleX     = COMPASS_INIT.scale; 
+  globalScaleY     = COMPASS_INIT.scale; 
+  
+  baseRotation     = COMPASS_INIT.base;
+  scaleRotation    = COMPASS_INIT.scaleRot;
+  updateCompassTransform();
+}
 
-        compassContainer.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            if (e.touches.length === 1 && isTouchingCompass) {
-                const touch = e.touches[0];
-                compassStartLeft = touch.clientX - compassDragStartX;
-                compassStartTop  = touch.clientY - compassDragStartY;
-                window.updateCompassTransform();
-            } else if (e.touches.length === 2) {
-                const dist = getDistance(e.touches[0], e.touches[1]);
-                const factor = dist / lastTouchDistance;
-                window.globalScaleX *= factor;
-                window.globalScaleY *= factor;
-                lastTouchDistance = dist;
-
-                if (!isRotationLocked) {
-                    const ang = getAngle(e.touches[0], e.touches[1]);
-                    const delta = ang - lastRotation;
-                    if (activeRotationTarget === 'compassInner') baseRotation += delta;
-                    else scaleRotation += delta;
-                    lastRotation = ang;
-                }
-                window.updateCompassTransform();
-            }
-        }, {passive:false});
-        
-        compassContainer.addEventListener('touchend', () => isTouchingCompass = false);
-    }
-
-    // Sākotnējais zīmējums
-    window.resetCompassToInitial();
-
-
-    // === 8. KALIBRĒŠANA (Fix: Nosaka karti) ===
-    
-    // Palīgs: Nosaka, vai Online karte ir redzama
-    function getActiveMapType() {
-        const el = document.getElementById('onlineMap');
-        if (el && window.getComputedStyle(el).display !== 'none') {
-            return 'online';
-        }
-        return 'local';
-    }
-
-    // Dati
-    let calibData = { compassX:0, compassY:0, mapX:0, mapY:0 };
-    
-    // Vizuālie helperi
-    function ensureMeasureOverlay() {
-        let svg = document.getElementById('measureOverlay');
-        if (svg) return svg;
-        svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svg.id = 'measureOverlay';
-        Object.assign(svg.style, {
-            position:'fixed', top:0, left:0, width:'100%', height:'100%',
-            zIndex:'99999', pointerEvents:'none', overflow:'visible'
-        });
-        document.body.appendChild(svg);
-        return svg;
-    }
-    function removeMeasureOverlay(){ const s=document.getElementById('measureOverlay'); if(s)s.remove(); }
-
-    function drawLine(x1, y1, x2, y2, color, dashed) {
-        const svg = ensureMeasureOverlay();
-        let line = document.getElementById(dashed ? 'activeGuideLine' : 'fixedLine_'+Date.now()+Math.random());
-        if (!line) {
-            line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            if(dashed) line.id = 'activeGuideLine';
-            svg.appendChild(line);
-        }
-        line.setAttribute("x1", x1); line.setAttribute("y1", y1);
-        line.setAttribute("x2", x2); line.setAttribute("y2", y2);
-        line.setAttribute("stroke", color); line.setAttribute("stroke-width", "2");
-        if(dashed) line.setAttribute("stroke-dasharray", "6,4");
-    }
-
-    function drawMarker(x, y, color) {
-        const svg = ensureMeasureOverlay();
-        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        c.setAttribute("cx", x); c.setAttribute("cy", y); c.setAttribute("r", 4);
-        c.setAttribute("fill", "none"); c.setAttribute("stroke", color); c.setAttribute("stroke-width", 2);
-        g.appendChild(c); svg.appendChild(g);
-    }
-
-    function showCalibrationModal(text, onConfirm) {
-        const ex = document.querySelector('.uploader-backdrop.calib-modal');
-        if(ex) ex.remove();
-        const wrap = document.createElement('div');
-        wrap.className = 'uploader-backdrop calib-modal';
-        wrap.style.zIndex = "100000";
-        wrap.innerHTML = `
-          <div class="uploader-card" style="max-width: 400px; text-align: center;">
-            <h3 style="color: #4CAF50;">Kalibrēšana</h3>
-            <p style="font-size: 16px; margin-bottom: 20px;">${text}</p>
-            <div class="footer-row" style="justify-content: center;">
-              <button id="calibOkBtn" class="primary" style="background:#0d631d;color:white;padding:8px 24px;border-radius:6px;cursor:pointer;">SĀKT</button>
-            </div>
-          </div>`;
-        document.body.appendChild(wrap);
-        wrap.querySelector('#calibOkBtn').onclick = () => { wrap.remove(); if(onConfirm) onConfirm(); };
-    }
-
-    function measureStep(target, axis, nextCallback) {
-        let el;
-        if (target === 'compass') {
-            el = document.getElementById('compassContainer');
-        } else {
-            const type = getActiveMapType();
-            el = (type === 'online') ? document.getElementById('onlineMap') : document.getElementById('mapCanvas');
-        }
-        if (!el) { alert("Kļūda: Elements nav atrasts!"); return; }
-
-        const oldCursor = el.style.cursor;
-        el.style.cursor = 'crosshair';
-        let points = [];
-
-        const moveHandler = (e) => {
-            if (points.length === 1) {
-                drawLine(points[0].x, points[0].y, e.clientX, e.clientY, (axis==='x'?'#00ff00':'#00ffff'), true);
-            }
-        };
-        document.addEventListener('mousemove', moveHandler);
-
-        const clickHandler = (e) => {
-            e.stopPropagation();
-            if(target==='compass') e.preventDefault();
-            
-            points.push({ x: e.clientX, y: e.clientY });
-            const col = (axis==='x'?'#00ff00':'#00ffff');
-            drawMarker(e.clientX, e.clientY, col);
-
-            if (points.length === 2) {
-                const dist = Math.sqrt(Math.pow(points[1].x - points[0].x, 2) + Math.pow(points[1].y - points[0].y, 2));
-                
-                if(target==='compass' && axis==='x') calibData.compassX = dist;
-                if(target==='compass' && axis==='y') calibData.compassY = dist;
-                if(target==='map' && axis==='x') calibData.mapX = dist;
-                if(target==='map' && axis==='y') calibData.mapY = dist;
-
-                console.log(`[KALIB] ${target} ${axis}: ${dist.toFixed(1)}px`);
-
-                el.removeEventListener('click', clickHandler, (target==='compass'));
-                document.removeEventListener('mousemove', moveHandler);
-                el.style.cursor = oldCursor;
-                
-                drawLine(points[0].x, points[0].y, points[1].x, points[1].y, col, false);
-
-                setTimeout(() => {
-                    if (target === 'map' && axis === 'y') removeMeasureOverlay();
-                    else {
-                        const l = document.getElementById('activeGuideLine');
-                        if(l) l.remove();
-                    }
-                    if(nextCallback) nextCallback();
-                }, 500);
-            }
-        };
-        el.addEventListener('click', clickHandler, (target==='compass'));
-    }
-
-    // Globālā funkcija, ko izsauc pogas
-    window.startMapCalibration = function() {
-        calibData = { compassX:0, compassY:0, mapX:0, mapY:0 };
-        if(window.map) window.map.off('zoom', syncOnlineMapZoom);
-        ensureMeasureOverlay();
-
-        showCalibrationModal("<b>1. SOLIS (Kompass):</b><br>Uzklikšķini uz <b>HORIZONTĀLĀS (X)</b> ass sākuma un beigām (1 km).", 
-            () => measureStep('compass', 'x', 
-            () => showCalibrationModal("<b>2. SOLIS (Kompass):</b><br>Uzklikšķini uz <b>VERTIKĀLĀS (Y)</b> ass sākuma un beigām (1 km).", 
-            () => measureStep('compass', 'y', 
-            () => initMapMeasurement()))));
-    };
-
-    function initMapMeasurement() {
-        const type = getActiveMapType();
-        const name = (type==='online') ? 'Online Karte' : 'Lokālā Karte';
-        showCalibrationModal(`<b>3. SOLIS (${name}):</b><br>Uzklikšķini uz <b>HORIZONTĀLĀ (X)</b> 1 km nogriežņa kartē.`, 
-            () => measureStep('map', 'x', 
-            () => showCalibrationModal(`<b>4. SOLIS (${name}):</b><br>Uzklikšķini uz <b>VERTIKĀLĀ (Y)</b> 1 km nogriežņa kartē.`, 
-            () => measureStep('map', 'y', 
-            () => applyFullCalibration()))));
-    }
-
-    function applyFullCalibration() {
-        if(calibData.compassX < 5 || calibData.compassY < 5 || calibData.mapX < 5 || calibData.mapY < 5) {
-            alert("Kļūda: Mērījumi pārāk īsi.");
-            return;
-        }
-
-        const type = getActiveMapType();
-        if (type === 'online') {
-            const fx = calibData.mapX / calibData.compassX;
-            const fy = calibData.mapY / calibData.compassY;
-            window.globalScaleX *= fx;
-            window.globalScaleY *= fy;
-            window.updateCompassTransform();
-            
-            if(typeof showPopupMessage==='function') showPopupMessage(`Kompass pielāgots! X:${fx.toFixed(2)} Y:${fy.toFixed(2)}`, "popup-success");
-            else alert("Kompass pielāgots!");
-            startOnlineSync();
-        } else {
-            // Lokālā karte
-            const factor = calibData.compassX / calibData.mapX;
-            if(typeof imgScale !== 'undefined') {
-                imgScale *= factor;
-                if(typeof drawImage==='function') drawImage();
-                if(typeof positionResizeHandle==='function') positionResizeHandle(true);
-                
-                if(typeof showPopupMessage==='function') showPopupMessage("Lokālā karte kalibrēta!", "popup-success");
-                else alert("Lokālā karte kalibrēta!");
-            }
-        }
-    }
-
-    // --- 9. SINHRONIZĀCIJA (Online) ---
-    let syncState = { active: false, baseZoom: 0, baseSX: 1, baseSY: 1 };
-
-    function startOnlineSync() {
-        if (!window.map) return;
-        syncState.active = true;
-        syncState.baseZoom = window.map.getZoom();
-        syncState.baseSX = window.globalScaleX;
-        syncState.baseSY = window.globalScaleY;
-        window.map.off('zoom', syncOnlineMapZoom);
-        window.map.on('zoom', syncOnlineMapZoom);
-    }
-
-    function syncOnlineMapZoom() {
-        if (!syncState.active) return;
-        const diff = window.map.getZoom() - syncState.baseZoom;
-        const factor = Math.pow(2, diff);
-        window.globalScaleX = syncState.baseSX * factor;
-        window.globalScaleY = syncState.baseSY * factor;
-        window.updateCompassTransform();
-    }
-
-    // --- 10. ROTATE 90 BUTTON ---
-    const rotateBtn = document.getElementById('rotateCompass90');
-    if (rotateBtn) {
-        rotateBtn.addEventListener('click', (ev) => {
-            ev.preventDefault(); ev.stopPropagation();
-            // Ja jau ieslēgts, izslēdzam
-            if (window.isCompassLocked) {
-                isRotationLocked = false;
-                window.isCompassLocked = false;
-                if(lockRotationModeButton) lockRotationModeButton.classList.remove('active');
-                rotateBtn.classList.remove('active');
-            } else {
-                // Izvēlne
-                const pm = document.createElement('div');
-                pm.id='popupMenu';
-                pm.innerHTML = `
-                    <p>Izvēlieties metodi:</p>
-                    <div class="button-row">
-                        <button id="r90" class="popup-button"><img src="./img/GRID_VIEW_1_OPTION.png"></button>
-                        <button id="rn90" class="popup-button"><img src="./img/GRID_VIEW_2_OPTION.png"></button>
-                    </div>`;
-                document.body.appendChild(pm);
-                const close = () => { try{ pm.remove(); }catch(_){} };
-                
-                const runRot = (deg) => {
-                    compassInner.classList.add('with-transition');
-                    compassScaleInner.classList.add('with-transition');
-                    baseRotation = deg;
-                    window.updateCompassTransform();
-                    isRotationLocked = true;
-                    window.isCompassLocked = true;
-                    if(lockRotationModeButton) lockRotationModeButton.classList.add('active');
-                    rotateBtn.classList.add('active');
-                    setTimeout(() => {
-                        compassInner.classList.remove('with-transition');
-                        compassScaleInner.classList.remove('with-transition');
-                        close();
-                        setTimeout(() => window.startMapCalibration(), 400);
-                    }, 500);
-                };
-                document.getElementById('r90').onclick = () => runRot(90);
-                document.getElementById('rn90').onclick = () => runRot(-90);
-                setTimeout(() => document.addEventListener('click', (e)=>{ if(!pm.contains(e.target)) close(); }, {once:true}),0);
-            }
-        });
-    }
-
-}); // ===== END onDomReady wrapper for COMPASS =====
-
-// LongTask Heal
-(function longTaskHeal(){
-  try {
-    if (window.PerformanceObserver) {
-      new PerformanceObserver(() => requestAnimationFrame(() => {
-          if(window.updateCompassTransform) window.updateCompassTransform();
-      })).observe({ entryTypes: ['longtask'] });
-    }
-  } catch (e) {}
+// Inicializācija
+(function initCompassSafe(){
+  const start = () => {
+    if (!document.getElementById('compassContainer')) { requestAnimationFrame(start); return; }
+    resetCompassToInitial();
+    window.addEventListener('resize', updateCompassTransform);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once:true});
+  else start();
 })();
 
-// Watchdog
+
+// === KOMPASA KLAUSĪTĀJI (Labots Zoom) ===
+(function bindCompassSection(){
+  function bindCompassListeners(){
+    const cc = document.getElementById('compassContainer');
+    if (!cc) { requestAnimationFrame(bindCompassListeners); return; } 
+    if (cc.__boundCompass) return;
+    cc.__boundCompass = true;
+
+    // Peles vilkšana
+    on(cc, 'mousedown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const rect = cc.getBoundingClientRect();
+      compassIsDragging = true;
+      compassDragStartX = e.clientX - rect.left;
+      compassDragStartY = e.clientY - rect.top;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (compassIsDragging) {
+        compassStartLeft = e.clientX - compassDragStartX;
+        compassStartTop  = e.clientY - compassDragStartY;
+        updateCompassTransform();
+      }
+    });
+    document.addEventListener('mouseup', () => { compassIsDragging = false; });
+
+    // Skārieni (Touch)
+    on(cc, 'touchstart', (e) => {
+      e.preventDefault();
+      if (e.touches.length === 1) {
+        isTouchingCompass = true;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        compassDragStartX = e.touches[0].clientX - compassStartLeft;
+        compassDragStartY = e.touches[0].clientY - compassStartTop;
+      } else if (e.touches.length === 2) {
+        lastTouchDistance = getDistance(e.touches[0], e.touches[1]);
+        lastRotation = getAngle(e.touches[0], e.touches[1]);
+      }
+    }, { passive:false });
+
+    on(cc, 'touchmove', (e) => {
+      e.preventDefault();
+      if (e.touches.length === 1 && isTouchingCompass) {
+        compassStartLeft = e.touches[0].clientX - compassDragStartX;
+        compassStartTop  = e.touches[0].clientY - compassDragStartY;
+        updateCompassTransform();
+      } else if (e.touches.length === 2) {
+        const newDistance = getDistance(e.touches[0], e.touches[1]);
+        // Proporcionāla tālummaiņa ar touch
+        const factor = newDistance / lastTouchDistance;
+        globalScaleX *= factor;
+        globalScaleY *= factor;
+        lastTouchDistance = newDistance;
+
+        if (!isRotationLocked) {
+          const newRotation = getAngle(e.touches[0], e.touches[1]);
+          if (activeRotationTarget === 'compassInner') baseRotation += newRotation - lastRotation;
+          else if (activeRotationTarget === 'compassScaleInner') scaleRotation += newRotation - lastRotation;
+          lastRotation = newRotation;
+        }
+        updateCompassTransform();
+      }
+    }, { passive:false });
+
+    on(cc, 'touchend', () => { isTouchingCompass = false; });
+
+    // --- PELES RULLĪTIS (LABOTS) ---
+    on(cc, 'wheel', (e) => {
+      e.preventDefault();
+      
+      if (e.shiftKey) {
+        // Shift: Rotācija Bāzei
+        baseRotation += e.deltaY * 0.05;
+      } else if (e.ctrlKey) {
+        // Ctrl: Rotācija Skalai
+        scaleRotation += e.deltaY * 0.05;
+      } else if (e.altKey) {
+        // Alt: Tālummaiņa (Mainām X un Y proporcionāli)
+        // e.deltaY negatīvs ir uz augšu (zoom in)
+        const zoomStep = e.deltaY * -0.001; 
+        const factor = 1 + zoomStep;
+
+        // Pielietojam faktoru abām asīm
+        let newX = globalScaleX * factor;
+        let newY = globalScaleY * factor;
+
+        // Ierobežojumi (lai nepazūd)
+        if (newX > 0.1 && newX < 10) {
+            globalScaleX = newX;
+            globalScaleY = newY;
+        }
+      }
+      updateCompassTransform();
+    }, { passive:false });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindCompassListeners, { once:true });
+  else bindCompassListeners();
+})();
+
+
+
+
+
+
+
+
+
+
+// =========================================================
+// === PRECIZITĀTES KALIBRĒŠANA (X un Y asis atsevišķi) ===
+// =========================================================
+
+let calibData = { compassX: 0, compassY: 0, mapX: 0, mapY: 0 };
+let points = [];
+let measureOverlay = null;
+
+// Palīgs: Nosaka vai Online karte ir redzama
+function isOnlineMapActive() {
+    const el = document.getElementById('onlineMap');
+    if (!el) return false;
+    // Pārbauda reālo stilu (vai ir 'none')
+    const style = window.getComputedStyle(el);
+    return style.display !== 'none' && style.visibility !== 'hidden';
+}
+
+// --- 1. VIZUĀLIE PALĪGI ---
+function ensureMeasureOverlay() {
+    let svg = document.getElementById('measureOverlay');
+    if (svg) return svg;
+    svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.id = 'measureOverlay';
+    Object.assign(svg.style, {
+        position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+        zIndex: '99999', pointerEvents: 'none', overflow: 'visible'
+    });
+    document.body.appendChild(svg);
+    return svg;
+}
+function clearMeasureOverlay() { const s=document.getElementById('measureOverlay'); if(s)s.innerHTML=''; }
+function removeMeasureOverlay() { const s=document.getElementById('measureOverlay'); if(s)s.remove(); }
+
+function drawMarker(x, y, color = '#00ff00') {
+    const svg = ensureMeasureOverlay();
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    c.setAttribute("cx", x); c.setAttribute("cy", y); c.setAttribute("r", "4");
+    c.setAttribute("fill", "none"); c.setAttribute("stroke", color); c.setAttribute("stroke-width", "2");
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    p.setAttribute("d", `M${x-10},${y} L${x+10},${y} M${x},${y-10} L${x},${y+10}`);
+    p.setAttribute("stroke", color); p.setAttribute("stroke-width", "1");
+    g.appendChild(c); g.appendChild(p); svg.appendChild(g);
+}
+
+function drawLine(x1, y1, x2, y2, color = 'yellow', dashed = false) {
+    const svg = ensureMeasureOverlay();
+    let line = document.getElementById(dashed ? 'activeGuideLine' : 'fixedLine_' + Date.now() + Math.random());
+    if (!line) {
+        line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        if(dashed) line.id = 'activeGuideLine';
+        svg.appendChild(line);
+    }
+    line.setAttribute("x1", x1); line.setAttribute("y1", y1);
+    line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+    line.setAttribute("stroke", color); line.setAttribute("stroke-width", "2");
+    if (dashed) line.setAttribute("stroke-dasharray", "6,4");
+}
+
+function showCalibrationModal(text, onConfirm) {
+    const existing = document.querySelector('.uploader-backdrop.calib-modal');
+    if(existing) existing.remove();
+    const wrap = document.createElement('div');
+    wrap.className = 'uploader-backdrop calib-modal';
+    wrap.style.zIndex = "100000";
+    wrap.innerHTML = `
+      <div class="uploader-card" style="max-width: 400px; text-align: center;">
+        <h3 style="color: #4CAF50;">Kalibrēšana</h3>
+        <p style="font-size: 16px; margin-bottom: 20px;">${text}</p>
+        <div class="footer-row" style="justify-content: center;">
+          <button id="calibOkBtn" class="primary" style="background:#0d631d;color:white;padding:8px 24px;border-radius:6px;cursor:pointer;">SĀKT</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    wrap.querySelector('#calibOkBtn').onclick = () => { wrap.remove(); if (onConfirm) onConfirm(); };
+}
+
+// --- 2. MĒRĪŠANA ---
+function measureStep(target, axis, nextCallback) {
+    let el;
+    if (target === 'compass') {
+        el = document.getElementById('compassContainer');
+    } else {
+        // LABOTS: Precīzi nosaka aktīvo karti
+        if (isOnlineMapActive()) {
+            el = document.getElementById('onlineMap');
+        } else {
+            el = document.getElementById('mapCanvas');
+        }
+    }
+    
+    if(!el) { alert("Kļūda: Nevar atrast elementu!"); return; }
+
+    const oldCursor = el.style.cursor;
+    el.style.cursor = 'crosshair';
+    points = [];
+
+    const moveHandler = (e) => {
+        if (points.length === 1) {
+            const color = (axis === 'x') ? '#00ff00' : '#00ffff';
+            drawLine(points[0].x, points[0].y, e.clientX, e.clientY, color, true);
+        }
+    };
+    document.addEventListener('mousemove', moveHandler);
+
+    const clickHandler = (e) => {
+        e.stopPropagation();
+        if(target === 'compass') e.preventDefault();
+        
+        points.push({ x: e.clientX, y: e.clientY });
+        const color = (axis === 'x') ? '#00ff00' : '#00ffff';
+        drawMarker(e.clientX, e.clientY, color);
+
+        if (points.length === 2) {
+            const dist = Math.sqrt(Math.pow(points[1].x - points[0].x, 2) + Math.pow(points[1].y - points[0].y, 2));
+            
+            if (target === 'compass' && axis === 'x') calibData.compassX = dist;
+            if (target === 'compass' && axis === 'y') calibData.compassY = dist;
+            if (target === 'map' && axis === 'x') calibData.mapX = dist;
+            if (target === 'map' && axis === 'y') calibData.mapY = dist;
+
+            console.log(`[KALIB] ${target} ${axis}: ${dist.toFixed(1)}px`);
+
+            el.removeEventListener('click', clickHandler, (target === 'compass')); 
+            document.removeEventListener('mousemove', moveHandler);
+            el.style.cursor = oldCursor;
+            drawLine(points[0].x, points[0].y, points[1].x, points[1].y, color, false);
+
+            setTimeout(() => {
+                if (target === 'map' && axis === 'y') {
+                    removeMeasureOverlay();
+                } else {
+                    const agl = document.getElementById('activeGuideLine');
+                    if(agl) agl.remove();
+                }
+                if (nextCallback) nextCallback();
+            }, 500);
+        }
+    };
+    el.addEventListener('click', clickHandler, (target === 'compass'));
+}
+
+// --- 3. PLŪSMA ---
+function startMapCalibration() {
+    points = [];
+    calibData = { compassX:0, compassY:0, mapX:0, mapY:0 };
+    if (window.map) window.map.off('zoom', syncOnlineMapZoom);
+    ensureMeasureOverlay();
+
+    showCalibrationModal("<b>1. SOLIS (Kompass):</b><br>Uzklikšķini uz <b>HORIZONTĀLĀS (X)</b> ass sākuma un beigām (1 km).", 
+        () => measureStep('compass', 'x', 
+        () => showCalibrationModal("<b>2. SOLIS (Kompass):</b><br>Uzklikšķini uz <b>VERTIKĀLĀS (Y)</b> ass sākuma un beigām (1 km).", 
+        () => measureStep('compass', 'y', 
+        () => initMapMeasurement()))));
+}
+
+function initMapMeasurement() {
+    const isOnline = isOnlineMapActive();
+    const mapName = isOnline ? 'Online Karte' : 'Lokālā Karte';
+    
+    showCalibrationModal(`<b>3. SOLIS (${mapName}):</b><br>Uzklikšķini uz <b>HORIZONTĀLĀ (X)</b> 1 km nogriežņa kartē.`, 
+        () => measureStep('map', 'x', 
+        () => showCalibrationModal(`<b>4. SOLIS (${mapName}):</b><br>Uzklikšķini uz <b>VERTIKĀLĀ (Y)</b> 1 km nogriežņa kartē.`, 
+        () => measureStep('map', 'y', 
+        () => applyFullCalibration()))));
+}
+
+// --- 4. REZULTĀTS ---
+function applyFullCalibration() {
+    if (calibData.compassX < 5 || calibData.compassY < 5 || calibData.mapX < 5 || calibData.mapY < 5) {
+        alert("Kļūda: Mērījumi pārāk īsi.");
+        return;
+    }
+
+    if (isOnlineMapActive()) {
+        // ONLINE: Mainām Kompasu
+        const factorX = calibData.mapX / calibData.compassX;
+        const factorY = calibData.mapY / calibData.compassY;
+
+        globalScaleX *= factorX;
+        globalScaleY *= factorY;
+        
+        updateCompassTransform();
+        
+        if (typeof showPopupMessage === 'function') showPopupMessage(`Kompass pielāgots! X:${factorX.toFixed(2)} Y:${factorY.toFixed(2)}`, "popup-success");
+        else alert("Kompass pielāgots!");
+        
+        startOnlineSync();
+    } else {
+        // LOKĀLĀ: Mainām bildi (tikai scale, nedeformējam attēlu)
+        // Izmantojam X asi kā galveno
+        const scaleFactor = calibData.compassX / calibData.mapX; 
+        
+        if (typeof imgScale !== 'undefined') {
+            imgScale *= scaleFactor;
+            if (typeof drawImage === 'function') drawImage();
+            if (typeof positionResizeHandle === 'function') positionResizeHandle(true);
+            
+            if (typeof showPopupMessage === 'function') showPopupMessage("Lokālā karte kalibrēta!", "popup-success");
+            else alert("Lokālā karte kalibrēta!");
+        }
+    }
+}
+
+// --- 5. SINHRONIZĀCIJA ---
+let syncState = { active: false, baseZoom: 0, baseSX: 1, baseSY: 1 };
+
+function startOnlineSync() {
+    if (!window.map) return;
+    syncState.active = true;
+    syncState.baseZoom = window.map.getZoom();
+    syncState.baseSX = globalScaleX;
+    syncState.baseSY = globalScaleY;
+    window.map.off('zoom', syncOnlineMapZoom);
+    window.map.on('zoom', syncOnlineMapZoom);
+}
+
+function syncOnlineMapZoom() {
+    if (!syncState.active) return;
+    const diff = window.map.getZoom() - syncState.baseZoom;
+    const factor = Math.pow(2, diff);
+    globalScaleX = syncState.baseSX * factor;
+    globalScaleY = syncState.baseSY * factor;
+    updateCompassTransform();
+}
+// =========================================================
+
+
+
+
+
+
+	
+
+
+// ✅ Rotate 90° popup — droši ar helperi
+let isCompassLocked = false;
+
+on(byId('rotateCompass90'), 'click', function (ev) {
+  ev.preventDefault();
+  ev.stopPropagation();
+
+  const compassInner      = byId('compassInner');
+  const compassScaleInner = byId('compassScaleInner');
+  const lockBtn           = byId('lockRotationMode');
+  const rotateBtn         = byId('rotateCompass90');
+
+  // ja kāds elements nav, vienkārši izejam
+  if (!compassInner || !compassScaleInner || !lockBtn || !rotateBtn) return;
+
+  if (!isCompassLocked) {
+    // uztaisām popup
+    const popupMenu = document.createElement('div');
+    popupMenu.id = 'popupMenu';
+
+    const menuTitle = document.createElement('p');
+    menuTitle.textContent = 'Izvēlieties noteikšanas metodi:';
+    popupMenu.appendChild(menuTitle);
+
+    const row = document.createElement('div');
+    row.className = 'button-row';
+
+    // +90°
+    const b90 = document.createElement('button');
+    b90.id = 'rotateTo90';
+    b90.className = 'popup-button';
+    const img90 = document.createElement('img');
+    img90.src = './img/GRID_VIEW_1_OPTION.png';
+    img90.alt = 'Rotēt 90°';
+    b90.appendChild(img90);
+    row.appendChild(b90);
+
+    // -90°
+    const b_90 = document.createElement('button');
+    b_90.id = 'rotateToNegative90';
+    b_90.className = 'popup-button';
+    const img_90 = document.createElement('img');
+    img_90.src = './img/GRID_VIEW_2_OPTION.png';
+    img_90.alt = 'Rotēt -90°';
+    b_90.appendChild(img_90);
+    row.appendChild(b_90);
+
+    popupMenu.appendChild(row);
+    document.body.appendChild(popupMenu);
+
+    const closePopup = () => { try { document.body.removeChild(popupMenu); } catch(_){} };
+
+    // --- POGA +90 ---
+    b90.addEventListener('click', () => {
+      console.log('[DEBUG] Nospiests +90. Sāku rotāciju...');
+      
+      compassInner.classList.add('with-transition');
+      compassScaleInner.classList.add('with-transition');
+
+      baseRotation = 90;                 // ← izmanto tavu globālo
+      updateCompassTransform();
+
+      isRotationLocked = true;           // ← arī tavs globālais
+      lockBtn.classList.add('active');
+      rotateBtn.classList.add('active');
+      isCompassLocked = true;
+
+      setTimeout(() => {
+        compassInner.classList.remove('with-transition');
+        compassScaleInner.classList.remove('with-transition');
+      }, 500);
+
+      closePopup();
+
+      // 👇 ŠEIT BIJA TRŪKSTOŠĀ DAĻA!
+      console.log('[DEBUG] Gaidu 400ms un sāku kalibrēšanu...');
+      setTimeout(() => {
+          console.log('[DEBUG] Izsaucu startMapCalibration()');
+          if (typeof startMapCalibration === 'function') {
+              startMapCalibration();
+          } else {
+              console.error('[KĻŪDA] startMapCalibration funkcija nav atrasta!');
+          }
+      }, 400);
+    });
+
+    // --- POGA -90 ---
+    b_90.addEventListener('click', () => {
+      console.log('[DEBUG] Nospiests -90. Sāku rotāciju...');
+
+      compassInner.classList.add('with-transition');
+      compassScaleInner.classList.add('with-transition');
+
+      baseRotation = -90;
+      updateCompassTransform();
+
+      isRotationLocked = true;
+      lockBtn.classList.add('active');
+      rotateBtn.classList.add('active');
+      isCompassLocked = true;
+
+      setTimeout(() => {
+        compassInner.classList.remove('with-transition');
+        compassScaleInner.classList.remove('with-transition');
+      }, 500);
+
+      closePopup();
+
+      // 👇 ŠEIT ARĪ BIJA TRŪKSTOŠĀ DAĻA!
+      console.log('[DEBUG] Gaidu 400ms un sāku kalibrēšanu...');
+      setTimeout(() => {
+          console.log('[DEBUG] Izsaucu startMapCalibration()');
+          if (typeof startMapCalibration === 'function') {
+              startMapCalibration();
+          } else {
+              console.error('[KĻŪDA] startMapCalibration funkcija nav atrasta!');
+          }
+      }, 400);
+    });
+
+    // klikšķis ārpus popup — aizver
+    setTimeout(() => {
+      const onDocClick = (e) => {
+        if (!popupMenu.contains(e.target)) {
+          document.removeEventListener('click', onDocClick, true);
+          closePopup();
+        }
+      };
+      document.addEventListener('click', onDocClick, true);
+    }, 0);
+
+  } else {
+    // atbloķējam
+    console.log('[DEBUG] Atbloķēju kompasu.');
+    isRotationLocked = false;
+    lockBtn.classList.remove('active');
+    rotateBtn.classList.remove('active');
+    isCompassLocked = false;
+  }
+});
+
+	
+
+
+window.updateCompassTransform = updateCompassTransform;
+window.resetCompassToInitial  = resetCompassToInitial;
+
+
+	
+}); // ===== END onDomReady wrapper for COMPASS =====
+
+
+// LongTask → pārkrāso kompasu nākamajā kadra brīdī
+(function longTaskHeal(){
+  try {
+    if (
+      window.PerformanceObserver &&
+      PerformanceObserver.supportedEntryTypes &&
+      PerformanceObserver.supportedEntryTypes.indexOf('longtask') !== -1
+    ) {
+      var po = new PerformanceObserver(function(){
+        requestAnimationFrame(function(){
+          try { updateCompassTransform(); } catch(e){}
+        });
+      });
+      po.observe({ entryTypes: ['longtask'] });
+    }
+  } catch (e) {
+    // vecs pārlūks – vienkārši izlaižam bez kļūdas
+  }
+})();
+
+// “Watchdog” – līdz kompasa inline stāvoklis tiešām ir uzlikts
 (function compassWatchdog(){
   const MAX_MS = 2000, STEP = 80;
-  let t = 0;
+  let t = 0, id = null;
+
   function tick(){
-    if(window.resetCompassToInitial) window.resetCompassToInitial();
+    try { resetCompassToInitial(); updateCompassTransform(); } catch(e){}
     const c = document.getElementById('compassContainer');
-    if (!c && t < MAX_MS) { setTimeout(tick, STEP); t+=STEP; }
+    if (!c) { id = setTimeout(tick, STEP); t+=STEP; return; }
+
+    const cs   = getComputedStyle(c);
+    const left = parseFloat(cs.left)  || 0;
+    const top  = parseFloat(cs.top)   || 0;
+const init = window.COMPASS_INIT || { left: 0, top: 0 };
+const ok = Math.abs(left - init.left) < 1 &&
+          Math.abs(top  - init.top ) < 1;
+
+    if (!ok && t < MAX_MS) { id = setTimeout(tick, STEP); t+=STEP; }
   }
+
+  // startē drīz, bet ne uzreiz (dod vietu citiem starta darbiem)
   setTimeout(tick, 0);
   window.addEventListener('load', tick, {once:true});
 })();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+							
+
+	
+								(function() {
+								const toggleFullscreenButton = document.getElementById('toggleFullscreen');
+								const fullscreenIcon = document.getElementById('fullscreenIcon');
+								const fullscreenPopup = document.getElementById('fullscreenPopup');
+  if (!toggleFullscreenButton || !fullscreenIcon || !fullscreenPopup) return;
+								const enterFullscreenIcon = './img/fullscreen_enter.png';
+								const exitFullscreenIcon = './img/fullscreen_exit.png';
+
+								// Iestatām sākotnējo ikonu
+								fullscreenIcon.src = enterFullscreenIcon;
+
+								toggleFullscreenButton.addEventListener('click', () => {
+									const elem = document.documentElement;
+									if (!isFullscreenActive()) {
+										enterFullscreen(elem);
+									} else {
+										exitFullscreen();
+									}
+								});
+
+								function enterFullscreen(elem) {
+									if (elem.requestFullscreen) {
+										elem.requestFullscreen().catch(err => console.warn('Pilnekrāna kļūda:', err));
+									} else if (elem.webkitRequestFullscreen) {
+										elem.webkitRequestFullscreen();
+									} else if (elem.msRequestFullscreen) {
+										elem.msRequestFullscreen();
+									} else if (elem.mozRequestFullScreen) {
+										elem.mozRequestFullScreen();
+									}
+								}
+
+								function exitFullscreen() {
+									if (document.exitFullscreen) {
+										document.exitFullscreen().catch(err => console.warn('Iziešanas kļūda:', err));
+									} else if (document.webkitExitFullscreen) {
+										document.webkitExitFullscreen();
+									} else if (document.msExitFullscreen) {
+										document.msExitFullscreen();
+									} else if (document.mozCancelFullScreen) {
+										document.mozCancelFullScreen();
+									}
+								}
+
+								function updateButtonState() {
+									if (isFullscreenActive()) {
+										fullscreenIcon.src = exitFullscreenIcon;
+										toggleFullscreenButton.classList.add('active');
+										showPopupMessage('Pilnekrāna režīms ieslēgts', 'popup-success');
+									} else {
+										fullscreenIcon.src = enterFullscreenIcon;
+										toggleFullscreenButton.classList.remove('active');
+										showPopupMessage('Pilnekrāna režīms izslēgts', 'popup-error');
+									}
+								}
+
+								function isFullscreenActive() {
+									return document.fullscreenElement || 
+										   document.webkitFullscreenElement || 
+										   document.mozFullScreenElement || 
+										   document.msFullscreenElement;
+								}
+
+								function showPopupMessage(message, popupClass) {
+									fullscreenPopup.textContent = message;
+									fullscreenPopup.className = ''; 
+									fullscreenPopup.classList.add(popupClass);
+									fullscreenPopup.style.display = 'block';
+
+									setTimeout(() => {
+										fullscreenPopup.style.display = 'none';
+									}, 4000);
+								}
+
+								// Klausītāji
+								document.addEventListener('fullscreenchange', updateButtonState);
+								document.addEventListener('webkitfullscreenchange', updateButtonState);
+								document.addEventListener('mozfullscreenchange', updateButtonState);
+								document.addEventListener('MSFullscreenChange', updateButtonState);
+
+								window.addEventListener('keydown', (e) => {
+									if (e.key === 'Escape') {
+										exitFullscreen();
+									}
+								});
+
+								window.addEventListener('visibilitychange', function () {
+									if (!document.hidden) {
+										updateButtonState();
+									}
+								});
+							})();
+
+
+
+
+on(byId("toggleMaterials"), "click", function() {
+  let menu = byId("dropdownMaterials");
+  let toggleButton = byId("toggleMaterials");
+  if (!menu || !toggleButton) return;
+  menu.classList.toggle("visible");
+  toggleButton.classList.toggle("active");
+});
+
+on(byId("toggleInstruction"), "click", function() {
+  let menu = byId("dropdownInstruction");
+  let toggleButton = byId("toggleInstruction");
+  if (!menu || !toggleButton) return;
+  menu.classList.toggle("visible");
+  toggleButton.classList.toggle("active");
+});
+
+
+							document.addEventListener("click", function(event) {
+  const instructionMenu   = document.getElementById("dropdownInstruction");
+  const materialsMenu     = document.getElementById("dropdownMaterials");
+  const instructionButton = document.getElementById("toggleInstruction");
+  const materialsButton   = document.getElementById("toggleMaterials");
+
+  if (instructionMenu && instructionButton &&
+      !instructionMenu.contains(event.target) && !instructionButton.contains(event.target)) {
+    instructionMenu.classList.remove("visible");
+    instructionButton.classList.remove("active");
+  }
+
+  if (materialsMenu && materialsButton &&
+      !materialsMenu.contains(event.target) && !materialsButton.contains(event.target)) {
+    materialsMenu.classList.remove("visible");
+    materialsButton.classList.remove("active");
+  }
+});
+
+
+
+							//ATVER IFRAME MACIBU MATERIALI
+							document.querySelectorAll('.dropdown-menu a').forEach(link => {
+								link.addEventListener('click', function(event) {
+									event.preventDefault();
+
+									let iframe = document.getElementById('contentFrame');
+									let dropdownMenus = document.querySelectorAll('.dropdown-menu');
+
+									// Parāda iframe un palielina tā augstumu līdz 85vh
+									iframe.style.display = 'block';
+									iframe.classList.add('active');
+									iframe.src = this.getAttribute('href');
+
+									// Paceļ dropdown pogas uz augšu
+									dropdownMenus.forEach(menu => menu.classList.add('shrink'));
+								});
+							});
+
+
+
+							// Aizver iframe un atgriež sākotnējo pogu un iframe pozīciju MACIBU MATERIALI
+							on(byId("toggleMaterials"),  "click", function() {
+								let iframe = document.getElementById('contentFrame');
+								let dropdownMenus = document.querySelectorAll('.dropdown-menu');
+
+								// Paslēpj iframe un atjauno sākotnējo augstumu
+								iframe.classList.remove('active');
+								setTimeout(() => {
+									iframe.style.display = 'none';
+									iframe.src = ""; // Noņem saturu
+								}, 300); // Aizkave, lai CSS animācija pabeigtos pirms iframe slēpšanas
+
+								// Atjauno dropdown pogu pozīciju
+								dropdownMenus.forEach(menu => menu.classList.remove('shrink'));
+							});
+
+
+
+							// Atver iframe priekš "Lietotāja ceļveža"
+							document.querySelectorAll('#dropdownInstruction a').forEach(link => {
+								link.addEventListener('click', function(event) {
+									event.preventDefault();
+
+									let iframe = document.getElementById('instructionFrame'); // Lietotāja ceļveža iframe
+									let dropdownMenus = document.getElementById('dropdownInstruction');
+
+									// Parāda iframe un ielādē saiti
+									iframe.style.display = 'block';
+									iframe.classList.add('active');
+									iframe.src = this.getAttribute('href');
+
+									// Paslēpj izvēlni
+									dropdownMenus.classList.add('shrink');
+								});
+							});
+
+							// Aizver iframe un atjauno sākotnējo pogu un iframe pozīciju priekš "Lietotāja ceļveža"
+							on(byId("toggleInstruction"),"click", function() {
+								let iframe = document.getElementById('instructionFrame'); // Lietotāja ceļveža iframe
+								let dropdownMenus = document.getElementById('dropdownInstruction');
+
+								iframe.classList.remove('active');
+								setTimeout(() => {
+									iframe.style.display = 'none';
+									iframe.src = ""; // Notīra saturu
+								}, 300);
+
+								dropdownMenus.classList.remove('shrink');
+							});
+
+
+
+
+							document.querySelectorAll('.dropdown-menu a').forEach(link => {
+								link.addEventListener('click', function(event) {
+									event.preventDefault();
+									let iframe = document.getElementById('contentFrame');
+									let dropdownMenus = document.querySelectorAll('.dropdown-menu');
+
+									// Ielādē saiti iframe un parāda to
+									iframe.style.display = 'block';
+									iframe.classList.add('active');
+									iframe.src = this.getAttribute('href');
+
+									// Paceļ dropdown pogas uz augšu
+									dropdownMenus.forEach(menu => menu.classList.add('shrink'));
+								});
+							});
+
+
+
+
+							// Atver atsauksmes un ziņojumi
+							function toggleIframeAbout(event) {
+								if (event) event.preventDefault(); // Novērš noklusēto darbību
+
+								let iframeContainer = document.getElementById("iframeContainerAbout");
+								let computedStyle = window.getComputedStyle(iframeContainer);
+
+								console.log("Poga nospiesta!");
+								console.log("iframeContainer sākuma statuss:", {
+									display: computedStyle.display,
+									bottom: computedStyle.bottom
+								});
+
+								if (computedStyle.display === "none" || computedStyle.bottom === "-620px") {
+									console.log("Atveram iframe...");
+									iframeContainer.style.display = "block";
+									setTimeout(() => {
+										iframeContainer.style.bottom = "35px"; // Slīd uz augšu no apakšas
+										console.log("iframeContainer pēc atvēršanas:", {
+											display: iframeContainer.style.display,
+											bottom: iframeContainer.style.bottom
+										});
+									}, 10);
+								} else {
+									console.log("Aizveram iframe...");
+									iframeContainer.style.bottom = "-620px"; // Slīd atpakaļ uz leju
+									setTimeout(() => {
+										iframeContainer.style.display = "none";
+										console.log("iframeContainer pēc aizvēršanas:", {
+											display: iframeContainer.style.display,
+											bottom: iframeContainer.style.bottom
+										});
+									}, 500);
+								}
+							}
+
+
+
+
+
+							document.addEventListener("DOMContentLoaded", function () {
+								let iframeContainer = document.getElementById("iframeContainerAbout");
+
+								// Pārliecinās, ka iframe sākumā ir paslēpts
+								iframeContainer.style.display = "none";
+								iframeContainer.style.bottom = "-220px";
+								console.log("iframeContainer iestatīts uz slēgtu stāvokli lapas ielādē!");
+							});
+
+
+
+
+
+							// QR koda atvēršana/aizvēršana
+							function toggleIframeQR(event) {
+								if (event) event.preventDefault();
+
+								let iframeContainer = document.getElementById("iframeContainerQR");
+								let computedStyle = window.getComputedStyle(iframeContainer);
+
+								if (computedStyle.display === "none" || computedStyle.bottom === "-370px") {
+									iframeContainer.style.display = "block";
+									setTimeout(() => {
+										iframeContainer.style.bottom = "35px";
+									}, 10);
+								} else {
+									iframeContainer.style.bottom = "-370px";
+									setTimeout(() => {
+										iframeContainer.style.display = "none";
+									}, 500);
+								}
+							}
+
+							// Paslēpj QR kodu sākumā
+							document.addEventListener("DOMContentLoaded", function () {
+								let iframeContainer = document.getElementById("iframeContainerQR");
+								iframeContainer.style.display = "none";
+								iframeContainer.style.bottom = "-370px";
+							});
+
+
+
+
+							(function(){
+							  var bc = document.getElementById('buttonContainer');
+							  if(!bc) return;
+							
+							  /* 1) Izveido “čaulu” un ieliek visas esošās pogas iekšā,
+							        + pievieno etiķeti un kupola SVG */
+							  var shell = document.createElement('div');
+							  shell.className = 'dock-shell';
+
+shell.setAttribute('data-no-gap-fix', '1');
+if (bc) bc.setAttribute('data-no-gap-fix', '1'); // izmanto jau esošo 'var bc'
+
+							
+							  // savācam tikai tiešos bērnus, kas ir pogas:
+							  var btns = [];
+							  for (var i = bc.children.length - 1; i >= 0; i--) {
+							    var el = bc.children[i];
+							    if (el.tagName === 'BUTTON') btns.push(el);
+							  }
+							  btns.reverse().forEach(function(b){ shell.appendChild(b); });
+							
+							  // izveido label + cap
+							  var dockLabel = document.createElement('div');
+							  dockLabel.className = 'dock-label';
+							  var dockCap = document.createElement('svg');
+							  dockCap.className = 'dock-cap'; dockCap.setAttribute('aria-hidden','true');
+							
+							  // ieliekam shell un pēc tam label+cap (būt bērni “shell”, lai ģeometrija būtu relatīva)
+							  bc.appendChild(shell);
+							  shell.appendChild(dockCap);
+							  shell.appendChild(dockLabel);
+
+							
+							  /* — DIMMERA UI — */
+							  var dimWrap = document.createElement('div');
+							  dimWrap.className = 'dock-dimmer';
+							  dimWrap.innerHTML =
+							    '<input id="mapDimmerRange" type="range" min="0" max="80" step="1">' +
+							    '<span class="value" id="mapDimmerValue"></span>';
+							  shell.insertBefore(dimWrap, shell.firstChild);
+
+								// Uzreiz pēc slīdņa ielikšanas DOM
+								setTimeout(function () {
+								  const bc = document.getElementById('buttonContainer');
+								  const range = document.getElementById('mapDimmerRange');
+								  if (!bc || !range) return;
+								
+								  const apply = () => {
+								    const side = bc.classList.contains('left') || bc.classList.contains('right');
+								    if (side) {
+								      range.setAttribute('orient','vertical');
+								      range.classList.add('range-vertical');
+								    } else {
+								      range.removeAttribute('orient');
+								      range.classList.remove('range-vertical');
+								    }
+								  };
+								
+								  // sākumā + turpmāk, kad mainās #buttonContainer klases
+								  apply();
+								  new MutationObserver(apply).observe(bc, { attributes:true, attributeFilter:['class'] });
+								}, 0);
+
+
+   
+								// Tooltipam un fokusam (tāpat kā pogām)
+								dimWrap.setAttribute('data-title', 'Tumšināt karti');
+								dimWrap.setAttribute('aria-label', 'Tumšināt karti');
+								dimWrap.setAttribute('tabindex', '0');
+								dimWrap.id = 'mapDimmer'; // ne obligāti, bet noderīgi
+								
+								  // sasaistām ar mainīgo + localStorage
+								  var dimRange = dimWrap.querySelector('#mapDimmerRange');
+								window.__bindDimmer && window.__bindDimmer(dimRange);
+
+								  var dimValue = dimWrap.querySelector('#mapDimmerValue');
+								
+								  var stored = +(localStorage.getItem('mapDarken') || 0);
+								  mapDarken = stored / 100;        // izmanto globālo mainīgo no 2. soļa
+								  dimRange.value = stored;
+								  dimValue.textContent = stored + '%';
+								
+								  dimRange.addEventListener('input', function(e){
+  const v = +e.target.value;
+  setDarkness(v);            // sinhronizē canvas + onlineMap un saglabā localStorage
+  dimValue.textContent = v + '%';
+  setRangeFill(dimRange);    // atjauno CSS progresu
+});
+
+							
+								function setRangeFill(el){
+								  const min = +el.min || 0, max = +el.max || 100, val = +el.value || 0;
+								  const p = (val - min) * 100 / (max - min); // 0..100
+								  el.style.setProperty('--p', p);
+								}
+								setRangeFill(dimRange);
+								dimRange.addEventListener('input', e => setRangeFill(e.target));
+								
+								
+								
+								// ⬇️ Pievieno šo — sākotnēji iestata pareizu pārklājumu (span)
+								window.__updateDimmerWidth && window.__updateDimmerWidth();
+
+
+ 
+							  /* 2) Pievieno etiķešu tekstus (ja nav), saglabājot Tavu ID loģiku */
+							  var titlesById = {
+							    resetMap:        'Restartēt karti',
+							    uploadMap:       'Augšupielādēt karti',
+							    resetCompass:    'Restartēt kompasu',
+							    toggleRotationMode: 'Griezt bāzi / skalu',
+							    lockRotationMode:   'Bloķēt rotāciju',
+							    rotateCompass90: 'Tīklveida režīms',
+							    toggleFullscreen:'Pilnekrāna režīms'
+							  };
+							 var allTriggers = shell.querySelectorAll('button, .dock-dimmer');
+							 allTriggers.forEach ? allTriggers.forEach(setTitle) : [].slice.call(allTriggers).forEach(setTitle);
+
+							  function setTitle(b){
+							    var id=b.id||'';
+							    if(!b.getAttribute('data-title') && titlesById[id]) b.setAttribute('data-title', titlesById[id]);
+							    if(!b.getAttribute('aria-label') && titlesById[id]) b.setAttribute('aria-label', titlesById[id]);
+							  }
+							
+							  /* 3) Kupola ģeometrija (horizontālam izvietojumam) */
+							  function updateCapGeometry(){
+							    var cs = getComputedStyle(shell);
+							    var labelW = parseFloat(cs.getPropertyValue('--labelW')) || 0;
+							    var extra  = parseFloat(cs.getPropertyValue('--capExtraW')) || 0;
+							    var w = labelW + 22 + extra;
+							    var h = parseFloat(cs.getPropertyValue('--capH')) || 0;
+							    var inset = parseFloat(cs.getPropertyValue('--capSkew')) || 0;
+							    var r = parseFloat(cs.getPropertyValue('--capR')) || 0;
+							    if(!w || !h) return;
+							
+							    var TLx = inset + r, TRx = w - inset - r;
+							    var LEx = inset, LEy = r;
+							    var REx = w - inset, REy = r;
+							
+							    var sideMidY = r + (h - r) * 0.45;
+							    var rightCP1x = REx + (w - REx) * 0.18, rightCP1y = sideMidY;
+							    var rightCP2x = w, rightCP2y = r + (h - r) * 0.82;
+							    var leftCP2x  = 0,  leftCP2y  = r + (h - r) * 0.82;
+							    var leftCP1x  = LEx - (LEx - 0) * 0.18, leftCP1y  = sideMidY;
+							
+							    dockCap.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+							    dockCap.setAttribute('width', w);
+							    dockCap.setAttribute('height', h);
+							    dockCap.innerHTML =
+							      '<defs>' +
+							        '<linearGradient id="capFill" x1="0" y1="0" x2="0" y2="1">' +
+							          '<stop offset="0%"  stop-color="rgba(40,44,52,.96)"/>' +
+							          '<stop offset="100%" stop-color="rgba(30,33,40,.96)"/>' +
+							        '</linearGradient>' +
+							        '<radialGradient id="capShine" cx="50%" cy="-30%" r="120%">' +
+							          '<stop offset="0%" stop-color="rgba(255,255,255,.18)"/>' +
+							          '<stop offset="60%" stop-color="rgba(255,255,255,0)"/>' +
+							        '</radialGradient>' +
+							      '</defs>' +
+							      '<path d="' +
+							        'M ' + TLx + ',0 H ' + TRx + ' A ' + r + ',' + r + ' 0 0 1 ' + REx + ',' + REy + ' ' +
+							        'C ' + rightCP1x + ',' + rightCP1y + ' ' + rightCP2x + ',' + rightCP2y + ' ' + w + ',' + h + ' ' +
+							        'L 0,' + h + ' C ' + leftCP2x + ',' + leftCP2y + ' ' + leftCP1x + ',' + leftCP1y + ' ' + LEx + ',' + LEy + ' ' +
+							        'A ' + r + ',' + r + ' 0 0 1 ' + TLx + ',0 Z" fill="url(#capFill)" stroke="rgba(210,34,34,.38)" stroke-width="1" />' +
+							      '<path d="' +
+							        'M ' + TLx + ',0 H ' + TRx + ' A ' + r + ',' + r + ' 0 0 1 ' + REx + ',' + REy + ' ' +
+							        'C ' + rightCP1x + ',' + rightCP1y + ' ' + rightCP2x + ',' + rightCP2y + ' ' + w + ',' + h + ' ' +
+							        'L 0,' + h + ' C ' + leftCP2x + ',' + leftCP2y + ' ' + leftCP1x + ',' + leftCP1y + ' ' + LEx + ',' + LEy + ' ' +
+							        'A ' + r + ',' + r + ' 0 0 1 ' + TLx + ',0 Z" fill="url(#capShine)" />';
+							  }
+							
+							  /* 4) Kustība — gluds X horizontāli; Y vertikāli */
+							  var raf=null, targetX=null, currentX=null;
+							  function setTipX(px){
+							    targetX = px;
+							    if(currentX == null) currentX = px;
+							    if(raf) return;
+							    function step(){
+							      currentX += (targetX - currentX) * 0.25;
+							      shell.style.setProperty('--tipX', currentX + 'px');
+							      if(Math.abs(targetX - currentX) > 0.5){ raf = requestAnimationFrame(step); }
+							      else { shell.style.setProperty('--tipX', targetX + 'px'); raf=null; }
+							    }
+							    raf = requestAnimationFrame(step);
+							  }
+							  function setTipY(py){ shell.style.setProperty('--tipY', py + 'px'); }
+							
+							  function isVertical(){
+							    return bc.classList.contains('left') || bc.classList.contains('right');
+							  }
+							
+							  function showFor(btn){
+							    var rShell = shell.getBoundingClientRect();
+							    var rBtn   = btn.getBoundingClientRect();
+							    var title  = btn.getAttribute('data-title') || btn.getAttribute('aria-label') || '';
+							
+							    dockLabel.textContent = title || '';
+							    // lai izmērītu īsto platumu/augstumu pirms ģeometrijas:
+							    dockLabel.style.opacity = '0.001'; // gandrīz neredzams uz mirkli
+							    dockLabel.style.pointerEvents = 'none';
+							
+							    // pieslēdzam klasei animācijas stāvokli
+							    shell.classList.add('show-label');
+							
+							    // pēc nākamā frame izmēram platumu/augstumu un atjauninām kupolu (horizontāliem)
+							    requestAnimationFrame(function(){
+							      var lw = Math.min(dockLabel.scrollWidth + 2, rShell.width - 40);
+							      shell.style.setProperty('--labelW', lw + 'px');
+							      shell.style.setProperty('--capH', (dockLabel.offsetHeight + 2) + 'px');
+							
+							      if(!isVertical()){
+							        // horizontāli: kupols redzams
+							        shell.classList.add('show-cap');
+							        // centrs X:
+							        var cx = rBtn.left + rBtn.width/2 - rShell.left;
+							        setTipX(cx);
+							        updateCapGeometry();
+							      }else{
+							        // vertikāli: slēpjam kupolu, slīdam pa Y
+							        shell.classList.remove('show-cap');
+							        var cy = rBtn.top + rBtn.height/2 - rShell.top;
+							        setTipY(cy);
+							      }
+							      dockLabel.style.opacity = '1';
+							    });
+							  }
+							  function hideTip(){ shell.classList.remove('show-label','show-cap'); }
+							
+							  /* 5) Notikumi – tikai uz īstajām pogām, lai neskartu Tavu esošo loģiku */
+							  var hideT=null;
+							  function arm(btn){
+							    btn.addEventListener('mouseenter', function(){
+							      if(hideT) clearTimeout(hideT);
+							      showFor(btn);
+							    });
+							    btn.addEventListener('focus', function(){
+							      showFor(btn);
+							    });
+							    btn.addEventListener('mouseleave', function(){
+							      if(hideT) clearTimeout(hideT);
+							      hideT = setTimeout(hideTip, 180);
+							    });
+							    // touch — ātri parādam un pēc 1.6s paslēpjam
+							    btn.addEventListener('touchstart', function(){
+							      if(hideT) clearTimeout(hideT);
+							      showFor(btn);
+							      hideT = setTimeout(hideTip, 1600);
+							    }, {passive:true});
+							  }
+							  [].slice.call(allTriggers).forEach(arm);
+
+							
+							  // Uz loga izmēru maiņas – paslēpjam
+							  window.addEventListener('resize', hideTip);
+							
+							  // Sākotnējais stāvoklis: ja vertical, kupolu neredzam
+							  if(isVertical()) shell.classList.remove('show-cap');
+							  window.__fitDock && window.__fitDock();
+							})();
+
+
+
+(function keepDockMarginsFromCSS(){
+  const shell = document.querySelector('#buttonContainer .dock-shell');
+  if (!shell) return;
+  const strip = () => shell.querySelectorAll('button').forEach(b=>{
+    b.style.removeProperty('margin');
+    b.style.removeProperty('margin-left');
+    b.style.removeProperty('margin-right');
+    b.style.removeProperty('margin-top');
+    b.style.removeProperty('margin-bottom');
+  });
+  strip();
+  new MutationObserver(strip).observe(shell, {subtree:true, attributes:true, attributeFilter:['style']});
+})();
+
+
+
+
+
+
+
+
+
+							
+							// === Auto-fit dokam (#buttonContainer .dock-shell) — ar apakšējās joslas korekciju ===
+							(function(){
+							 function fitDock(){
+							    const bc = document.getElementById('buttonContainer');
+							    if(!bc) return;
+							    const shell = bc.querySelector('.dock-shell');
+							    if(!shell) return;
+							
+							    const about = document.getElementById('about');
+							    const ah = about ? (about.getBoundingClientRect().height || 0) : 0;
+							
+							    const isBottom   = bc.classList.contains('bottom');
+							    const isVertical = bc.classList.contains('left') || bc.classList.contains('right');
+							
+							    /* ❗ NEKĀDUS inline bottom */
+							    bc.style.removeProperty('bottom');
+							
+							    /* Apakšā – tikai tik, lai nepārklātos ar #about (vai 8px) */
+							    if (isBottom) {
+							      const gap = Math.max(8, ah + 8);
+							      document.documentElement.style.setProperty('--dock-bottom', gap + 'px');
+							    }
+							
+							    /* Mērogs – tikai samazinām, nestiepjam malas */
+							    const prev = shell.style.transform;
+							    shell.style.transform = 'none';
+							    const natural = shell.getBoundingClientRect();
+							    shell.style.transform = prev;
+							
+							    let maxW = window.innerWidth * 0.98;
+							    let maxH = window.innerHeight * 0.94;
+							    if (isVertical) maxH = Math.max(120, maxH - ah);
+							
+							    let scale = isVertical
+							      ? Math.min(1, maxH / natural.height)
+							      : Math.min(1, maxW / natural.width);
+							
+							    scale = Math.max(0.35, Math.min(1, scale));
+							    shell.style.transform = 'scale(' + scale + ')';
+							  }
+							
+							  window.__fitDock = fitDock;
+							  const queue = () => setTimeout(fitDock, 50);
+							  window.addEventListener('load', fitDock);
+							  window.addEventListener('resize', queue);
+							  window.addEventListener('orientationchange', queue);
+							})();
+
+							
+							// 🔹 Tagad __fitDock noteikti ir definēts — pielāgo mērlogu uzreiz
+							window.__fitDock && window.__fitDock();
+
+
+
+
+(function(){
+  function updateDimmerPlacement(){
+    var bc  = document.getElementById('buttonContainer');
+    if(!bc) return;
+    var dim = bc.querySelector('.dock-dimmer');
+    if(!dim) return;
+
+    dim.style.gridRow    = '';
+    dim.style.gridColumn = '';
+    dim.style.width      = '';
+    dim.style.maxWidth   = '';
+    dim.style.height     = '';
+    dim.style.removeProperty('--colH');
+  }
+
+  function updateDimmerSpan(){
+    var bc    = document.getElementById('buttonContainer');
+    if(!bc) return;
+    var shell = bc.querySelector('.dock-shell');
+    if(!shell) return;
+    var dim   = shell.querySelector('.dock-dimmer');
+    if(!dim) return;
+
+    var side = bc.classList.contains('left') || bc.classList.contains('right');
+    if (!side) { dim.style.gridRow = ''; return; }
+
+    var children = [].slice.call(shell.children);
+    var rows = Math.max(
+      1,
+      children.filter(function(el){ return el.tagName === 'BUTTON' && el.offsetParent !== null; }).length
+    );
+
+    dim.style.gridRow = '1 / span ' + rows;
+  }
+
+  function updateDimmerAll(){
+    updateDimmerPlacement();
+    updateDimmerSpan();
+  }
+
+  window.__updateDimmerWidth = updateDimmerAll;
+  window.addEventListener('load',  updateDimmerAll);
+  window.addEventListener('resize',updateDimmerAll);
+})();
+
+							
+							(function(){
+							  const prevUpdate = window.__updateDimmerWidth || function(){};
+							
+							  function measureBottomRowWidth(){
+							    const bc = document.getElementById('buttonContainer');
+							    if(!bc || !bc.classList.contains('bottom')) return;
+							    const shell = bc.querySelector('.dock-shell');
+							    if(!shell) return;
+							
+							    const btns = [...shell.children].filter(el => el.tagName === 'BUTTON' && el.offsetParent !== null);
+							    if(!btns.length) return;
+							
+							    const top0 = Math.min(...btns.map(b => b.offsetTop));
+							    const firstLine = btns.filter(b => Math.abs(b.offsetTop - top0) < 2);
+							    const rects = firstLine.map(b => b.getBoundingClientRect());
+							    const minL = Math.min(...rects.map(r => r.left));
+							    const maxR = Math.max(...rects.map(r => r.right));
+							    const w = Math.round(maxR - minL);
+							
+							    const shellEl = bc.querySelector('.dock-shell');
+							    shellEl && shellEl.style.setProperty('--rowW', w + 'px');
+							  }
+							
+							  /* NEW: izmēri pogu kolonnas kopējo augstumu sānos (left/right) */
+							  function measureSideColHeight(){
+							    const bc = document.getElementById('buttonContainer');
+							    if(!bc || !(bc.classList.contains('left') || bc.classList.contains('right'))) return;
+							
+							    const shell = bc.querySelector('.dock-shell');
+							    const dim   = shell && shell.querySelector('.dock-dimmer');
+							    if(!shell || !dim) return;
+							
+							    const btns = [...shell.children].filter(el => el.tagName === 'BUTTON' && el.offsetParent !== null);
+							    if(!btns.length) return;
+							
+							    const rects = btns.map(b => b.getBoundingClientRect());
+							    const top   = Math.min(...rects.map(r => r.top));
+							    const bottom= Math.max(...rects.map(r => r.bottom));
+							    const h     = Math.max(0, Math.round(bottom - top));   // pogu kolonnas “garums”, iesk. rindstarpas
+							
+							    // iedodam .dock-dimmer CSS mainīgo + drošības pēc arī height
+							    dim.style.setProperty('--colH', h + 'px');
+							    dim.style.height = h + 'px';
+							  }
+							
+							  window.__updateDimmerWidth = function(){
+							    prevUpdate();
+							    measureBottomRowWidth();
+							    measureSideColHeight();
+							  };
+							
+							  const run = () => window.__updateDimmerWidth && window.__updateDimmerWidth();
+							  window.addEventListener('load', run);
+							  window.addEventListener('resize', run);
+							  window.addEventListener('orientationchange', run);
+							  run();
+							})();
+
+				
+							(function () {
+							  // ── nodrošinām, ka ir konteiners ─────────────────────────────────────────────
+							  const bc = document.getElementById('buttonContainer');
+							  if (!bc) return;
+							
+							  // ── SVG ikona (backticki aizsargāti ar \`) ───────────────────────────────────
+							  const GRID_ICON = `
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="3" width="7" height="7"></rect>
+  <rect x="14" y="3" width="7" height="7"></rect>
+  <rect x="3" y="14" width="7" height="7"></rect>
+  <rect x="14" y="14" width="7" height="7"></rect>
+</svg>
+`;
+							
+							  /* — ROKTURIS — */
+							  const handle = document.createElement('div');
+							  handle.className = 'dock-handle';
+							  handle.setAttribute('title', 'Parādīt pogas');
+							  handle.setAttribute('aria-label', 'Parādīt pogas');
+							  handle.innerHTML = GRID_ICON; // uzreiz ieliekam SVG
+							  bc.appendChild(handle);
+							
+							  /* — PUBLISKĀS FUNKCIJAS — */
+							  function dockButtons() { bc.classList.add('docked'); window.__updateMapSafeAreas && window.__updateMapSafeAreas(); }
+							  function showButtons() { bc.classList.remove('docked'); window.__fitDock && window.__fitDock(); window.__updateMapSafeAreas && window.__updateMapSafeAreas(); }
+							
+							  // Piesienam rokturim
+							  handle.addEventListener('click', showButtons);
+							
+							  // Ja maina novietojumu ar selectiem — atjaunojam un pārrēķinām izkārtojumu
+							  const leftSel  = document.getElementById('positionSelectLeft');
+							  const rightSel = document.getElementById('positionSelect');
+							  function refreshBySelect() { handle.innerHTML = GRID_ICON; window.__fitDock && window.__fitDock(); }
+							  leftSel  && leftSel.addEventListener('change', refreshBySelect);
+							  rightSel && rightSel.addEventListener('change', refreshBySelect);
+							
+							  // Ielāpam updateButtonContainerPosition, lai rokturis sekotu
+							  if (window.updateButtonContainerPosition) {
+							    const _old = window.updateButtonContainerPosition;
+							    window.updateButtonContainerPosition = function (pos) {
+							      _old(pos);
+							      refreshBySelect();
+							      // ja bija dokēts, saglabājas; rokturis vienmēr pareizā vietā
+							    };
+							  }
+							
+							  /* — AUTOMĀTISKĀ DOKĒŠANA, kad sāc “darbu ar saturu” — */
+							  const map     = document.getElementById('mapCanvas');
+							  const compass = document.getElementById('compassContainer');
+							
+							  ['pointerdown', 'mousedown', 'touchstart'].forEach(ev => {
+							    map     && map.addEventListener(ev, dockButtons,    { passive: true });
+							    compass && compass.addEventListener(ev, dockButtons, { passive: true });
+							  });
+							
+							  // Pēc loga/virtuālā viewport izmaiņām pielāgo mērogu
+							  function onViewportChange() { window.__fitDock && window.__fitDock(); }
+							  window.addEventListener('resize', onViewportChange);
+							  if (window.visualViewport) {
+							    window.visualViewport.addEventListener('resize', onViewportChange);
+							    window.visualViewport.addEventListener('scroll', onViewportChange);
+							  }
+							})();
+
+
+
+
+
+//PRINTMEDIA TESTERIS
+
+// === PrintMedia overlay tester — drop-in, zero CSS edits ===
+(function(){
+  const OVERLAY_ID = 'printAreaOverlay';
+  const STYLE_ID   = 'printAreaOverlayCSS';
+  const mm2px = mm => Math.round(mm * 96 / 25.4);
+
+  function ensureStyles(){
+    if (document.getElementById(STYLE_ID)) return;
+    const st = document.createElement('style');
+    st.id = STYLE_ID;
+    st.textContent = `
+#printAreaOverlay{position:fixed;inset:0;margin:auto;width:0;height:0;z-index:2147483647;pointer-events:none;border:3px dashed rgba(255,0,0,.75);background:rgba(255,0,0,.12);box-shadow:0 0 0 9999px rgba(0,0,0,.15);display:none}
+#printAreaOverlay .label{position:absolute;right:8px;bottom:8px;font:600 12px/1.2 system-ui,sans-serif;padding:6px 8px;background:rgba(0,0,0,.55);color:#fff;border-radius:6px}`;
+    document.head.appendChild(st);
+  }
+  function ensureOverlay(){
+    let el = document.getElementById(OVERLAY_ID);
+    if (!el){
+      el = document.createElement('div');
+      el.id = OVERLAY_ID;
+      el.innerHTML = '<div class="label"></div>';
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+
+  // Nolasām mm no TAVA dinamiski ieliktā CSS noteikuma `body.print-mode #onlineMap`
+  function findPrintBoxMm(){
+    let mm = { w:277, h:190, src:'default' }; // fallback: A4 ainava (277×190 mm)
+    for (const ss of document.styleSheets){
+      let rules;
+      try { rules = ss.cssRules || ss.rules; } catch(e){ continue; } // CORS
+      if (!rules) continue;
+      for (const r of rules){
+        if (r.type === CSSRule.MEDIA_RULE && r.cssRules){
+          for (const rr of r.cssRules){ mm = parseRule(rr, mm); }
+        } else {
+          mm = parseRule(r, mm);
+        }
+      }
+    }
+    return mm;
+
+    function parseRule(rule, out){
+      const sel = rule.selectorText || '';
+      if (sel && sel.includes('body.print-mode') && sel.includes('#onlineMap')){
+        const txt = rule.cssText || '';
+        const mW = /width\s*:\s*([\d.]+)mm/i.exec(txt);
+        const mH = /height\s*:\s*([\d.]+)mm/i.exec(txt);
+        if (mW && mH){
+          return { w: parseFloat(mW[1]), h: parseFloat(mH[1]), src:'css' };
+        }
+      }
+      return out;
+    }
+  }
+
+  function showOverlay(ms=5000){
+    ensureStyles();
+    const el = ensureOverlay();
+    const { w, h } = findPrintBoxMm();
+
+    // mm -> px uz ekrāna; centrē skatlogā (kā print CSS ar inset:0;margin:auto;)
+    const vpW = window.innerWidth;
+    const vpH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const wpx = mm2px(w), hpx = mm2px(h);
+    const scale = Math.min(vpW / wpx, vpH / hpx, 1);
+
+    el.style.width  = Math.floor(wpx * scale) + 'px';
+    el.style.height = Math.floor(hpx * scale) + 'px';
+    el.style.display = 'block';
+    el.querySelector('.label').textContent =
+      `print-media: ${w}×${h} mm  ≈  ${Math.round(wpx)}×${Math.round(hpx)} px`;
+
+    clearTimeout(showOverlay._t);
+    showOverlay._t = setTimeout(()=> el.style.display='none', ms);
+  }
+
+  // Piesienamies TAVAI esošajai pogai (bez citu handleru mainīšanas)
+  document.addEventListener('click', (e)=>{
+    const btn = e.target.closest && e.target.closest('#preparePrintBtn');
+    if (!btn) return;
+    showOverlay(); // vizualizē print kasti
+  }, true);
+})();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ===== VC TOUR v11 — clip-path izgriež mērķi no blur, stingra secība, “?” poga, demo animācijas ===== */
+(() => {
+  if (window.__VC_TOUR_V11__) return; window.__VC_TOUR_V11__ = 1;
+
+  // ——— Utils
+  const qs  = (s, r=document)=> r.querySelector(s);
+  const vis = (el)=> !!el && el.offsetWidth>0 && el.offsetHeight>0 &&
+    getComputedStyle(el).visibility!=='hidden' && getComputedStyle(el).display!=='none';
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const VW = ()=> innerWidth;
+  const VH = ()=> (visualViewport?.height || innerHeight);
+  const isTouch = ('ontouchstart' in window) || matchMedia?.('(pointer: coarse)').matches;
+
+  // ——— UI (viens slānis ar clip-path, bez “šuvēm”)
+  let host, sh, overlay, ring, tip, progress, hint, running=false, idx=-1;
+  function ensureUI(){
+    if (host) return;
+    host = document.createElement('div');
+    host.style.cssText = 'position:fixed;inset:0;z-index:2147483655;';
+    sh = host.attachShadow({mode:'open'});
+
+    const css = `
+      :host{ all:initial }
+      .overlay{
+        position:fixed; inset:0;
+        background:rgba(10,14,18,.55);
+        backdrop-filter: blur(10px) saturate(1.05);
+        -webkit-backdrop-filter: blur(10px) saturate(1.05);
+        clip-path:none; pointer-events:none;
+        transition: clip-path .18s ease, background-color .18s ease;
+      }
+      .ring{
+        position:fixed; pointer-events:none; border-radius:12px;
+        outline:2px solid rgba(255,255,255,.9);
+        box-shadow:0 0 0 2px rgba(255,255,255,.18) inset, 0 14px 38px rgba(0,0,0,.45), 0 0 0 12px rgba(255,255,255,.06);
+        transition:all .18s ease;
+      }
+      .tip{
+        position:fixed; max-width:min(460px,92vw);
+        color:#eaf1ff; background:linear-gradient(180deg,rgba(17,21,29,.96),rgba(26,12,26,.92));
+        border:1px solid #ffffff1e; border-radius:14px; padding:12px 14px;
+        box-shadow:0 20px 54px rgba(0,0,0,.55); pointer-events:auto; opacity:.99;
+        transform:translateY(6px); animation:tipIn .18s ease forwards;
+      }
+      @keyframes tipIn{ to{ transform:translateY(0) } }
+      .tip h3{ margin:0 0 6px; font:700 16px/1.3 system-ui,Segoe UI,Roboto,Arial }
+      .tip p{ margin:0; font:13px/1.45 system-ui,Segoe UI,Roboto,Arial; opacity:.95 }
+      .nav{ display:flex; gap:8px; justify-content:flex-end; margin-top:10px }
+      .sp{ margin-right:auto; color:#9fb3c8; font:12px/1.4 ui-monospace,monospace }
+      .btn{ appearance:none; border:1px solid #ffffff33; background:#ffffff12; color:#fff; border-radius:10px; padding:7px 11px; font:600 12px/1 system-ui; cursor:pointer }
+      .btn:hover{ background:#ffffff21 }
+      .x{ position:absolute; right:8px; top:8px; width:26px; height:26px; border-radius:8px; border:1px solid #ffffff25; background:#ffffff14; color:#fff; font:700 14px/24px system-ui; text-align:center; cursor:pointer }
+      .progress{ position:fixed; left:12px; bottom:12px; pointer-events:none; color:#cfe8c1; background:rgba(20,30,20,.86); border:1px solid #2a4621; border-radius:999px; padding:5px 9px; font:12px/1 ui-monospace,monospace }
+      .hint{ position:fixed; width:28px; height:28px; border-radius:50%; pointer-events:none; opacity:.9; transition:opacity .2s }
+      .hint.drag{ outline:2px dashed #fff3; }
+      .hide{ display:none !important }
+    `;
+    sh.appendChild(Object.assign(document.createElement('style'),{textContent:css}));
+    overlay = Object.assign(document.createElement('div'), {className:'overlay'});
+    ring    = Object.assign(document.createElement('div'), {className:'ring'});
+    tip     = Object.assign(document.createElement('div'), {className:'tip'});
+    progress= Object.assign(document.createElement('div'), {className:'progress'});
+    hint    = Object.assign(document.createElement('div'), {className:'hint hide'});
+    sh.append(overlay, ring, tip, progress, hint);
+    document.body.appendChild(host);
+    hideUI();
+  }
+  function showUI(){ host.style.pointerEvents='none'; [overlay,ring,tip,progress].forEach(n=>n.classList.remove('hide')); }
+  function hideUI(){ host.style.pointerEvents='none'; [overlay,ring,tip,progress,hint].forEach(n=>n.classList.add('hide')); }
+
+  // ——— ģeometrija (viena path ar “caurumu” → nav svītru)
+  function placeCutout(rect, pad=8, radius=12){
+    const vw=VW(), vh=VH();
+    const x = clamp(Math.floor(rect.left)-pad, 0, vw);
+    const y = clamp(Math.floor(rect.top)-pad,  0, vh);
+    const w = Math.ceil(rect.width) + pad*2;
+    const h = Math.ceil(rect.height)+ pad*2;
+
+    // ārējais (CW)
+    const outer = `M0 0H${vw}V${vh}H0Z`;
+    // iekšējais (CCW) — ar nonzero noteikumu veido “caurumu”
+    const innerCCW = `M${x} ${y}V${y+h}H${x+w}V${y}H${x}Z`;
+
+    const d = `${outer} ${innerCCW}`;
+    overlay.style.clipPath = `path("${d}")`;
+    overlay.style.webkitClipPath = `path("${d}")`; // Safari
+    Object.assign(ring.style,{left:x+'px',top:y+'px',width:w+'px',height:h+'px',borderRadius:radius+'px'});
+  }
+
+  // ——— stabila “lipīga” tip novietošana (nemētājas)
+  const posMemo = Object.create(null);
+  const clampPos=(x,y,tw,th)=>({x:clamp(x,8,VW()-tw-8), y:clamp(y,8,VH()-th-8)});
+  function placeTip(rect, key, pref='right'){
+    tip.style.left='-9999px'; tip.style.top='-9999px';
+    const gap=12, tw=Math.min(tip.offsetWidth||360,VW()-16), th=tip.offsetHeight||120;
+    const base = posMemo[key] || pref;
+    const fits = {
+      right:  rect.left+rect.width+gap+tw < VW()-8,
+      left:   rect.left-gap-tw > 8,
+      top:    rect.top-gap-th > 8,
+      bottom: rect.bottom+gap+th < VH()-8
+    };
+    let pos = fits[base] ? base : (['right','left','bottom','top'].find(p=>fits[p])||base);
+    let x=rect.left+rect.width+gap, y=rect.top;
+    if (pos==='left')   { x=rect.left - tw - gap; }
+    if (pos==='top')    { x=rect.left; y=rect.top - th - gap; }
+    if (pos==='bottom') { x=rect.left; y=rect.bottom + gap; }
+    const p=clampPos(x,y,tw,th); tip.style.left=p.x+'px'; tip.style.top=p.y+'px'; posMemo[key]=pos;
+  }
+  function resetTipMemo(){ for(const k in posMemo) delete posMemo[k]; }
+
+  // ——— īsa demo (“pamēģini” sajūta), nekad neblokē īstos eventus
+  let demoStop=null; const stopDemo=()=>{ if(demoStop){ try{demoStop()}catch{} demoStop=null; } hint.classList.add('hide'); };
+  function demoRotate(el){ if(!el) return ()=>{}; const prev=el.style.transform; let k=0;
+    const id=setInterval(()=>{ k++; el.style.transform = `${prev} rotate(${Math.sin(k/4)*4}deg)`; }, 60);
+    return ()=>{ clearInterval(id); el.style.transform=prev; };
+  }
+  function demoSlider(input){ if(!input) return ()=>{}; const orig=input.value; let t=0;
+    const id=setInterval(()=>{ t+=0.06; const v=Math.round(50+45*Math.sin(t)); input.value=v;
+      input.dispatchEvent(new Event('input',{bubbles:true})); input.dispatchEvent(new Event('change',{bubbles:true})); },60);
+    return ()=>{ clearInterval(id); input.value=orig; input.dispatchEvent(new Event('input',{bubbles:true})); };
+  }
+
+  // ——— Soļi: ļoti konkrēti elementi + “ensure” atvēršanai
+  const T = {
+    compass: isTouch
+      ? 'Skārienā: velc pārvieto; pincete — mērogs; 2 pirkstu grieziens — griež izvēlēto daļu.'
+      : 'Peles kreisais taustiņš - pārvieto; ALT+peles rullītis — mērogs; SHIFT+peles rullītis 1° vai ← → 5° — griež bāzi, CTRL+peles rullītis 1° vai ↑ ↓ 5° — griež skalu.',
+    base: 'Bāze: pele SHIFT+rullītis 1°, klaviatūra ← → 5° vai 2-pirkstu grieziens (skāriens).',
+    scale: 'Skala: pele CTRL+rullītis 1°, klaviatūra ↑ ↓ 5° vai 2-pirkstu grieziens (skāriens).'
+  };
+
+  const STEPS = [
+    { sel:'#buttonContainer',  title:'Ātrās darbības', body:'Galvenās kontroles pogas', place:'top', optional:true },
+
+// pogu novietojuma selektori	  
+{
+  sel:'.toggle-selector',
+  title:'Atvērt / aizvērt pogu novietojuma izvēlne (labā puse)',
+  place:'left',
+  optional:true,
+  ensure:()=>{
+    const p = document.querySelector('.position-selector');
+    p && p.classList.remove('hidden');   // atver paneli (ja slēpts)
+  }
+},
+{ sel:'#positionSelect', title:'Izvēlies: Apakša / Pa kreisi / Pa labi', place:'left', optional:true },
+
+{
+  sel:'.toggle-selector-left',
+  title:'Atvērt / aizvērt pogu novietojuma izvēlne (kreisā puse)',
+  place:'right',
+  optional:true,
+  ensure:()=>{
+    const p = document.querySelector('.position-selector-left');
+    p && p.classList.remove('hidden-left'); // atver kreiso paneli (ja slēpts)
+  }
+},
+{ sel:'#positionSelectLeft', title:'Izvēlies: Apakša / Pa kreisi / Pa labi', place:'right', optional:true },   
+
+    // BĀZE (vizuāli iezīmējam #compassBase)
+{ sel:'#compassBase',  title:'Griezt BĀZI',  body:T.base,  place:'right',
+  demo:()=>demoRotate(document.getElementById('compassInner')) },
+
+    // SKALA (iezīmējam #compassScale, lai lietotājs saprot atšķirību)
+{ sel:'#compassScale', title:'Griezt SKALU', body:T.scale, place:'right',
+  demo:()=>demoRotate(document.getElementById('compassScaleInner')) },
+
+ // Kompass — vispārīgi
+    { sel:'#compassContainer', title:'Kompass (pārvieto/mērogo/griez)', body:T.compass, place:'right' },
+	  
+    // Režīma pogas
+    { sel:'#toggleRotationMode', title:'Bāze ⇄ Skala', body:'Pārslēdz, kuru daļu grozīt ar žestiem.', place:'top', optional:true },
+    { sel:'#lockRotationMode',   title:'Bloķēt rotāciju', body:'Fiksē rotāciju ērtai tālummaiņai.', place:'top', optional:true },
+    { sel:'#rotateCompass90',    title:'Koordināšu noteikšanas opcijas', body:'Izvēlies ar kādu metodi noteiksi koordinātes.', place:'top', optional:true },
+    { sel:'#resetCompass',       title:'Atjauno kompasu', body:'Atgriež sākumstāvoklī (pozīcija un izmērs).', place:'top', optional:true },
+
+    // Lokālā karte
+    { sel:'#uploadMap',        title:'Augšupielādēt karti', body:'Ielādē JPG/PNG/PDF (vienu vai vairāku lapu fails)/URL kartes.', place:'top', optional:true },
+    { sel:'#mapCanvas',        title:'Lokālā karte', body:(isTouch?'Tālummaiņa ritinot pelītes rulīti vai ar diviem pikstiem velkot uz augšu/leju touchpad; Pārvieto spiezot peles kreiso pogu un velkot.':'Tālummaiņa - divu pirkstu tuvināšana/tālināšana; Pārvietot - peskaries un velc.'), place:'bottom', optional:true },
+	{ sel:'#resizeHandle',     title:'Izmēra rokturis', body:'Uzspied un velc, lai mainītu lokālās kartes izmēru (ieteicams kalibrēšanai ar kompasu).', place:'bottom', optional:true },
+    { sel:'#resetMap',         title:'Atjauno lokālo karti.', body:'Atgriežas sākumstāvoklī (pozīcija un izmērs).', place:'top', optional:true },
+
+    // Tiešsaistes karte + slāņi + PDF
+    { sel:'#toggleOnlineMap',  title:'Tiešsaistes karte', ensure:()=>{ const m=qs('#onlineMap'); if(!m||!vis(m)) qs('#toggleOnlineMap')?.click(); }, body:'Ritenis/touchpad/žesti — tālummaiņa; nospied un velc — pārvieto.', place:'bottom', optional:true },
+    { sel:'.leaflet-control-zoom-in', title:'Tālummaiņas pogas', body:'Tiešsaistes kartes + / −', place:'left', optional:true },
+    { sel:'.leaflet-control-layers-toggle', title:'Slāņi', ensure:()=>qs('.leaflet-control-layers')||qs('.leaflet-control-layers-toggle')?.click(), body:'Pamatkartes un pārklājumi.', place:'left', optional:true },
+  
+    { sel:'#mapDimmerRange',   title:'Tumšuma slīdnis', body:'Maini lokālās un tiešsaistes kartes spilgtumu, lai izceltu kompasu. Automātiski tiek noņemts drukā', place:'right', optional:true },
+    { sel:'#preparePrintBtn',  title:'Sagatavot drukai', body:'Izvēlies formātu/mērogu, sagatavo drukai vai saglabāšanai PDF.', place:'left', optional:true },
+
+    // Pilnekrāns
+    { sel:'#toggleFullscreen', title:'Pilnekrāns', body:'Ieslēgt/izslēgt ērtākam darbam.', place:'top', optional:true },
+
+    // Info/Par
+    { sel:'#toggleInstruction', title:'Detalizētas instrukcijas', place:'bottom', optional:true },
+    { sel:'#toggleMaterials',   title:'Mācību materiāli', place:'bottom', optional:true },
+    { sel:'#about',             title:'Koplietošanas QR auditorijai / Par rīku / Ziņot.', place:'top', optional:true },
+  ];
+
+  // ——— Plūsma (ātra gaidīšana: ~0.2s; ja nav — atlikt uz beigām)
+  const deferrals = Object.create(null);
+  function start(){ ensureUI(); resetTipMemo(); running=true; idx=0; run(); }
+  function stop(){ running=false; hideUI(); stopDemo(); }
+  function next(){ if(!running) return; idx++; run(); }
+  function prev(){ if(!running) return; idx=Math.max(0,idx-1); run(true); }
+
+
+// app.js — pie ceļveža koda (pirms run)
+function ensureDockOpen(){
+  const bc = qs('#buttonContainer');
+  if (bc && bc.classList.contains('docked')) bc.classList.remove('docked');
+}
+
+
+	
+  function run(backwards=false){
+    stopDemo();
+    if (!running) return;
+	ensureDockOpen();
+    if (idx>=STEPS.length){ stop(); return; }
+
+    const s = STEPS[idx];
+    showUI();
+    progress.textContent = `Ceļvedis — ${idx+1}/${STEPS.length}`;
+    try{ s.ensure && s.ensure(); }catch{}
+
+    let tries=0;
+    (function wait(){
+      if (!running) return;
+      const el = qs(s.sel);
+      const ok = el && vis(el);
+      if (!ok){
+        if (tries++<2){ setTimeout(wait, 100); return; } // ~0.2s max meklēšana
+        const maxDef = s.optional ? 2 : 1;
+        deferrals[s.sel]=(deferrals[s.sel]||0)+1;
+        if (deferrals[s.sel] <= maxDef) STEPS.push(s);
+        idx++; run(); return;
+      }
+
+      const r = el.getBoundingClientRect();
+      placeCutout(r, 8, 12);
+
+      tip.innerHTML = `
+        <button class="x" data-act="close" title="Beigt">×</button>
+        <h3>${s.title||''}</h3>
+        <p>${(typeof s.body==='function'?s.body():s.body)||''}</p>
+        <div class="nav">
+          <span class="sp">${idx+1}/${STEPS.length}</span>
+          ${idx>0?'<button class="btn" data-act="prev">Atpakaļ</button>':''}
+          <button class="btn" data-act="next">${idx<STEPS.length-1?'Tālāk':'Pabeigt'}</button>
+        </div>`;
+      placeTip(r, s.sel, s.place||'right');
+
+      // demo (ja definēts) — īss vizuāls mājiens
+      if (s.demo) { demoStop = s.demo(el); }
+
+      tip.querySelectorAll('[data-act]').forEach(b=>{
+        b.onclick = (ev)=>{
+          ev.stopPropagation();
+          const a = b.getAttribute('data-act');
+          if (a==='prev') prev();
+          else if (a==='next') (idx<STEPS.length-1? next(): stop());
+          else if (a==='close') stop();
+        };
+      });
+    })();
+  }
+
+  // ——— Repozicionēšana (resize/scroll/mutations)
+  const reposition = () => {
+    if (!running) return;
+    const s = STEPS[idx]; if (!s) return;
+    const el = qs(s.sel); if (!vis(el)) return;
+    const r = el.getBoundingClientRect(); placeCutout(r, 8, 12); placeTip(r, s.sel, s.place||'right');
+  };
+  addEventListener('resize', reposition, true);
+  addEventListener('scroll',  reposition, true);
+  visualViewport && (visualViewport.addEventListener('resize', reposition), visualViewport.addEventListener('scroll', reposition));
+  new MutationObserver(()=> running && reposition())
+    .observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style','hidden','open','aria-expanded','aria-hidden']});
+
+  // ——— Publiskais API + “?” poga
+  window.helpTour = { start, stop, next, prev, go:(n)=>{ idx=clamp(n|0,0,STEPS.length-1); run(); } };
+  window.startHelpTour = start;
+
+  function ensureFab(){
+    let fab = qs('#helpFab', document);
+    if (!fab){
+      fab = document.createElement('button');
+      fab.id='helpFab'; fab.type='button'; fab.textContent='?';
+      Object.assign(fab.style,{
+        position:'fixed', right:'14px', bottom:'14px', width:'46px', height:'46px',
+        borderRadius:'12px', border:'1px solid rgba(255,255,255,.16)',
+        background:'linear-gradient(180deg,#1b1f25,#371017aa)', color:'#fff',
+        font:'900 20px/46px system-ui', boxShadow:'0 12px 28px rgba(0,0,0,.55)', zIndex:2147483656, cursor:'pointer'
+      });
+      document.body.appendChild(fab);
+    }
+    if (!fab.__bound){ fab.__bound=1; fab.addEventListener('click', start); }
+  }
+  (document.readyState==='loading') ? document.addEventListener('DOMContentLoaded', ensureFab, {once:true}) : ensureFab();
+
+  // Klaviatūra (sākšana/navigācija)
+  document.addEventListener('keydown',(e)=>{
+    if (e.key==='i'||e.key==='I'){ e.preventDefault(); start(); }
+    if (!running) return;
+    if (e.key==='Escape') stop();
+    if (e.key==='ArrowRight') next();
+    if (e.key==='ArrowLeft')  prev();
+  });
+})();
+
+
+
+
 
 
 
