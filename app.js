@@ -5020,13 +5020,15 @@ let lastRotation = 0;     // pinch/rotate aprēķinam
 
 
 // Sākumstāvoklis vienuviet
-const COMPASS_INIT = { left: 550, top: 60, scale: 1, base: 0, scaleRot: 70 };
-window.COMPASS_INIT = COMPASS_INIT;
-
+// Jāatjauno arī reset funkcija, lai tā nodzēš X/Y
 function resetCompassToInitial(){
   compassStartLeft = COMPASS_INIT.left;
   compassStartTop  = COMPASS_INIT.top;
+  
   globalScale      = COMPASS_INIT.scale;
+  globalScaleX     = COMPASS_INIT.scale; // Reset X
+  globalScaleY     = COMPASS_INIT.scale; // Reset Y
+  
   baseRotation     = COMPASS_INIT.base;
   scaleRotation    = COMPASS_INIT.scaleRot;
   updateCompassTransform();
@@ -5157,6 +5159,13 @@ window.addEventListener('keydown', (e) => {
 
 						// Atjauno transformācijas
 // DROŠA versija: vienmēr pārvaicā DOM un iziet, ja kas nav gatavs
+// === JAUNIE GLOBĀLIE MAINĪGIE ===
+let globalScaleX = 1; 
+let globalScaleY = 1;
+// Saglabājam veco saderībai, ja kaut kur vēl lieto 'globalScale', bet primāri lietosim X/Y
+let globalScale = 1; 
+
+// Atjaunināta funkcija, kas atbalsta deformāciju (X vs Y)
 function updateCompassTransform() {
   const container   = document.getElementById('compassContainer');
   const inner       = document.getElementById('compassInner');
@@ -5164,34 +5173,27 @@ function updateCompassTransform() {
   const scaleInner  = document.getElementById('compassScaleInner');
   if (!container || !inner || !scaleWrap || !scaleInner) return;
 
-  // 1) FORCĒTA pozicionēšana (der arī vecajiem dzinējiem)
-  container.style.setProperty('position','absolute','important');
-  container.style.setProperty('left', compassStartLeft + 'px', 'important');
-  container.style.setProperty('top',  compassStartTop  + 'px', 'important');
+  // 1) Pozīcija
+  container.style.left = compassStartLeft + 'px';
+  container.style.top  = compassStartTop  + 'px';
+  container.style.transform = 'translate(0,0)';
 
-  // 2) NEITRALIZĒ jebkuru CSS translate uz konteinera
-  var t0 = 'translate(0,0)';
-  container.style.transform       = t0;
-  container.style.webkitTransform = t0;  // vecs WebKit
-  container.style.msTransform     = t0;  // IE9–11
-
-  // 3) Mērogs visam kompasam
-  var s = 'scale(' + globalScale + ')';
-  scaleWrap.style.transform       = s;
+  // 2) Mērogs (Tagad atbalsta X un Y atsevišķi)
+  // Ja globalScaleX/Y nav iestatīti (vecā loģika), izmantojam globalScale
+  const sx = (typeof globalScaleX !== 'undefined') ? globalScaleX : globalScale;
+  const sy = (typeof globalScaleY !== 'undefined') ? globalScaleY : globalScale;
+  
+  const s = `scale(${sx}, ${sy})`;
+  scaleWrap.style.transform = s;
   scaleWrap.style.webkitTransform = s;
-  scaleWrap.style.msTransform     = s;
 
-  // 4) Rotācija bāzei
-  var r1 = 'rotate(' + baseRotation + 'deg)';
-  inner.style.transform       = r1;
-  inner.style.webkitTransform = r1;
-  inner.style.msTransform     = r1;
+  // 3) Rotācija bāzei
+  const r1 = `rotate(${baseRotation}deg)`;
+  inner.style.transform = r1;
 
-  // 5) Rotācija skalai
-  var r2 = 'rotate(' + scaleRotation + 'deg)';
-  scaleInner.style.transform       = r2;
-  scaleInner.style.webkitTransform = r2;
-  scaleInner.style.msTransform     = r2;
+  // 4) Rotācija skalai
+  const r2 = `rotate(${scaleRotation}deg)`;
+  scaleInner.style.transform = r2;
 }
 
 
@@ -5345,26 +5347,20 @@ document.addEventListener('mouseup', () => { compassIsDragging = false; });
 
 
 
-
-
 // =========================================================
-// === PRECIZITĀTES KALIBRĒŠANA AR GUI UN SINHRONIZĀCIJU ===
+// === PRECIZITĀTES KALIBRĒŠANA (X un Y asis atsevišķi) ===
 // =========================================================
 
-let calibrationStep = 0; 
-let compassDistPx = 0;   
+let calibData = {
+    compassX: 0,
+    compassY: 0,
+    mapX: 0,
+    mapY: 0
+};
 let points = [];
 let measureOverlay = null;
 
-// Saglabājam kalibrācijas datus sinhronizācijai
-let syncData = {
-    active: false,
-    baseZoom: 0,
-    baseScale: 1,
-    mode: '' // 'online' vai 'local'
-};
-
-// --- 1. VIZUĀLIE PALĪGI (Līnijas un punkti) ---
+// --- 1. VIZUĀLIE PALĪGI ---
 
 function ensureMeasureOverlay() {
     let svg = document.getElementById('measureOverlay');
@@ -5380,14 +5376,14 @@ function ensureMeasureOverlay() {
     return svg;
 }
 
-function clearMeasureOverlay() {
-    const svg = document.getElementById('measureOverlay');
-    if (svg) svg.innerHTML = '';
+function clearMeasureOverlay() { 
+    const s = document.getElementById('measureOverlay'); 
+    if (s) s.innerHTML = ''; 
 }
 
-function removeMeasureOverlay() {
-    const svg = document.getElementById('measureOverlay');
-    if (svg) svg.remove();
+function removeMeasureOverlay() { 
+    const s = document.getElementById('measureOverlay'); 
+    if (s) s.remove(); 
 }
 
 function drawMarker(x, y, color = '#00ff00') {
@@ -5411,7 +5407,9 @@ function drawMarker(x, y, color = '#00ff00') {
 
 function drawLine(x1, y1, x2, y2, color = 'yellow', dashed = false) {
     const svg = ensureMeasureOverlay();
-    let line = document.getElementById(dashed ? 'activeGuideLine' : 'fixedLine');
+    // Ja raustīta līnija (kustīga), tai vajag ID, lai var izdzēst/atjaunot
+    // Ja fiksēta līnija, tai vajag unikālu ID, lai paliek
+    let line = document.getElementById(dashed ? 'activeGuideLine' : 'fixedLine_' + Date.now() + Math.random());
     
     if (!line) {
         line = document.createElementNS("http://www.w3.org/2000/svg", "line");
@@ -5425,18 +5423,21 @@ function drawLine(x1, y1, x2, y2, color = 'yellow', dashed = false) {
     if (dashed) line.setAttribute("stroke-dasharray", "6,4");
 }
 
-// --- 2. SKAISTIE MODĀLIE LOGI (Aizstāj alert) ---
+// --- 2. GUI (MODĀLIE LOGI) ---
 
 function showCalibrationModal(text, onConfirm) {
-    // Izmantojam esošo 'uploader-backdrop' stilu, bet ar savu saturu
+    // Pārbauda, vai jau nav atvērts
+    const existing = document.querySelector('.uploader-backdrop.calib-modal');
+    if(existing) existing.remove();
+
     const wrap = document.createElement('div');
-    wrap.className = 'uploader-backdrop'; // Tava esošā klase tumšajam fonam
-    wrap.style.zIndex = "100000"; // Pārliecināmies, ka ir virs visa
+    wrap.className = 'uploader-backdrop calib-modal';
+    wrap.style.zIndex = "100000";
     
     wrap.innerHTML = `
       <div class="uploader-card" style="max-width: 400px; text-align: center;">
         <h3 style="color: #4CAF50; margin-bottom: 10px;">Kalibrēšana</h3>
-        <p style="font-size: 16px; line-height: 1.5; margin-bottom: 20px;">${text}</p>
+        <p style="font-size: 16px; margin-bottom: 20px;">${text}</p>
         <div class="footer-row" style="justify-content: center;">
           <button id="calibOkBtn" class="primary" style="
             background: linear-gradient(180deg, #1b5e20, #0d330f); 
@@ -5449,226 +5450,226 @@ function showCalibrationModal(text, onConfirm) {
     document.body.appendChild(wrap);
 
     const btn = wrap.querySelector('#calibOkBtn');
-    btn.addEventListener('click', () => {
+    btn.onclick = () => {
         wrap.remove();
         if (onConfirm) onConfirm();
-    });
+    };
 }
 
-// --- 3. KALIBRĒŠANAS LOĢIKA ---
+// --- 3. UNIVERSĀLĀ MĒRĪŠANA (X un Y) ---
+
+function measureStep(target, axis, nextCallback) {
+    // Atrodam pareizo elementu
+    const el = (target === 'compass') ? document.getElementById('compassContainer') : 
+               (document.getElementById('onlineMap').style.display !== 'none' ? document.getElementById('onlineMap') : document.getElementById('mapCanvas'));
+    
+    if(!el) return;
+
+    const oldCursor = el.style.cursor;
+    el.style.cursor = 'crosshair';
+    points = [];
+
+    // Dinamiskā līnija (seko pelei)
+    const moveHandler = (e) => {
+        if (points.length === 1) {
+            // X asij zaļa, Y asij zila
+            const color = (axis === 'x') ? '#00ff00' : '#00ffff';
+            drawLine(points[0].x, points[0].y, e.clientX, e.clientY, color, true);
+        }
+    };
+    document.addEventListener('mousemove', moveHandler);
+
+    const clickHandler = (e) => {
+        e.stopPropagation();
+        // Kompasam bloķējam default, lai nevar dragot. Online kartei uzmanīgi.
+        if(target === 'compass') e.preventDefault();
+        
+        points.push({ x: e.clientX, y: e.clientY });
+        
+        const color = (axis === 'x') ? '#00ff00' : '#00ffff';
+        drawMarker(e.clientX, e.clientY, color);
+
+        if (points.length === 2) {
+            // Aprēķinām pikseļus
+            const dist = Math.sqrt(Math.pow(points[1].x - points[0].x, 2) + Math.pow(points[1].y - points[0].y, 2));
+            
+            // Saglabājam
+            if (target === 'compass' && axis === 'x') calibData.compassX = dist;
+            if (target === 'compass' && axis === 'y') calibData.compassY = dist;
+            if (target === 'map' && axis === 'x') calibData.mapX = dist;
+            if (target === 'map' && axis === 'y') calibData.mapY = dist;
+
+            console.log(`[KALIB] ${target.toUpperCase()} ${axis.toUpperCase()}: ${dist.toFixed(1)}px`);
+
+            // Notīrām eventus
+            el.removeEventListener('click', clickHandler, (target === 'compass')); 
+            document.removeEventListener('mousemove', moveHandler);
+            el.style.cursor = oldCursor;
+            
+            // Atstājam fiksēto līniju
+            drawLine(points[0].x, points[0].y, points[1].x, points[1].y, color, false);
+
+            // Pēc īsa brīža turpinām
+            setTimeout(() => {
+                if (target === 'map' && axis === 'y') {
+                    // Beigas - tīram visu
+                    removeMeasureOverlay();
+                } else {
+                    // Starpsoļi - tīram tikai raustīgo līniju
+                    const agl = document.getElementById('activeGuideLine');
+                    if(agl) agl.remove();
+                }
+                if (nextCallback) nextCallback();
+            }, 500);
+        }
+    };
+    
+    // Pievienojam listener (kompasam useCapture=true)
+    el.addEventListener('click', clickHandler, (target === 'compass'));
+}
+
+// --- 4. PROCESA PLŪSMA (4 Soļi) ---
 
 function startMapCalibration() {
-    calibrationStep = 1;
     points = [];
-    compassDistPx = 0;
-    syncData.active = false; // Izslēdzam veco sinhronizāciju
+    calibData = { compassX:0, compassY:0, mapX:0, mapY:0 };
     
-    // Noņemam vecos listenerus, ja tādi palikuši
+    // Izslēdzam veco sinhronizāciju
     if (window.map) window.map.off('zoom', syncOnlineMapZoom);
-
     ensureMeasureOverlay();
 
-    // 1. SOLIS: LOGS -> KOMPASS
+    // 1. SOLIS: Kompass X
     showCalibrationModal(
-        "<b>1. SOLIS:</b> Uzklikšķini uz KOMPASA sarkanā režģa sākuma un beigām (1 rūtiņa).", 
-        () => {
-            // Sākam klausīties klikšķus uz kompasa
-            const compassEl = document.getElementById('compassContainer');
-            const oldCursor = compassEl.style.cursor;
-            compassEl.style.cursor = 'crosshair';
-
-            // Peli sekojoša līnija
-            const moveHandler = (e) => {
-                if (points.length === 1) drawLine(points[0].x, points[0].y, e.clientX, e.clientY, 'rgba(0,255,0,0.7)', true);
-            };
-            document.addEventListener('mousemove', moveHandler);
-
-            const compassHandler = (e) => {
-                e.stopPropagation(); e.preventDefault();
-                points.push({ x: e.clientX, y: e.clientY });
-                drawMarker(e.clientX, e.clientY, '#00ff00');
-
-                if (points.length === 2) {
-                    // Pabeigts 1. solis
-                    drawLine(points[0].x, points[0].y, points[1].x, points[1].y, '#00ff00', false);
-                    compassDistPx = Math.sqrt(Math.pow(points[1].x - points[0].x, 2) + Math.pow(points[1].y - points[0].y, 2));
+        "<b>1. SOLIS (Kompass):</b><br>Uzklikšķini uz <b>HORIZONTĀLĀS (X)</b> ass sākuma un beigām (1 km).",
+        () => measureStep('compass', 'x', () => {
+            
+            // 2. SOLIS: Kompass Y
+            showCalibrationModal(
+                "<b>2. SOLIS (Kompass):</b><br>Uzklikšķini uz <b>VERTIKĀLĀS (Y)</b> ass sākuma un beigām (1 km).",
+                () => measureStep('compass', 'y', () => {
                     
-                    console.log(`[KALIB] Kompasa 1km = ${compassDistPx.toFixed(1)}px`);
-                    
-                    compassEl.removeEventListener('click', compassHandler, true);
-                    document.removeEventListener('mousemove', moveHandler);
-                    compassEl.style.cursor = oldCursor;
-
-                    // Pēc īsa brīža pārejam uz 2. soli
-                    setTimeout(() => {
-                        clearMeasureOverlay();
-                        initMapMeasurementStep(); // Izsauc nākamo soli
-                    }, 800);
-                }
-            };
-            compassEl.addEventListener('click', compassHandler, true);
-        }
+                    // Pārejam uz karti
+                    initMapMeasurement();
+                })
+            );
+        })
     );
 }
 
-function initMapMeasurementStep() {
+function initMapMeasurement() {
     const onlineMap = document.getElementById('onlineMap');
-    const localCanvas = document.getElementById('mapCanvas');
-    let activeEl = null;
-    let mode = '';
+    const isOnline = (onlineMap && onlineMap.style.display !== 'none');
+    
+    // 3. SOLIS: Karte X
+    showCalibrationModal(
+        `<b>3. SOLIS (${isOnline ? 'Online Karte' : 'Lokālā Karte'}):</b><br>Uzklikšķini uz <b>HORIZONTĀLĀ (X)</b> 1 km nogriežņa kartē.`,
+        () => measureStep('map', 'x', () => {
+            
+            // 4. SOLIS: Karte Y
+            showCalibrationModal(
+                `<b>4. SOLIS (${isOnline ? 'Online Karte' : 'Lokālā Karte'}):</b><br>Uzklikšķini uz <b>VERTIKĀLĀ (Y)</b> 1 km nogriežņa kartē.`,
+                () => measureStep('map', 'y', () => {
+                    
+                    // Pabeigts
+                    applyFullCalibration();
+                })
+            );
+        })
+    );
+}
 
-    // Nosakām režīmu
-    if (onlineMap && onlineMap.style.display !== 'none' && onlineMap.offsetParent !== null) {
-        mode = 'online';
-        activeEl = onlineMap;
-    } else if (localCanvas && getComputedStyle(localCanvas).display !== 'none') {
-        mode = 'local';
-        activeEl = localCanvas;
-    } else {
-        alert("Nav aktīvas kartes!");
-        removeMeasureOverlay();
+// --- 5. REZULTĀTA PIELIETOŠANA ---
+
+function applyFullCalibration() {
+    // Validācija
+    if (calibData.compassX < 5 || calibData.compassY < 5 || calibData.mapX < 5 || calibData.mapY < 5) {
+        if(typeof showPopupMessage === 'function') showPopupMessage("Kļūda: Mērījumi pārāk īsi.", "popup-error");
+        else alert("Kļūda: Mērījumi pārāk īsi.");
         return;
     }
 
-    points = []; // Notīrām punktus priekš kartes
+    const onlineMap = document.getElementById('onlineMap');
+    const isOnline = (onlineMap && onlineMap.style.display !== 'none');
 
-    // 2. SOLIS: LOGS -> KARTE
-    showCalibrationModal(
-        "<b>2. SOLIS:</b> Tagad iezīmē 1km (vai 1 rūtiņu) uz KARTES.",
-        () => {
-            const oldCursor = activeEl.style.cursor;
-            activeEl.style.cursor = 'crosshair';
+    if (isOnline) {
+        // --- ONLINE REŽĪMS ---
+        // Aprēķinām faktorus (Karte / Kompass)
+        const factorX = calibData.mapX / calibData.compassX;
+        const factorY = calibData.mapY / calibData.compassY;
 
-            const moveHandler = (e) => {
-                if (points.length === 1) drawLine(points[0].x, points[0].y, e.clientX, e.clientY, 'rgba(255,0,0,0.7)', true);
-            };
-            document.addEventListener('mousemove', moveHandler);
+        // Iegūstam esošos mērogus (vai 1)
+        // SVARĪGI: Pārliecinies, ka updateCompassTransform izmanto šos mainīgos!
+        const currentSX = (typeof globalScaleX !== 'undefined') ? globalScaleX : 1;
+        const currentSY = (typeof globalScaleY !== 'undefined') ? globalScaleY : 1;
 
-            const mapHandler = (e) => {
-                // Online kartei uzmanīgi ar preventDefault
-                // e.preventDefault(); 
-                points.push({ x: e.clientX, y: e.clientY });
-                drawMarker(e.clientX, e.clientY, 'red');
+        // Uzstādām jaunos
+        globalScaleX = currentSX * factorX;
+        globalScaleY = currentSY * factorY;
+        
+        // Saderībai
+        if (typeof globalScale !== 'undefined') globalScale = globalScaleX; 
 
-                if (points.length === 2) {
-                    drawLine(points[0].x, points[0].y, points[1].x, points[1].y, 'red', false);
-                    const mapDistPx = Math.sqrt(Math.pow(points[1].x - points[0].x, 2) + Math.pow(points[1].y - points[0].y, 2));
-                    
-                    console.log(`[KALIB] Kartes 1km = ${mapDistPx.toFixed(1)}px`);
-
-                    // Aprēķinām un pielietojam
-                    applyCalibration(mode, mapDistPx);
-
-                    activeEl.removeEventListener('click', mapHandler);
-                    document.removeEventListener('mousemove', moveHandler);
-                    activeEl.style.cursor = oldCursor;
-
-                    setTimeout(() => { removeMeasureOverlay(); }, 2000);
-                }
-            };
-            activeEl.addEventListener('click', mapHandler);
+        if (typeof updateCompassTransform === 'function') updateCompassTransform();
+        
+        if (typeof showPopupMessage === 'function') {
+            showPopupMessage(`Kompass pielāgots! X:${factorX.toFixed(2)} Y:${factorY.toFixed(2)}`, "popup-success");
+        } else {
+            alert("Kompass pielāgots!");
         }
-    );
-}
+        
+        startOnlineSync();
 
-// Pievieno šo palīgfunkciju kaut kur pirms applyCalibration
-function showSafeMessage(msg, type='success') {
-    // Mēģinām atrast esošo popup elementu
-    let popup = document.getElementById('touchscreenPopup');
-    
-    // Ja nav, izveidojam jaunu (lai kods nenokristu)
-    if (!popup) {
-        popup = document.createElement('div');
-        popup.id = 'touchscreenPopup';
-        popup.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 5px; z-index: 10000; display: none;';
-        document.body.appendChild(popup);
-    }
-
-    popup.textContent = msg;
-    popup.className = type === 'success' ? 'popup-success' : 'popup-error'; // Pievieno klases, ja tās ir CSS
-    popup.style.display = 'block';
-    
-    // Nokrāsojam, ja nav CSS klašu
-    if (type === 'success') popup.style.border = '1px solid #4CAF50';
-    else popup.style.border = '1px solid #F44336';
-
-    setTimeout(() => {
-        popup.style.display = 'none';
-    }, 4000);
-}
-
-// Atjaunotā applyCalibration funkcija
-function applyCalibration(mode, mapDistPx) {
-    if (mapDistPx < 10 || compassDistPx < 10) return;
-
-    if (mode === 'local') {
-        // Lokālajā: mainām bildes izmēru
-        const scaleFactor = compassDistPx / mapDistPx;
+    } else {
+        // --- LOKĀLAIS REŽĪMS ---
+        // Lokālajai kartei parasti nemaina X/Y atsevišķi, lai nedeformētu bildi.
+        // Ņemam X asi kā atskaites punktu.
+        const scaleFactor = calibData.compassX / calibData.mapX; 
+        
         if (typeof imgScale !== 'undefined') {
             imgScale *= scaleFactor;
             if (typeof drawImage === 'function') drawImage();
             if (typeof positionResizeHandle === 'function') positionResizeHandle(true);
             
-            showSafeMessage("Lokālā karte kalibrēta!", "success"); // <-- Izmantojam jauno funkciju
-        }
-    } 
-    else if (mode === 'online') {
-        // Online: mainām kompasa izmēru
-        const inverseFactor = mapDistPx / compassDistPx;
-        if (typeof globalScale !== 'undefined') {
-            globalScale *= inverseFactor;
-            if (typeof updateCompassTransform === 'function') updateCompassTransform();
-            
-            showSafeMessage("Kompass pielāgots kartei!", "success"); // <-- Izmantojam jauno funkciju
-            
-            // IESLĒDZAM SINHRONIZĀCIJU (Zoom Tracking)
-            startOnlineSync();
+            if (typeof showPopupMessage === 'function') showPopupMessage("Lokālā karte kalibrēta!", "popup-success");
         }
     }
 }
 
-// --- 4. SINHRONIZĀCIJA (Zoom sekošana) ---
+// --- 6. SINHRONIZĀCIJA (ZOOM SUPPORT) ---
+
+let syncState = { active: false, baseZoom: 0, baseSX: 1, baseSY: 1 };
 
 function startOnlineSync() {
     if (!window.map) return;
-
-    // Saglabājam atskaites punktus brīdī, kad viss ir perfekti
-    syncData.active = true;
-    syncData.mode = 'online';
-    syncData.baseZoom = window.map.getZoom();
-    syncData.baseScale = globalScale; // Kompasa pašreizējais mērogs
-
-    console.log(`[SYNC] Aktivizēta. BaseZoom:${syncData.baseZoom}, BaseScale:${syncData.baseScale}`);
-
-    // Noņemam veco listeneri, lai nedubultojas
-    window.map.off('zoom', syncOnlineMapZoom);
     
-    // Pievienojam jauno (Leaflet zoom event)
-    // Izmantojam 'zoom' nevis 'zoomend', lai kompass mainītos gludi animācijas laikā
+    syncState.active = true;
+    syncState.baseZoom = window.map.getZoom();
+    
+    // Saglabājam pašreizējo "deformēto" stāvokli kā bāzi
+    syncState.baseSX = (typeof globalScaleX !== 'undefined') ? globalScaleX : 1;
+    syncState.baseSY = (typeof globalScaleY !== 'undefined') ? globalScaleY : 1;
+
+    console.log(`[SYNC] Sākts. BaseZoom: ${syncState.baseZoom}, SX: ${syncState.baseSX.toFixed(2)}, SY: ${syncState.baseSY.toFixed(2)}`);
+
+    window.map.off('zoom', syncOnlineMapZoom);
     window.map.on('zoom', syncOnlineMapZoom);
 }
 
-// Šī funkcija tiks izsaukta katru reizi, kad mainās kartes zoom
 function syncOnlineMapZoom() {
-    if (!syncData.active) return;
+    if (!syncState.active) return;
+    
+    const diff = window.map.getZoom() - syncState.baseZoom;
+    const factor = Math.pow(2, diff); // Leaflet zoom ir eksponenciāls
 
-    const currentZoom = window.map.getZoom(); // Var būt daļskaitlis (fractional zoom)
-    const diff = currentZoom - syncData.baseZoom;
+    // Mainām abus vienādi, lai saglabātu X/Y proporciju, bet mainītu izmēru
+    window.globalScaleX = syncState.baseSX * factor;
+    window.globalScaleY = syncState.baseSY * factor;
+    
+    // Saderībai
+    if (typeof globalScale !== 'undefined') window.globalScale = window.globalScaleX;
 
-    // Matemātika: Leaflet mērogs dubultojas ik pēc +1 zoom.
-    // Ja zoom +1, kompasam jābūt 2x lielākam.
-    // Ja zoom -1, kompasam jābūt 0.5x lielākam.
-    const factor = Math.pow(2, diff);
-
-    // Aprēķinām jauno kompasa mērogu balstoties uz kalibrēto bāzi
-    globalScale = syncData.baseScale * factor;
-
-    // Atjaunojam kompasu
-    if (typeof updateCompassTransform === 'function') {
-        updateCompassTransform();
-    }
+    if (typeof updateCompassTransform === 'function') updateCompassTransform();
 }
-
 // =========================================================
 
 
