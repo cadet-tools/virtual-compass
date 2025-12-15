@@ -5160,8 +5160,16 @@ window.addEventListener('keydown', (e) => {
 						// Atjauno transformācijas
 // DROŠA versija: vienmēr pārvaicā DOM un iziet, ja kas nav gatavs
 // === JAUNIE GLOBĀLIE MAINĪGIE ===
-// === SĀKUMA VĒRTĪBAS (PIEVIENO ŠO BLOKU) ===
-// === SĀKUMA VĒRTĪBAS ===
+
+
+
+
+
+// =========================================================
+// === KOMPASA TRANSFORMĀCIJA UN MAINĪGIE (LABOTS) ===
+// =========================================================
+
+// 1. SĀKUMA VĒRTĪBAS
 const COMPASS_INIT = { 
     left: 550, 
     top: 60, 
@@ -5171,44 +5179,46 @@ const COMPASS_INIT = {
 };
 window.COMPASS_INIT = COMPASS_INIT;
 
-// === GLOBĀLIE MAINĪGIE (Droša definīcija) ===
-// Pārbaudām, vai jau eksistē, lai nebūtu "Identifier already declared" kļūdu
+// 2. GLOBĀLIE MAINĪGIE (Droša definīcija - novērš SyntaxError)
+// Mēs neizmantojam 'let', ja mainīgie jau eksistē globālajā sciopā
 if (typeof globalScaleX === 'undefined') var globalScaleX = 1;
 if (typeof globalScaleY === 'undefined') var globalScaleY = 1;
-// globalScale izmantojam tikai kā atskaites punktu
+
+// Pārliecināmies, ka globalScale eksistē, bet nedeklarējam to otrreiz ar 'let'
 if (typeof globalScale === 'undefined') var globalScale = 1; 
 
-// Atjaunināta funkcija: Zīmē kompasu
+// 3. ATJAUNINĀTA FUNKCIJA: Zīmē kompasu
 function updateCompassTransform() {
   const container   = document.getElementById('compassContainer');
   const inner       = document.getElementById('compassInner');
   const scaleWrap   = document.getElementById('compassScaleContainer');
   const scaleInner  = document.getElementById('compassScaleInner');
+  
   if (!container || !inner || !scaleWrap || !scaleInner) return;
 
-  // 1) Pozīcija
+  // Pozīcija
   container.style.left = compassStartLeft + 'px';
   container.style.top  = compassStartTop  + 'px';
   container.style.transform = 'translate(0,0)';
 
-  // 2) Mērogs - ņemam X un Y. Ja tie ir 0 vai undefined, ņemam 1.
-  const sx = globalScaleX || 1;
-  const sy = globalScaleY || 1;
+  // Mērogs: Izmantojam X un Y. Ja tie ir pazaudēti, ņemam globalScale vai 1.
+  const sx = (typeof globalScaleX === 'number' && !isNaN(globalScaleX)) ? globalScaleX : (globalScale || 1);
+  const sy = (typeof globalScaleY === 'number' && !isNaN(globalScaleY)) ? globalScaleY : (globalScale || 1);
   
+  // Sinhronizējam, lai nākamais zoom solis būtu pareizs
+  if (globalScaleX !== sx) globalScaleX = sx;
+  if (globalScaleY !== sy) globalScaleY = sy;
+
   const s = `scale(${sx}, ${sy})`;
   scaleWrap.style.transform = s;
   scaleWrap.style.webkitTransform = s;
 
-  // 3) Rotācija bāzei
-  const r1 = `rotate(${baseRotation}deg)`;
-  inner.style.transform = r1;
-
-  // 4) Rotācija skalai
-  const r2 = `rotate(${scaleRotation}deg)`;
-  scaleInner.style.transform = r2;
+  // Rotācija
+  inner.style.transform = `rotate(${baseRotation}deg)`;
+  scaleInner.style.transform = `rotate(${scaleRotation}deg)`;
 }
 
-// Reset funkcija
+// 4. RESET FUNKCIJA
 function resetCompassToInitial(){
   compassStartLeft = COMPASS_INIT.left;
   compassStartTop  = COMPASS_INIT.top;
@@ -5222,7 +5232,7 @@ function resetCompassToInitial(){
   updateCompassTransform();
 }
 
-// Inicializācija
+// 5. INICIALIZĀCIJA
 (function initCompassSafe(){
   const start = () => {
     if (!document.getElementById('compassContainer')) { requestAnimationFrame(start); return; }
@@ -5234,7 +5244,9 @@ function resetCompassToInitial(){
 })();
 
 
-// === KOMPASA KLAUSĪTĀJI (Labots Zoom) ===
+// =========================================================
+// === KOMPASA KLAUSĪTĀJI (ZOOM LABOJUMS) ===
+// =========================================================
 (function bindCompassSection(){
   function bindCompassListeners(){
     const cc = document.getElementById('compassContainer');
@@ -5283,7 +5295,6 @@ function resetCompassToInitial(){
         updateCompassTransform();
       } else if (e.touches.length === 2) {
         const newDistance = getDistance(e.touches[0], e.touches[1]);
-        // Proporcionāla tālummaiņa ar touch
         const factor = newDistance / lastTouchDistance;
         globalScaleX *= factor;
         globalScaleY *= factor;
@@ -5301,31 +5312,25 @@ function resetCompassToInitial(){
 
     on(cc, 'touchend', () => { isTouchingCompass = false; });
 
-    // --- PELES RULLĪTIS (LABOTS) ---
+    // --- PELES RULLĪTIS (ZOOM FIX) ---
     on(cc, 'wheel', (e) => {
       e.preventDefault();
       
       if (e.shiftKey) {
-        // Shift: Rotācija Bāzei
         baseRotation += e.deltaY * 0.05;
       } else if (e.ctrlKey) {
-        // Ctrl: Rotācija Skalai
         scaleRotation += e.deltaY * 0.05;
       } else if (e.altKey) {
-        // Alt: Tālummaiņa (Mainām X un Y proporcionāli)
-        // e.deltaY negatīvs ir uz augšu (zoom in)
-        const zoomStep = e.deltaY * -0.001; 
-        const factor = 1 + zoomStep;
+        // Alt: Tālummaiņa - mainām abus (X un Y) proporcionāli
+        // Izmantojam reizinātāju (factor), nevis saskaitīšanu, lai būtu gludāk
+        const zoomFactor = (e.deltaY > 0) ? 0.95 : 1.05; // 5% solis
+        
+        globalScaleX *= zoomFactor;
+        globalScaleY *= zoomFactor;
 
-        // Pielietojam faktoru abām asīm
-        let newX = globalScaleX * factor;
-        let newY = globalScaleY * factor;
-
-        // Ierobežojumi (lai nepazūd)
-        if (newX > 0.1 && newX < 10) {
-            globalScaleX = newX;
-            globalScaleY = newY;
-        }
+        // Ierobežojumi
+        globalScaleX = Math.max(0.1, Math.min(globalScaleX, 10));
+        globalScaleY = Math.max(0.1, Math.min(globalScaleY, 10));
       }
       updateCompassTransform();
     }, { passive:false });
@@ -5336,29 +5341,22 @@ function resetCompassToInitial(){
 })();
 
 
-
-
-
-
-
-
-
-
 // =========================================================
-// === PRECIZITĀTES KALIBRĒŠANA (X un Y asis atsevišķi) ===
+// === PRECIZITĀTES KALIBRĒŠANA (AR PAREIZU KARTES IZVĒLI) ===
 // =========================================================
 
 let calibData = { compassX: 0, compassY: 0, mapX: 0, mapY: 0 };
 let points = [];
 let measureOverlay = null;
 
-// Palīgs: Nosaka vai Online karte ir redzama
-function isOnlineMapActive() {
+// Svarīgi: Pārbauda, vai Online karte tiešām ir redzama
+function getActiveMapType() {
     const el = document.getElementById('onlineMap');
-    if (!el) return false;
-    // Pārbauda reālo stilu (vai ir 'none')
-    const style = window.getComputedStyle(el);
-    return style.display !== 'none' && style.visibility !== 'hidden';
+    // Ja online karte eksistē UN tai nav display:none -> tā ir aktīva
+    if (el && window.getComputedStyle(el).display !== 'none') {
+        return 'online';
+    }
+    return 'local';
 }
 
 // --- 1. VIZUĀLIE PALĪGI ---
@@ -5427,12 +5425,9 @@ function measureStep(target, axis, nextCallback) {
     if (target === 'compass') {
         el = document.getElementById('compassContainer');
     } else {
-        // LABOTS: Precīzi nosaka aktīvo karti
-        if (isOnlineMapActive()) {
-            el = document.getElementById('onlineMap');
-        } else {
-            el = document.getElementById('mapCanvas');
-        }
+        // Izvēlas pareizo kartes elementu
+        const mapType = getActiveMapType();
+        el = (mapType === 'online') ? document.getElementById('onlineMap') : document.getElementById('mapCanvas');
     }
     
     if(!el) { alert("Kļūda: Nevar atrast elementu!"); return; }
@@ -5501,8 +5496,8 @@ function startMapCalibration() {
 }
 
 function initMapMeasurement() {
-    const isOnline = isOnlineMapActive();
-    const mapName = isOnline ? 'Online Karte' : 'Lokālā Karte';
+    const mapType = getActiveMapType();
+    const mapName = (mapType === 'online') ? 'Online Karte' : 'Lokālā Karte';
     
     showCalibrationModal(`<b>3. SOLIS (${mapName}):</b><br>Uzklikšķini uz <b>HORIZONTĀLĀ (X)</b> 1 km nogriežņa kartē.`, 
         () => measureStep('map', 'x', 
@@ -5518,11 +5513,14 @@ function applyFullCalibration() {
         return;
     }
 
-    if (isOnlineMapActive()) {
+    const mapType = getActiveMapType();
+
+    if (mapType === 'online') {
         // ONLINE: Mainām Kompasu
         const factorX = calibData.mapX / calibData.compassX;
         const factorY = calibData.mapY / calibData.compassY;
 
+        // Piemērojam faktoru esošajam mērogam
         globalScaleX *= factorX;
         globalScaleY *= factorY;
         
@@ -5533,8 +5531,7 @@ function applyFullCalibration() {
         
         startOnlineSync();
     } else {
-        // LOKĀLĀ: Mainām bildi (tikai scale, nedeformējam attēlu)
-        // Izmantojam X asi kā galveno
+        // LOKĀLĀ: Mainām bildi (tikai vienmērīgu mērogu)
         const scaleFactor = calibData.compassX / calibData.mapX; 
         
         if (typeof imgScale !== 'undefined') {
@@ -5548,7 +5545,7 @@ function applyFullCalibration() {
     }
 }
 
-// --- 5. SINHRONIZĀCIJA ---
+// --- 5. SINHRONIZĀCIJA (Tikai Online kartei) ---
 let syncState = { active: false, baseZoom: 0, baseSX: 1, baseSY: 1 };
 
 function startOnlineSync() {
@@ -5569,6 +5566,8 @@ function syncOnlineMapZoom() {
     globalScaleY = syncState.baseSY * factor;
     updateCompassTransform();
 }
+
+
 // =========================================================
 
 
