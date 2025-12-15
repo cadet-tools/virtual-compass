@@ -5173,13 +5173,8 @@ window.COMPASS_INIT = COMPASS_INIT; // Drošībai padarām globālu
 // === JAUNIE GLOBĀLIE MAINĪGIE ===
 let globalScaleX = 1; 
 let globalScaleY = 1;
+globalScale = 1;
 
-// Pārbaudām, vai globalScale jau eksistē
-if (typeof globalScale === 'undefined') {
-    var globalScale = 1; 
-} else {
-    globalScale = 1; 
-}
 	
 // Atjaunināta funkcija, kas atbalsta deformāciju (X vs Y)
 function updateCompassTransform() {
