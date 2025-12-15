@@ -5160,10 +5160,26 @@ window.addEventListener('keydown', (e) => {
 						// Atjauno transformācijas
 // DROŠA versija: vienmēr pārvaicā DOM un iziet, ja kas nav gatavs
 // === JAUNIE GLOBĀLIE MAINĪGIE ===
+// === SĀKUMA VĒRTĪBAS (PIEVIENO ŠO BLOKU) ===
+const COMPASS_INIT = { 
+    left: 550, 
+    top: 60, 
+    scale: 1, 
+    base: 0, 
+    scaleRot: 70 
+};
+window.COMPASS_INIT = COMPASS_INIT; // Drošībai padarām globālu
+
+// === JAUNIE GLOBĀLIE MAINĪGIE ===
 let globalScaleX = 1; 
 let globalScaleY = 1;
-// Tikai piešķiram vērtību, nevis definējam no jauna
-globalScale = 1;
+
+// Pārbaudām, vai globalScale jau eksistē
+if (typeof globalScale === 'undefined') {
+    var globalScale = 1; 
+} else {
+    globalScale = 1; 
+}
 	
 // Atjaunināta funkcija, kas atbalsta deformāciju (X vs Y)
 function updateCompassTransform() {
