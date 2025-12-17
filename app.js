@@ -5305,7 +5305,14 @@ document.addEventListener('mouseup', () => { compassIsDragging = false; });
         updateCompassTransform();
       } else if (e.touches.length === 2) {
         const newDistance = getDistance(e.touches[0], e.touches[1]);
-        globalScale *= newDistance / lastTouchDistance;
+       // Aprēķinām izmaiņu faktoru
+        const factor = newDistance / lastTouchDistance;
+        
+        // Pielietojam faktoru visiem mērogiem, lai saglabātu kalibrāciju
+        globalScale *= factor;
+        if (typeof globalScaleX !== 'undefined') globalScaleX *= factor;
+        if (typeof globalScaleY !== 'undefined') globalScaleY *= factor;
+        // --- LABOJUMS BEIDZAS ---
         lastTouchDistance = newDistance;
 
         if (!isRotationLocked) {
@@ -5325,13 +5332,27 @@ document.addEventListener('mouseup', () => { compassIsDragging = false; });
     on(cc, 'touchend', () => { isTouchingCompass = false; });
 
     // Ritenītis (zoom/rotācija)
+// Ritenītis (zoom/rotācija)
     on(cc, 'wheel', (e) => {
       e.preventDefault();
       if (e.shiftKey) {
         baseRotation += e.deltaY * 0.005;
       } else if (e.altKey) {
-        globalScale += e.deltaY * -0.0005;
-        globalScale  = Math.min(Math.max(0.5, globalScale), 5);
+        // --- LABOJUMS SĀKAS ---
+        const oldScale = globalScale;
+        let newScale = oldScale + (e.deltaY * -0.0005);
+        
+        // Ierobežojumi
+        newScale = Math.min(Math.max(0.2, newScale), 8);
+        
+        // Aprēķinām relatīvo izmaiņu (faktoru), lai nesabojātu X/Y proporciju
+        const factor = newScale / oldScale;
+
+        globalScale = newScale;
+        if (typeof globalScaleX !== 'undefined') globalScaleX *= factor;
+        if (typeof globalScaleY !== 'undefined') globalScaleY *= factor;
+        // --- LABOJUMS BEIDZAS ---
+
       } else if (e.ctrlKey) {
         scaleRotation += e.deltaY * 0.005;
       }
