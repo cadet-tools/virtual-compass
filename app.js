@@ -5488,18 +5488,43 @@ function showCalibrationModal(text, onConfirm) {
     };
 }
 
-// --- 3. UNIVERSĀLĀ MĒRĪŠANA (X un Y) ---
 
+// 1. JAUNA PALĪGFUNKCIJA: Nosaka, kura karte pašlaik ir aktīva
+function getActiveMapMode() {
+    const onlineMap = document.getElementById('onlineMap');
+    // Mēs uzskatām, ka Online karte ir aktīva TIKAI tad, ja:
+    // 1. Tā eksistē DOMā
+    // 2. Tās display nav 'none'
+    // 3. Tās augstums ir lielāks par 0 (tā reāli ir redzama ekrānā)
+    if (onlineMap && onlineMap.style.display !== 'none' && onlineMap.offsetHeight > 0) {
+        return 'online';
+    }
+    return 'local';
+}
+
+	
+// --- 3. UNIVERSĀLĀ MĒRĪŠANA (X un Y) ---
+// 2. LABOTS measureStep: Izvēlas pareizo elementu, balstoties uz aktīvo karti
 function measureStep(target, axis, nextCallback) {
     // Atrodam pareizo elementu
-    const el = (target === 'compass') ? document.getElementById('compassContainer') : 
-               (document.getElementById('onlineMap').style.display !== 'none' ? document.getElementById('onlineMap') : document.getElementById('mapCanvas'));
+    let el;
+    
+    if (target === 'compass') {
+        el = document.getElementById('compassContainer');
+    } else {
+        // Ja mērķis ir karte, skatāmies, kura ir aktīva
+        if (getActiveMapMode() === 'online') {
+            el = document.getElementById('onlineMap');
+        } else {
+            el = document.getElementById('mapCanvas'); // Lokālā (augšupielādētā) karte
+        }
+    }
     
     if(!el) return;
 
     const oldCursor = el.style.cursor;
     el.style.cursor = 'crosshair';
-    points = [];
+    points = []; // Reset points for this step
 
     // Dinamiskā līnija (seko pelei)
     const moveHandler = (e) => {
@@ -5513,7 +5538,7 @@ function measureStep(target, axis, nextCallback) {
 
     const clickHandler = (e) => {
         e.stopPropagation();
-        // Kompasam bloķējam default, lai nevar dragot. Online kartei uzmanīgi.
+        // Kompasam bloķējam default, lai nevar dragot. 
         if(target === 'compass') e.preventDefault();
         
         points.push({ x: e.clientX, y: e.clientY });
@@ -5560,8 +5585,8 @@ function measureStep(target, axis, nextCallback) {
     el.addEventListener('click', clickHandler, (target === 'compass'));
 }
 
+	
 // --- 4. PROCESA PLŪSMA (4 Soļi) ---
-
 function startMapCalibration() {
     points = [];
     calibData = { compassX:0, compassY:0, mapX:0, mapY:0 };
@@ -5588,18 +5613,19 @@ function startMapCalibration() {
     );
 }
 
+// 3. LABOTS initMapMeasurement: Pareizais teksts un loģika (3. un 4. solis)
 function initMapMeasurement() {
-    const onlineMap = document.getElementById('onlineMap');
-    const isOnline = (onlineMap && onlineMap.style.display !== 'none');
+    const mode = getActiveMapMode();
+    const mapName = (mode === 'online') ? 'Online Karte' : 'Lokālā Karte';
     
     // 3. SOLIS: Karte X
     showCalibrationModal(
-        `<b>3. SOLIS (${isOnline ? 'Online Karte' : 'Lokālā Karte'}):</b><br>Uzklikšķini uz <b>HORIZONTĀLĀ (X)</b> 1 km nogriežņa kartē.`,
+        `<b>3. SOLIS (${mapName}):</b><br>Uzklikšķini uz <b>HORIZONTĀLĀ (X)</b> 1 km nogriežņa kartē.`,
         () => measureStep('map', 'x', () => {
             
             // 4. SOLIS: Karte Y
             showCalibrationModal(
-                `<b>4. SOLIS (${isOnline ? 'Online Karte' : 'Lokālā Karte'}):</b><br>Uzklikšķini uz <b>VERTIKĀLĀ (Y)</b> 1 km nogriežņa kartē.`,
+                `<b>4. SOLIS (${mapName}):</b><br>Uzklikšķini uz <b>VERTIKĀLĀ (Y)</b> 1 km nogriežņa kartē.`,
                 () => measureStep('map', 'y', () => {
                     
                     // Pabeigts
@@ -5609,9 +5635,9 @@ function initMapMeasurement() {
         })
     );
 }
-
+	
 // --- 5. REZULTĀTA PIELIETOŠANA ---
-
+// 4. LABOTS applyFullCalibration: Veic izmaiņas atkarībā no aktīvās kartes
 function applyFullCalibration() {
     // Validācija
     if (calibData.compassX < 5 || calibData.compassY < 5 || calibData.mapX < 5 || calibData.mapY < 5) {
@@ -5620,41 +5646,37 @@ function applyFullCalibration() {
         return;
     }
 
-    const onlineMap = document.getElementById('onlineMap');
-    const isOnline = (onlineMap && onlineMap.style.display !== 'none');
+    const mode = getActiveMapMode();
 
-    if (isOnline) {
+    if (mode === 'online') {
         // --- ONLINE REŽĪMS ---
-        // Aprēķinām faktorus (Karte / Kompass)
+        // Šeit mēs mainām KOMPASA mērogu (X un Y atsevišķi), lai tas atbilstu kartei.
         const factorX = calibData.mapX / calibData.compassX;
         const factorY = calibData.mapY / calibData.compassY;
 
-        // Iegūstam esošos mērogus (vai 1)
-        // SVARĪGI: Pārliecinies, ka updateCompassTransform izmanto šos mainīgos!
         const currentSX = (typeof globalScaleX !== 'undefined') ? globalScaleX : 1;
         const currentSY = (typeof globalScaleY !== 'undefined') ? globalScaleY : 1;
 
-        // Uzstādām jaunos
         globalScaleX = currentSX * factorX;
         globalScaleY = currentSY * factorY;
         
-        // Saderībai
         if (typeof globalScale !== 'undefined') globalScale = globalScaleX; 
 
         if (typeof updateCompassTransform === 'function') updateCompassTransform();
         
         if (typeof showPopupMessage === 'function') {
-            showPopupMessage(`Kompass pielāgots! X:${factorX.toFixed(2)} Y:${factorY.toFixed(2)}`, "popup-success");
+            showPopupMessage(`Kompass pielāgots Online kartei!`, "popup-success");
         } else {
-            alert("Kompass pielāgots!");
+            alert("Kompass pielāgots Online kartei!");
         }
         
         startOnlineSync();
 
     } else {
         // --- LOKĀLAIS REŽĪMS ---
-        // Lokālajai kartei parasti nemaina X/Y atsevišķi, lai nedeformētu bildi.
-        // Ņemam X asi kā atskaites punktu.
+        // Lokālajai kartei mēs mainām KARTES (attēla) izmēru, lai tā atbilstu kompasam.
+        // Izmantojam X asi kā atskaites punktu.
+        
         const scaleFactor = calibData.compassX / calibData.mapX; 
         
         if (typeof imgScale !== 'undefined') {
@@ -5662,7 +5684,11 @@ function applyFullCalibration() {
             if (typeof drawImage === 'function') drawImage();
             if (typeof positionResizeHandle === 'function') positionResizeHandle(true);
             
-            if (typeof showPopupMessage === 'function') showPopupMessage("Lokālā karte kalibrēta!", "popup-success");
+            if (typeof showPopupMessage === 'function') {
+                showPopupMessage(`Lokālā karte kalibrēta!`, "popup-success");
+            } else {
+                alert("Lokālā karte kalibrēta!");
+            }
         }
     }
 }
