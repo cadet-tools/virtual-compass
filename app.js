@@ -1651,7 +1651,7 @@ const lvmTopo10_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
 	  'CartoDB Positron': cartoLight,
 	  'LVM Topo10': lvmTopo10_wms,
 	  'LVM Topo50': lvmTopo50_wms,
-	  'LVM Topo50': lvmTopo250_wms,
+	  'LVM Topo250': lvmTopo250_wms,
 	  'LVM OSM (WMS)': lvmOSM
 	
 	};
