@@ -1570,8 +1570,8 @@ const lvmTopo10_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
   attribution: '© LVM, © LGIA'
 });
 
-	  const lvmTopo250_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', {
-  layers: 'public:Topo250',  // Vai 'public:LVM_Zemes_karte' vēl modernākam skatam
+	  const lvmTopoAuto_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', {
+  layers: 'public:LVM_Zemes_karte',  // Vai 'public:LVM_Zemes_karte' vēl modernākam skatam
   format: 'image/png',
   transparent: true,
   version: '1.1.1',         // Svarīgi stabilitātei
@@ -1651,7 +1651,7 @@ const lvmTopo10_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
 	  'CartoDB Positron': cartoLight,
 	  'LVM Topo10': lvmTopo10_wms,
 	  'LVM Topo50': lvmTopo50_wms,
-	  'LVM Topo250': lvmTopo250_wms,
+	  'LVM Zemes karte (Auto)': lvmTopoAuto_wms,
 	  'LVM OSM (WMS)': lvmOSM
 	
 	};
@@ -1661,7 +1661,7 @@ const lvmTopo10_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
   // [E] PAPLAŠINI tavu tileerror listeneri uz VISIEM slāņiem
   [
     osm, topo, esri, hot, cyclo, osmDe, osmFr, cartoLight,
-    lvmTopo50_wms, lvmTopo10_wms, lvmTopo250_wms, lvmOSM,
+    lvmTopo50_wms, lvmTopo10_wms, lvmTopoAuto_wms, lvmOSM,
     hiking, cycling, rail, seamarks
   ].forEach(l => l.on('tileerror', (e) => {
     // nerādīt “salūzušo bildi” + logā redzēt avotu
