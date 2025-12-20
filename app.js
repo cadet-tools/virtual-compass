@@ -2900,72 +2900,102 @@ map.setView([56.9496, 24.1052], 13);
 
 
 
-// ====== LKS-92 režģa ģenerators ======
-function createLKSGridLayers(){
- const lineStyle = { color:'#000000', weight:2.6, opacity:0.95 }; // melnas, izteiktas līnijas
-
-  const labelStyle = {className:'lks-grid-label'};               // CSS vari piekrāsot, ja vajag
-
+// ====== LKS-92 režģa ģenerators (LABOTS - KĀ MGRS) ======
+function createLKSGridLayers() {
   const grid = L.layerGroup();
   const labels = L.layerGroup();
 
-  // ņem redzamo kartes rāmi un taisa 1 km režģi
-function redraw(){
-  grid.clearLayers(); labels.clearLayers();
-  const thin = document.body.classList.contains('print-mode');
-  const lineStyle = { color:'#000000', weight: thin ? 0.6 : 2.6, opacity: 0.95 };
+  // Pārliecinies, vai CSS ir definēts 'lks-grid-label'. 
+  // Ja gribi identisku stilu MGRS, vari šeit nomainīt uz 'utm-label' vai pievienot CSS.
+  const labelStyle = { className: 'lks-grid-label' };
+
+  function redraw() {
+    grid.clearLayers();
+    labels.clearLayers();
+    
+    if (!map) return;
+
+    const thin = document.body.classList.contains('print-mode');
+    
+    // 1. IZMAIŅA: Pievienojam 'interactive: false' un pareizo 'pane'
+    const lineStyle = { 
+      color: '#000000', 
+      weight: thin ? 0.6 : 2.6, 
+      opacity: 0.95, 
+      interactive: false, // Svarīgi: ļauj klikšķināt cauri līnijām
+      pane: 'gridPane'    // Zīmē zem etiķetēm (ja pane eksistē)
+    };
 
     const b = map.getBounds();
-  const scale = getCurrentScale();
-const step  = gridStepForScale(scale);
+    const scale = getCurrentScale();
+    const step = gridStepForScale(scale);
 
-    // pārveido robežas uz LKS, lai iterētu E/N
+    // Pārveidojam robežas
     const bl = wgsToLKS(b.getSouth(), b.getWest());
     const tr = wgsToLKS(b.getNorth(), b.getEast());
 
-    const E_min = Math.floor(bl.E/step)*step;
-    const N_min = Math.floor(bl.N/step)*step;
-    const E_max = Math.ceil(tr.E/step)*step;
-    const N_max = Math.ceil(tr.N/step)*step;
+    // Aprēķinām režģa robežas
+    const minE_raw = Math.min(bl.E, tr.E);
+    const maxE_raw = Math.max(bl.E, tr.E);
+    const minN_raw = Math.min(bl.N, tr.N);
+    const maxN_raw = Math.max(bl.N, tr.N);
 
-    // Palīgfunkcija: LKS punktu rindu pārveido uz LatLng polilīniju
-    const toLatLngs = (pointsEN) => pointsEN.map(p=>{
-      // “atpakaļ” uz WGS84 — ja Tev ir lksToWgs, izmanto to.
-      // Šeit izmantojam proj4 jau definēto transformāciju (ja Tev tāda ir):
-      const xy = proj4('EPSG:3059','EPSG:4326',[p.E,p.N]);  // [lng,lat]
+    const E_min = Math.floor(minE_raw / step) * step;
+    const E_max = Math.ceil(maxE_raw / step) * step;
+    const N_min = Math.floor(minN_raw / step) * step;
+    const N_max = Math.ceil(maxN_raw / step) * step;
+
+    // 2. IZMAIŅA: Iegūstam kartes centru LKS koordinātēs
+    // Tas nepieciešams, lai etiķetes zīmētu ekrāna vidū
+    const c = map.getCenter();
+    const cLKS = wgsToLKS(c.lat, c.lng);
+    
+    // "Noklampējam" centru, lai tas neiziet ārpus redzamā režģa robežām
+    const centerE = Math.max(E_min, Math.min(E_max, cLKS.E));
+    const centerN = Math.max(N_min, Math.min(N_max, cLKS.N));
+
+    const toLatLngs = (pointsEN) => pointsEN.map(p => {
+      const xy = proj4('EPSG:3059', 'EPSG:4326', [p.E, p.N]);
       return L.latLng(xy[1], xy[0]);
     });
 
-    // Vertikālās (E konst) līnijas
-    for (let E=E_min; E<=E_max; E+=step){
-      const pts = [
-        {E, N:N_min},
-        {E, N:N_max}
-      ];
+    // --- Vertikālās līnijas (E konstante) ---
+    for (let E = E_min; E <= E_max; E += step) {
+      const pts = [{ E, N: N_min }, { E, N: N_max }];
       L.polyline(toLatLngs(pts), lineStyle).addTo(grid);
-      // etiķete augšā
-      const top = toLatLngs([{E, N:N_max}])[0];
-      L.marker(top, {icon:L.divIcon({...labelStyle, html:`E ${E}` }), interactive:false}).addTo(labels);
+
+      // 3. IZMAIŅA: Etiķetes pozīcija
+      // E ir fiksēts (līnija), bet N ņemam no ekrāna centra (centerN)
+      const labelPos = toLatLngs([{ E, N: centerN }])[0];
+      
+      L.marker(labelPos, {
+        icon: L.divIcon({ ...labelStyle, html: `<span>E ${E}</span>` }), // Ieliekam <span> lai varētu smuki noformēt
+        interactive: false,
+        pane: 'gridLabelPane' // Zīmējam virs līnijām
+      }).addTo(labels);
     }
 
-    // Horizontālās (N konst) līnijas
-    for (let N=N_min; N<=N_max; N+=step){
-      const pts = [
-        {E:E_min, N},
-        {E:E_max, N}
-      ];
+    // --- Horizontālās līnijas (N konstante) ---
+    for (let N = N_min; N <= N_max; N += step) {
+      const pts = [{ E: E_min, N }, { E: E_max, N }];
       L.polyline(toLatLngs(pts), lineStyle).addTo(grid);
-      // etiķete pa kreisi
-      const left = toLatLngs([{E:E_min, N}])[0];
-      L.marker(left, {icon:L.divIcon({...labelStyle, html:`N ${N}` }), interactive:false}).addTo(labels);
+
+      // 3. IZMAIŅA: Etiķetes pozīcija
+      // N ir fiksēts (līnija), bet E ņemam no ekrāna centra (centerE)
+      const labelPos = toLatLngs([{ E: centerE, N }])[0];
+      
+      L.marker(labelPos, {
+        icon: L.divIcon({ ...labelStyle, html: `<span>N ${N}</span>` }), 
+        interactive: false,
+        pane: 'gridLabelPane'
+      }).addTo(labels);
     }
   }
 
   map.on('moveend zoomend resize viewreset', redraw);
-
   redraw();
 
-  return {grid, labels};
+  return { grid, labels };
 }
 
 
