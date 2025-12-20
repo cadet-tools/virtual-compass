@@ -2906,6 +2906,7 @@ function createLKSGridLayers() {
   const grid = L.layerGroup();
   const labels = L.layerGroup();
 
+	
   // 1. Iespricējam CSS, lai etiķetes izskatītos kā MGRS (melns fons, balts teksts)
   if (!document.getElementById('lks-grid-css')) {
     const el = document.createElement('style');
