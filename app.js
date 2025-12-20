@@ -1470,17 +1470,13 @@ function installTileErrorWatch(layer, opts){
   }).addTo(map);
 
 	  
-// REPLACE: Aizstājam CyclOSM ar OpenTopoMap
-const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-  attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
-  subdomains: 'abc',
-  maxZoom: 20,           // Atļaujam lietotāja interfeisā zoomot līdz 20...
-  maxNativeZoom: 16,     
+// REPLACE: Esri World Topo Map (Stabila, ātra, ar reljefu)
+const topo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community',
+  maxZoom: 20,
+  maxNativeZoom: 19, // Esri parasti iet līdz 19, tālāk digital zoom
   updateWhenIdle: true,
-  keepBuffer: 2,
-  detectRetina: false,
-  crossOrigin: true,     // Svarīgi, ja karti saglabā vai drukā
-  errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' // Tukša flīze kļūdas gadījumā
+  keepBuffer: 2
 });
 
 // Kļūdu ķērājs (OpenTopoMap serveri dažreiz ir lēnāki vai pārslogoti, šis noderēs)
