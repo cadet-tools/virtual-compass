@@ -1479,12 +1479,6 @@ const topo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/W
   keepBuffer: 2
 });
 
-// Kļūdu ķērājs (OpenTopoMap serveri dažreiz ir lēnāki vai pārslogoti, šis noderēs)
-let topoErrors = 0;
-topo.on('tileerror', () => {
-  topoErrors++;
-  if (topoErrors < 3) console.warn('[topo] Kļūda ielādējot OpenTopoMap flīzi (iespējams servera pārslodze)');
-});
 
 	  
   const esri = L.tileLayer(
@@ -1565,6 +1559,16 @@ const lvmTopo50_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
   attribution: '© LVM, © LGIA'
 });
 
+const lvmTopo10_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', {
+  layers: 'public:Topo10',  // Vai 'public:LVM_Zemes_karte' vēl modernākam skatam
+  format: 'image/png',
+  transparent: true,
+  version: '1.1.1',         // Svarīgi stabilitātei
+  tiled: true,              // Ielādē pa gabaliņiem (ātrāk)
+  maxZoom: 22,              // LVM atļauj ļoti dziļu zoom
+  maxNativeZoom: 18,        // Reālā izšķirtspēja ir ļoti augsta
+  attribution: '© LVM, © LGIA'
+});
 
   const lvmOSM = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', {
     layers: 'public:OSM',
@@ -1628,14 +1632,15 @@ const lvmTopo50_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
 	  
     const baseLayers = {
       'OSM': osm,
-      'OpenTopoMap': topo,
+      'Esri World Topo Map': topo,
       'Esri satelīts': esri,
       'OSM HOT': hot,
       'CyclOSM': cyclo,
 	  'OSM DE': osmDe,
 	  'OSM France': osmFr,	
-	  'CartoDB Positron': cartoLight,	
-	  'LVM Topo50': lvmTopo50_wms,	
+	  'CartoDB Positron': cartoLight,
+	  'LVM Topo10': lvmTopo10_wms,
+	  'LVM Topo50': lvmTopo50_wms,
 	  'LVM OSM (WMS)': lvmOSM
 	
 	};
@@ -1645,7 +1650,7 @@ const lvmTopo50_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
   // [E] PAPLAŠINI tavu tileerror listeneri uz VISIEM slāņiem
   [
     osm, topo, esri, hot, cyclo, osmDe, osmFr, cartoLight,
-    lvmTopo50_wms, lvmOSM,
+    lvmTopo50_wms, lvmTopo10_wms, lvmOSM,
     hiking, cycling, rail, seamarks
   ].forEach(l => l.on('tileerror', (e) => {
     // nerādīt “salūzušo bildi” + logā redzēt avotu
