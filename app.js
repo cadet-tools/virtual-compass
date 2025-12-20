@@ -1474,7 +1474,7 @@ function installTileErrorWatch(layer, opts){
 const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
   attribution: 'Map data: © OpenStreetMap, SRTM | Style: © OpenTopoMap (CC-BY-SA)',
   subdomains: 'abc',
-  maxZoom: 18,
+  maxZoom: 20,
   maxNativeZoom: 17,
   updateWhenIdle: true,
   keepBuffer: 2,
