@@ -1628,7 +1628,31 @@ const lvmTopo50_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
     attribution: '© OpenSeaMap, dati © OSM (ODbL)'
   });
 
+// JAUNS PĀRKLĀJUMS: LVM Meža infrastruktūra (Stigas, Kvartāli, Ceļi)
+// Šis slānis ir caurspīdīgs (transparent: true), tāpēc to var likt VIRS satelīta.
+const lvmForest = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', {
+    layers: 'public:Meza_kvartali,public:Meza_autoceli', // Kvartāli (stigas) + Ceļi
+    format: 'image/png',
+    transparent: true,      // Svarīgi: ļauj redzēt satelītu fonā
+    version: '1.1.1',
+    tiled: true,
+    maxZoom: 22,            // Ļauj pietuvināt ļoti tuvu
+    maxNativeZoom: 20,
+    opacity: 1.0,           // Maksimāla redzamība (vari mainīt uz 0.7, ja par spilgtu)
+    attribution: '© LVM Meža infrastruktūra'
+});
 
+// ALTERNATĪVA: Ja vēlies redzēt arī grāvjus (bieži iet gar stigām), izmanto šo:
+/*
+const lvmDitches = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', {
+    layers: 'public:Melioracijas_kaderi',
+    format: 'image/png',
+    transparent: true,
+    tiled: true,
+    maxZoom: 22,
+    attribution: '© LVM Meliorācija'
+});
+*/
 
 	  
     const baseLayers = {
@@ -1642,6 +1666,8 @@ const lvmTopo50_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
 	  'CartoDB Positron': cartoLight,	
 	  'LVM Topo50': lvmTopo50_wms,	
 	  'LVM OSM (WMS)': lvmOSM
+		// JAUNAIS PĀRKLĀJUMS:
+  	  'LVM Stigas un Ceļi': lvmForest,  // <--- Ideāli priekš satelīta
 	};
 
 
@@ -1650,7 +1676,7 @@ const lvmTopo50_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
   [
     osm, topo, esri, hot, cyclo, osmDe, osmFr, cartoLight,
     lvmTopo50_wms, lvmOSM,
-    hiking, cycling, rail, seamarks
+    hiking, cycling, rail, seamarks, lvmForest
   ].forEach(l => l.on('tileerror', (e) => {
     // nerādīt “salūzušo bildi” + logā redzēt avotu
     try { if (e && e.tile) e.tile.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACw='; } catch(_){}
