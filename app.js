@@ -2791,7 +2791,7 @@ function addLine(points, isMajor, putLabel, labelLatLng, labelText){
   L.polyline(points, {pane:'gridPane', color:'#ffffff', opacity:thin?.9:.92,
                       weight: isMajor ? majorOut : minorOut, lineJoin:'round', lineCap:'round', interactive: false}).addTo(gLines);
   L.polyline(points, {pane:'gridPane', color:'#000000', opacity:1.0,
-                      weight: isMajor ? wMajor : wMinor, lineJoin:'round', lineCap:'round' interactive: false}).addTo(gLines);
+                      weight: isMajor ? wMajor : wMinor, lineJoin:'round', lineCap:'round', interactive: false}).addTo(gLines);
 
   if (putLabel && labelLatLng){
     const icon = L.divIcon({ className: 'utm-label' + (isMajor ? ' major' : ''),
