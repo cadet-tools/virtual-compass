@@ -1665,9 +1665,9 @@ const lvmDitches = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?',
 	  'OSM France': osmFr,	
 	  'CartoDB Positron': cartoLight,	
 	  'LVM Topo50': lvmTopo50_wms,	
-	  'LVM OSM (WMS)': lvmOSM
+	  'LVM OSM (WMS)': lvmOSM,
 		// JAUNAIS PĀRKLĀJUMS:
-  	  'LVM Stigas un Ceļi': lvmForest,  // <--- Ideāli priekš satelīta
+  	  'LVM Stigas un Ceļi': lvmForest  // <--- Ideāli priekš satelīta
 	};
 
 
