@@ -1570,18 +1570,21 @@ const lvmTopo10_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
   attribution: '© LVM, © LGIA'
 });
 
-const lgiaOfficial_wms = L.tileLayer.wms('https://wms.lgia.gov.lv/open/rest/services/OPEN_DATA/LGIA_pamatkarte/MapServer/wms?', {
-  layers: '0',              // '0' ir ID slānim "Pamatkarte"
+// REPLACE: Oficiālā LGIA Pamatkarte (Izlabots URL)
+const lgiaOfficial_wms = L.tileLayer.wms('https://wms.lgia.gov.lv/open/services/OPEN_DATA/LGIA_pamatkarte/MapServer/WMSServer?', {
+  layers: '0',              // '0' ir pareizais slāņa ID šim servisam
   format: 'image/png',
-  transparent: false,       // Šī ir pamatkarte (nav caurspīdīga)
-  version: '1.3.0',         // Jaunāka WMS versija
+  transparent: false,
+  version: '1.3.0',
   
-  // SVARĪGI STABILITĀTEI:
-  tiled: false,             // Ielādē vienu lielu bildi. Novērš "rūtiņu" kļūdas un tekstu apgriešanu.
+  // SVARĪGI: Tiled: false nodrošina, ka ielādē vienu lielu bildi.
+  // Tas novērš problēmas ar tekstu apgriešanu, kas raksturīgas LGIA serverim.
+  tiled: false,
   
-  maxZoom: 22,              // Ļauj pietuvināt digitāli
+  maxZoom: 22,              // Ļaujam pietuvināt digitāli (iestiepjot)
+  maxNativeZoom: 17,        // LGIA serverim reālie dati beidzas ap 16-17 līmeni
   
-  // Ierobežojam uz Latviju, lai serveris nemet kļūdas par pasaules daļām
+  // Ierobežojam uz Latviju, lai neprasītu datus ārpusē
   bounds: L.latLngBounds([55.60, 20.90], [58.10, 28.50]),
   
   attribution: '© <a href="https://www.lgia.gov.lv/">LGIA</a>'
