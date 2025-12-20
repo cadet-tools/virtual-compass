@@ -1719,10 +1719,17 @@ function gridMinorDivisionsForScale(scale){
 
 
 	  
+function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+
 function zoomForScale(scale){
   const lat = map.getCenter().lat * Math.PI/180;
-  const mppTarget = scale * 0.0002645833; // m/pixel pie 0.28mm pikseļa
-  return Math.log2(156543.03392 * Math.cos(lat) / mppTarget);
+  const mppTarget = scale * 0.0002645833; // m/pixel pie ~0.28mm pikseļa
+  const z = Math.log2(156543.03392 * Math.cos(lat) / mppTarget);
+
+  // ✅ CLAMP uz aktīvajiem Leaflet ierobežojumiem
+  const minZ = (typeof map.getMinZoom === 'function') ? map.getMinZoom() : (map.options.minZoom ?? 0);
+  const maxZ = (typeof map.getMaxZoom === 'function') ? map.getMaxZoom() : (map.options.maxZoom ?? 22);
+  return clamp(z, minZ, maxZ);
 }
 
 // pašas kontroles UI
