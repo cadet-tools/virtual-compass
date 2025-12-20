@@ -1474,7 +1474,7 @@ function installTileErrorWatch(layer, opts){
 const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
   attribution: 'Map data: © OpenStreetMap, SRTM | Style: © OpenTopoMap (CC-BY-SA)',
   subdomains: 'abc',
-  maxZoom: 19,
+  maxZoom: 18,
   maxNativeZoom: 17,
   updateWhenIdle: true,
   keepBuffer: 2,
@@ -1487,10 +1487,9 @@ const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
 let topoErrors = 0;
 topo.on('load',      () => { topoErrors = 0; });      // ja ielādējas, skaitītāju nullējam
 topo.on('tileerror', () => {
-  if (++topoErrors >= 4 && map && map.hasLayer(topo)) {
-    console.warn('[layers] OpenTopoMap nav pieejams — pārslēdzos uz OSM');
-    map.removeLayer(topo);
-    if (!map.hasLayer(osm)) osm.addTo(map);
+ topoErrors++;
+  if (topoErrors === 4) {
+    console.warn('[layers] OpenTopoMap met tileerror (iespējams limits/īslaicīgs errors). Nepārslēdzu slāni.');
   }
 });
 
