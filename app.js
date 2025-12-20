@@ -1475,7 +1475,7 @@ const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
   attribution: 'Map data: © OpenStreetMap, SRTM | Style: © OpenTopoMap (CC-BY-SA)',
   subdomains: 'abc',
   maxZoom: 20,
-  maxNativeZoom: 17,
+  maxNativeZoom: 16,
   updateWhenIdle: true,
   keepBuffer: 2,
   detectRetina: false,
@@ -1560,14 +1560,17 @@ topo.on('tileerror', () => {
 
 	  
 // LVM Topo50 — GWC TMS (ātrāks kešots slānis)
-  const lvmTopo50_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', {
-    layers: 'public:Topo50',
-    format: 'image/png',
-    transparent: true,
-    tiled: true,               // ADD
-    maxZoom: 19                // ADD
-    // crs: L.CRS.EPSG3857
-  });
+
+const lvmTopo50_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', {
+  layers: 'public:Topo50',  // Vai 'public:LVM_Zemes_karte' vēl modernākam skatam
+  format: 'image/png',
+  transparent: true,
+  version: '1.1.1',         // Svarīgi stabilitātei
+  tiled: true,              // Ielādē pa gabaliņiem (ātrāk)
+  maxZoom: 22,              // LVM atļauj ļoti dziļu zoom
+  maxNativeZoom: 18,        // Reālā izšķirtspēja ir ļoti augsta
+  attribution: '© LVM, © LGIA'
+});
 
 
   const lvmOSM = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', {
