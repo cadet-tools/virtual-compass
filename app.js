@@ -1628,24 +1628,7 @@ const lvmTopo50_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
     attribution: '© OpenSeaMap, dati © OSM (ODbL)'
   });
 
-// JAUNS PĀRKLĀJUMS: LVM Meža infrastruktūra (Stigas, Kvartāli, Ceļi)
-const lvmForest = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', {
-    layers: 'public:Meza_kvartali,public:Meza_autoceli', 
-    format: 'image/png',
-    transparent: true,      
-    version: '1.1.1',
-    
-    // --- LABOJUMS: STABILITĀTES KONFIGURĀCIJA ---
-    tiled: true,            // OBLIGĀTI true. Ļauj serverim kešot flīzes un strādāt ātrāk.
-    minZoom: 14,            // Rāda tikai tad, kad pietuvina (lai nav kļūdu tālumā)
-    maxNativeZoom: 16,      // KRITISKI: Ielādējam datus tikai līdz z16. Tālāk (z17-22) tikai palielinām.
-                            // Tas novērš "Resursa kļūda" un pelēkos kvadrātus.
-    // ---------------------------------------------
 
-    maxZoom: 22,            // Ļauj lietotājam pietuvināt ļoti dziļi (digitāli)
-    opacity: 1.0,           
-    attribution: '© LVM Meža infrastruktūra'
-});
 
 	  
     const baseLayers = {
@@ -1668,7 +1651,7 @@ const lvmForest = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', 
   [
     osm, topo, esri, hot, cyclo, osmDe, osmFr, cartoLight,
     lvmTopo50_wms, lvmOSM,
-    hiking, cycling, rail, seamarks, lvmForest
+    hiking, cycling, rail, seamarks
   ].forEach(l => l.on('tileerror', (e) => {
     // nerādīt “salūzušo bildi” + logā redzēt avotu
     try { if (e && e.tile) e.tile.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACw='; } catch(_){}
@@ -3100,7 +3083,6 @@ const overlays = {
   'Velomaršruti (Waymarked)': cycling,
   'Dzelzceļš (OpenRailwayMap)': rail,
   'Jūras zīmes (OpenSeaMap)': seamarks,
-	'LVM Stigas un Ceļi': lvmForest,
 
 };
 
