@@ -1470,25 +1470,24 @@ function installTileErrorWatch(layer, opts){
   }).addTo(map);
 
 	  
-// REPLACE: Aizstājam OpenTopoMap ar CyclOSM (stabilāks, detalizētāks, bez kļūdām)
-const topo = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
-  attribution: 'Map data: © OpenStreetMap | Style: © CyclOSM',
+// REPLACE: Aizstājam CyclOSM ar OpenTopoMap
+const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+  attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
   subdomains: 'abc',
-  maxZoom: 20,              // Šī karte tiešām atbalsta dziļu zoom
-  maxNativeZoom: 20,        // Tai ir īstas flīzes līdz galam (nav jāiestiepj)
+  maxZoom: 20,           // Atļaujam lietotāja interfeisā zoomot līdz 20...
+  maxNativeZoom: 17,     // ...BET ņemam vērā, ka OpenTopoMap flīzes beidzas pie 17. Leaflet automātiski "iestieps" bildi tālāk.
   updateWhenIdle: true,
   keepBuffer: 2,
   detectRetina: false,
-  crossOrigin: true,
-  // Ja nu tomēr kāda flīze nobrūk, ieliekam caurspīdīgu:
-  errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' 
+  crossOrigin: true,     // Svarīgi, ja karti saglabā vai drukā
+  errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' // Tukša flīze kļūdas gadījumā
 });
 
-// Veco kļūdu ķērāju priekš topo vari dzēst vai atstāt - CyclOSM parasti nemet kļūdas.
+// Kļūdu ķērājs (OpenTopoMap serveri dažreiz ir lēnāki vai pārslogoti, šis noderēs)
 let topoErrors = 0;
 topo.on('tileerror', () => {
   topoErrors++;
-  if (topoErrors < 3) console.warn('[topo] Kļūda ielādējot flīzi (iespējams tīkla problēma)');
+  if (topoErrors < 3) console.warn('[topo] Kļūda ielādējot OpenTopoMap flīzi (iespējams servera pārslodze)');
 });
 
 	  
