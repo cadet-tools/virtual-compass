@@ -1448,6 +1448,7 @@ function installTileErrorWatch(layer, opts){
     maxZoom: 20,               // ADD (varēsi iezūmot dziļāk par native)
     zoomSnap: 0.25             // ADD (smalkāks zoom solis)
   });
+	  window.map = map;
   window.__getMap = () => map;
 
 
@@ -3828,7 +3829,10 @@ onDomReady(() => {
       .catch(() => localStorage.setItem('onlineMapActive','0'));
   }
 
-  window.addEventListener('resize', () => window.map && map.invalidateSize());
+  window.addEventListener('resize', () => {
+  const m = window.map || (window.__getMap && window.__getMap());
+  if (m) m.invalidateSize();
+});
   if (dimRange) window.__bindDimmer(dimRange);
 });
 
