@@ -1570,25 +1570,6 @@ const lvmTopo10_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
   attribution: '© LVM, © LGIA'
 });
 
-// REPLACE: Oficiālā LGIA Pamatkarte (Izlabots URL)
-const lgiaOfficial_wms = L.tileLayer.wms('https://wms.lgia.gov.lv/open/services/OPEN_DATA/LGIA_pamatkarte/MapServer/WMSServer?', {
-  layers: '0',              // '0' ir pareizais slāņa ID šim servisam
-  format: 'image/png',
-  transparent: false,
-  version: '1.3.0',
-  
-  // SVARĪGI: Tiled: false nodrošina, ka ielādē vienu lielu bildi.
-  // Tas novērš problēmas ar tekstu apgriešanu, kas raksturīgas LGIA serverim.
-  tiled: false,
-  
-  maxZoom: 22,              // Ļaujam pietuvināt digitāli (iestiepjot)
-  maxNativeZoom: 17,        // LGIA serverim reālie dati beidzas ap 16-17 līmeni
-  
-  // Ierobežojam uz Latviju, lai neprasītu datus ārpusē
-  bounds: L.latLngBounds([55.60, 20.90], [58.10, 28.50]),
-  
-  attribution: '© <a href="https://www.lgia.gov.lv/">LGIA</a>'
-});
 
 
 
@@ -1665,7 +1646,7 @@ const lgiaOfficial_wms = L.tileLayer.wms('https://wms.lgia.gov.lv/open/services/
 	  'CartoDB Positron': cartoLight,
 	  'LVM Topo10': lvmTopo10_wms,
 	  'LVM Topo50': lvmTopo50_wms,
-	  'LGIA Pamatkarte (Oficiālā)': lgiaOfficial_wms,
+	  
 	  'LVM OSM (WMS)': lvmOSM
 	
 	};
@@ -1675,7 +1656,7 @@ const lgiaOfficial_wms = L.tileLayer.wms('https://wms.lgia.gov.lv/open/services/
   // [E] PAPLAŠINI tavu tileerror listeneri uz VISIEM slāņiem
   [
     osm, topo, esri, hot, cyclo, osmDe, osmFr, cartoLight,
-    lvmTopo50_wms, lvmTopo10_wms, lgiaOfficial_wms, lvmOSM,
+    lvmTopo50_wms, lvmTopo10_wms, lvmOSM,
     hiking, cycling, rail, seamarks
   ].forEach(l => l.on('tileerror', (e) => {
     // nerādīt “salūzušo bildi” + logā redzēt avotu
