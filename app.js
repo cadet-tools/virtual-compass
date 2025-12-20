@@ -1629,30 +1629,23 @@ const lvmTopo50_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
   });
 
 // JAUNS PĀRKLĀJUMS: LVM Meža infrastruktūra (Stigas, Kvartāli, Ceļi)
-// Šis slānis ir caurspīdīgs (transparent: true), tāpēc to var likt VIRS satelīta.
 const lvmForest = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', {
-    layers: 'public:Meza_kvartali,public:Meza_autoceli', // Kvartāli (stigas) + Ceļi
+    layers: 'public:Meza_kvartali,public:Meza_autoceli', 
     format: 'image/png',
-    transparent: true,      // Svarīgi: ļauj redzēt satelītu fonā
+    transparent: true,      
     version: '1.1.1',
     tiled: true,
-    maxZoom: 22,            // Ļauj pietuvināt ļoti tuvu
+    
+    // --- LABOJUMS SĀKAS ---
+    minZoom: 14,            // FIX: LVM serveris nedod datus z13 un tālāk. 
+                            // Tas novērsīs [tileerror] kļūdas, kad karte ir tālu.
+    // --- LABOJUMS BEIDZAS ---
+
+    maxZoom: 22,            
     maxNativeZoom: 20,
-    opacity: 1.0,           // Maksimāla redzamība (vari mainīt uz 0.7, ja par spilgtu)
+    opacity: 1.0,           
     attribution: '© LVM Meža infrastruktūra'
 });
-
-// ALTERNATĪVA: Ja vēlies redzēt arī grāvjus (bieži iet gar stigām), izmanto šo:
-/*
-const lvmDitches = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', {
-    layers: 'public:Melioracijas_kaderi',
-    format: 'image/png',
-    transparent: true,
-    tiled: true,
-    maxZoom: 22,
-    attribution: '© LVM Meliorācija'
-});
-*/
 
 	  
     const baseLayers = {
@@ -1665,9 +1658,8 @@ const lvmDitches = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?',
 	  'OSM France': osmFr,	
 	  'CartoDB Positron': cartoLight,	
 	  'LVM Topo50': lvmTopo50_wms,	
-	  'LVM OSM (WMS)': lvmOSM,
-		// JAUNAIS PĀRKLĀJUMS:
-  	  'LVM Stigas un Ceļi': lvmForest  // <--- Ideāli priekš satelīta
+	  'LVM OSM (WMS)': lvmOSM
+	
 	};
 
 
@@ -3108,6 +3100,7 @@ const overlays = {
   'Velomaršruti (Waymarked)': cycling,
   'Dzelzceļš (OpenRailwayMap)': rail,
   'Jūras zīmes (OpenSeaMap)': seamarks,
+	'LVM Stigas un Ceļi': lvmForest,
 
 };
 
