@@ -1472,24 +1472,15 @@ function installTileErrorWatch(layer, opts){
 	  
 // REPLACE: Aizstājam CyclOSM ar OpenTopoMap
 const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-  attribution: 'Map data: © OpenStreetMap | Style: © OpenTopoMap',
+  attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
   subdomains: 'abc',
-  
-  // 1. Šis ļauj lietotājam pietuvināt ļoti dziļi (interface limits)
-  maxZoom: 20, 
-  
-  // 2. ŠIS IR SVARĪGI: Pasaka, ka serverim reāli beidzas flīzes pie 17. 
-  // Viss, kas ir dziļāk par 17, tiks "pievilkts digitāli" (auto-scale).
-  maxNativeZoom: 17, 
-
-  // 3. Ja serveris nespēj iedot flīzi (kā tavā kļūdā pie z:16), 
-  // ieliekam caurspīdīgu bildi, lai konsolē nebļauj un nerādās "broken image" ikona.
-  errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=',
-  
+  maxZoom: 20,           // Atļaujam lietotāja interfeisā zoomot līdz 20...
+  maxNativeZoom: 16,     
   updateWhenIdle: true,
   keepBuffer: 2,
   detectRetina: false,
-  crossOrigin: true
+  crossOrigin: true,     // Svarīgi, ja karti saglabā vai drukā
+  errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' // Tukša flīze kļūdas gadījumā
 });
 
 // Kļūdu ķērājs (OpenTopoMap serveri dažreiz ir lēnāki vai pārslogoti, šis noderēs)
