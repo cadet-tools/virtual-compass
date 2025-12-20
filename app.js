@@ -1570,16 +1570,36 @@ const lvmTopo10_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
   attribution: '© LVM, © LGIA'
 });
 
-	  const lvmTopoAuto_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', {
-  layers: 'public:LVM_Zemes_karte',  // Vai 'public:LVM_Zemes_karte' vēl modernākam skatam
+// Aizstāj veco definīciju ar šo drošo versiju:
+const lvmTopoAuto_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', {
+  layers: 'public:LVM_Zemes_karte',
   format: 'image/png',
-  transparent: true,
-  version: '1.1.1',         // Svarīgi stabilitātei
-  tiled: true,              // Ielādē pa gabaliņiem (ātrāk)
-  maxZoom: 22,              // LVM atļauj ļoti dziļu zoom
-  maxNativeZoom: 18,        // Reālā izšķirtspēja ir ļoti augsta
+  transparent: true,     // Svarīgi: true, lai fons būtu caurspīdīgs, kur nav datu
+  version: '1.1.1',
+  tiled: true,
+  maxZoom: 22,
+  maxNativeZoom: 18,
+  
+  // 1. IEROBEŽOTĀJS: Šis ir kritiski svarīgi LVM kartei!
+  // Tas neļauj Leaflet prasīt datus ārpus Latvijas taisnstūra.
+  bounds: L.latLngBounds([55.60, 20.90], [58.10, 28.50]),
+
+  // 2. KĻŪDU SLĒPŠANA: Ja serveris tomēr nespēj iedot bildi, ieliekam tukšu pikseli.
+  errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=',
+  
   attribution: '© LVM, © LGIA'
 });
+
+// 3. KONSOLER TĪRĪTĀJS: Šis kods neļauj "tileerror" parādīties konsolē kā sarkanai kļūdai.
+// Tas "noķer" notikumu un apstādina to pirms tas nonāk konsolē.
+lvmTopoAuto_wms.on('tileerror', function(error, tile) {
+    // Pārliecināmies, ka kļūdainā flīze tiek aizstāta ar caurspīdīgu, lai lietotājs neredz "broken image"
+    error.tile.src = error.target.options.errorTileUrl;
+    // (Šeit apzināti nav console.error, lai netraucētu)
+});
+
+
+	  
   const lvmOSM = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', {
     layers: 'public:OSM',
     format: 'image/png',
