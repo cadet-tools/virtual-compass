@@ -1470,27 +1470,25 @@ function installTileErrorWatch(layer, opts){
   }).addTo(map);
 
 	  
-// REPLACE tikai topo definīciju:
-const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-  attribution: 'Map data: © OpenStreetMap, SRTM | Style: © OpenTopoMap (CC-BY-SA)',
+// REPLACE: Aizstājam OpenTopoMap ar CyclOSM (stabilāks, detalizētāks, bez kļūdām)
+const topo = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
+  attribution: 'Map data: © OpenStreetMap | Style: © CyclOSM',
   subdomains: 'abc',
-  maxZoom: 20,
-  maxNativeZoom: 16,
+  maxZoom: 20,              // Šī karte tiešām atbalsta dziļu zoom
+  maxNativeZoom: 20,        // Tai ir īstas flīzes līdz galam (nav jāiestiepj)
   updateWhenIdle: true,
   keepBuffer: 2,
   detectRetina: false,
   crossOrigin: true,
-  errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw='
+  // Ja nu tomēr kāda flīze nobrūk, ieliekam caurspīdīgu:
+  errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' 
 });
 
-// ADD: automātiska pārslēgšanās uz OSM, ja OTM birst
+// Veco kļūdu ķērāju priekš topo vari dzēst vai atstāt - CyclOSM parasti nemet kļūdas.
 let topoErrors = 0;
-topo.on('load',      () => { topoErrors = 0; });      // ja ielādējas, skaitītāju nullējam
 topo.on('tileerror', () => {
- topoErrors++;
-  if (topoErrors === 4) {
-    console.warn('[layers] OpenTopoMap met tileerror (iespējams limits/īslaicīgs errors). Nepārslēdzu slāni.');
-  }
+  topoErrors++;
+  if (topoErrors < 3) console.warn('[topo] Kļūda ielādējot flīzi (iespējams tīkla problēma)');
 });
 
 	  
