@@ -1474,24 +1474,22 @@ function installTileErrorWatch(layer, opts){
 const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
   attribution: 'Map data: © OpenStreetMap, SRTM | Style: © OpenTopoMap (CC-BY-SA)',
   subdomains: 'abc',
-  maxZoom: 20,               // Ļauj lietotājam pietuvināt ļoti tuvu (digitāli)
-  maxNativeZoom: 16,         // Šis ir drošais slieksnis. OTM bieži nav 17. līmeņa.
-                             // Ja 17. līmenis Tev parasti strādā, vari mēģināt likt 17,
-                             // bet 16 ir visdrošākais, lai nerādītu pelēkus kvadrātus.
+  maxZoom: 20,
+  maxNativeZoom: 17,
   updateWhenIdle: true,
   keepBuffer: 2,
   detectRetina: false,
   crossOrigin: true,
-  errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' // Paslēpj kļūdainās flīzes
+  errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw='
 });
 
 // ADD: automātiska pārslēgšanās uz OSM, ja OTM birst
 let topoErrors = 0;
-topo.on('load',      () => { topoErrors = 0; });
+topo.on('load',      () => { topoErrors = 0; });      // ja ielādējas, skaitītāju nullējam
 topo.on('tileerror', () => {
  topoErrors++;
   if (topoErrors === 4) {
-    console.warn('[layers] OpenTopoMap met tileerror. Iespējams servera pārslodze.');
+    console.warn('[layers] OpenTopoMap met tileerror (iespējams limits/īslaicīgs errors). Nepārslēdzu slāni.');
   }
 });
 
