@@ -1634,15 +1634,14 @@ const lvmForest = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', 
     format: 'image/png',
     transparent: true,      
     version: '1.1.1',
-    tiled: true,
     
     // --- LABOJUMS SĀKAS ---
-    minZoom: 14,            // FIX: LVM serveris nedod datus z13 un tālāk. 
-                            // Tas novērsīs [tileerror] kļūdas, kad karte ir tālu.
+    tiled: false,           // FIX: false ir stabilāk LVM serverim (sūta 1 lielu bildi, nevis 50 mazas)
+    minZoom: 14,            // Rāda tikai tad, kad pietuvina (lai nav kļūdu tālumā)
+    maxNativeZoom: 18,      // Dziļāk par 18 neprasām serverim (tālāk Leaflet palielinās digitāli)
     // --- LABOJUMS BEIDZAS ---
 
     maxZoom: 22,            
-    maxNativeZoom: 20,
     opacity: 1.0,           
     attribution: '© LVM Meža infrastruktūra'
 });
