@@ -2901,12 +2901,32 @@ map.setView([56.9496, 24.1052], 13);
 
 
 // ====== LKS-92 režģa ģenerators (LABOTS - KĀ MGRS) ======
+// ====== LKS-92 režģa ģenerators (AR ETIĶEŠU FONU) ======
 function createLKSGridLayers() {
   const grid = L.layerGroup();
   const labels = L.layerGroup();
 
-  // Pārliecinies, vai CSS ir definēts 'lks-grid-label'. 
-  // Ja gribi identisku stilu MGRS, vari šeit nomainīt uz 'utm-label' vai pievienot CSS.
+  // 1. Iespricējam CSS, lai etiķetes izskatītos kā MGRS (melns fons, balts teksts)
+  if (!document.getElementById('lks-grid-css')) {
+    const el = document.createElement('style');
+    el.id = 'lks-grid-css';
+    el.textContent = `
+      .lks-grid-label span {
+        display: inline-block;
+        background: rgba(0, 0, 0, 0.55); /* Tumšs fons kā MGRS */
+        color: #fff;
+        padding: 2px 6px;
+        border-radius: 6px;
+        font: 12px/1.25 system-ui;
+        text-shadow: 0 1px 0 #000, 0 0 3px #000;
+        white-space: nowrap;
+        user-select: none;
+        pointer-events: none; /* Lai netraucē klikšķiem */
+      }
+    `;
+    document.head.appendChild(el);
+  }
+
   const labelStyle = { className: 'lks-grid-label' };
 
   function redraw() {
@@ -2917,24 +2937,22 @@ function createLKSGridLayers() {
 
     const thin = document.body.classList.contains('print-mode');
     
-    // 1. IZMAIŅA: Pievienojam 'interactive: false' un pareizo 'pane'
+    // Līnijas bez pointer-events
     const lineStyle = { 
       color: '#000000', 
       weight: thin ? 0.6 : 2.6, 
       opacity: 0.95, 
-      interactive: false, // Svarīgi: ļauj klikšķināt cauri līnijām
-      pane: 'gridPane'    // Zīmē zem etiķetēm (ja pane eksistē)
+      interactive: false,
+      pane: 'gridPane'
     };
 
     const b = map.getBounds();
     const scale = getCurrentScale();
     const step = gridStepForScale(scale);
 
-    // Pārveidojam robežas
     const bl = wgsToLKS(b.getSouth(), b.getWest());
     const tr = wgsToLKS(b.getNorth(), b.getEast());
 
-    // Aprēķinām režģa robežas
     const minE_raw = Math.min(bl.E, tr.E);
     const maxE_raw = Math.max(bl.E, tr.E);
     const minN_raw = Math.min(bl.N, tr.N);
@@ -2945,12 +2963,9 @@ function createLKSGridLayers() {
     const N_min = Math.floor(minN_raw / step) * step;
     const N_max = Math.ceil(maxN_raw / step) * step;
 
-    // 2. IZMAIŅA: Iegūstam kartes centru LKS koordinātēs
-    // Tas nepieciešams, lai etiķetes zīmētu ekrāna vidū
+    // Centra aprēķins etiķešu pozicionēšanai
     const c = map.getCenter();
     const cLKS = wgsToLKS(c.lat, c.lng);
-    
-    // "Noklampējam" centru, lai tas neiziet ārpus redzamā režģa robežām
     const centerE = Math.max(E_min, Math.min(E_max, cLKS.E));
     const centerN = Math.max(N_min, Math.min(N_max, cLKS.N));
 
@@ -2959,31 +2974,25 @@ function createLKSGridLayers() {
       return L.latLng(xy[1], xy[0]);
     });
 
-    // --- Vertikālās līnijas (E konstante) ---
+    // --- Vertikālās līnijas (E) ---
     for (let E = E_min; E <= E_max; E += step) {
       const pts = [{ E, N: N_min }, { E, N: N_max }];
       L.polyline(toLatLngs(pts), lineStyle).addTo(grid);
 
-      // 3. IZMAIŅA: Etiķetes pozīcija
-      // E ir fiksēts (līnija), bet N ņemam no ekrāna centra (centerN)
       const labelPos = toLatLngs([{ E, N: centerN }])[0];
-      
       L.marker(labelPos, {
-        icon: L.divIcon({ ...labelStyle, html: `<span>E ${E}</span>` }), // Ieliekam <span> lai varētu smuki noformēt
+        icon: L.divIcon({ ...labelStyle, html: `<span>E ${E}</span>` }),
         interactive: false,
-        pane: 'gridLabelPane' // Zīmējam virs līnijām
+        pane: 'gridLabelPane'
       }).addTo(labels);
     }
 
-    // --- Horizontālās līnijas (N konstante) ---
+    // --- Horizontālās līnijas (N) ---
     for (let N = N_min; N <= N_max; N += step) {
       const pts = [{ E: E_min, N }, { E: E_max, N }];
       L.polyline(toLatLngs(pts), lineStyle).addTo(grid);
 
-      // 3. IZMAIŅA: Etiķetes pozīcija
-      // N ir fiksēts (līnija), bet E ņemam no ekrāna centra (centerE)
       const labelPos = toLatLngs([{ E: centerE, N }])[0];
-      
       L.marker(labelPos, {
         icon: L.divIcon({ ...labelStyle, html: `<span>N ${N}</span>` }), 
         interactive: false,
