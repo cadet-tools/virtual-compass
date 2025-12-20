@@ -1570,18 +1570,21 @@ const lvmTopo10_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
   attribution: '© LVM, © LGIA'
 });
 
-const lvmTopoAuto_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows?', {
-  layers: 'public:LVM_Zemes_karte',
+const lgiaOfficial_wms = L.tileLayer.wms('https://wms.lgia.gov.lv/open/rest/services/OPEN_DATA/LGIA_pamatkarte/MapServer/wms?', {
+  layers: '0',              // '0' ir ID slānim "Pamatkarte"
   format: 'image/png',
-  transparent: true,
-  version: '1.1.1',
-  tiled: true,
-  maxZoom: 22,
-  maxNativeZoom: 18,
-  // IEROBEŽOTĀJS: Neļauj prasīt flīzes ārpus Latvijas (novērš 404/500 kļūdas)
+  transparent: false,       // Šī ir pamatkarte (nav caurspīdīga)
+  version: '1.3.0',         // Jaunāka WMS versija
+  
+  // SVARĪGI STABILITĀTEI:
+  tiled: false,             // Ielādē vienu lielu bildi. Novērš "rūtiņu" kļūdas un tekstu apgriešanu.
+  
+  maxZoom: 22,              // Ļauj pietuvināt digitāli
+  
+  // Ierobežojam uz Latviju, lai serveris nemet kļūdas par pasaules daļām
   bounds: L.latLngBounds([55.60, 20.90], [58.10, 28.50]),
-  errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', // Slēpj "saplēsto" ikonu
-  attribution: '© LVM, © LGIA'
+  
+  attribution: '© <a href="https://www.lgia.gov.lv/">LGIA</a>'
 });
 
 
@@ -1659,7 +1662,7 @@ const lvmTopoAuto_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/o
 	  'CartoDB Positron': cartoLight,
 	  'LVM Topo10': lvmTopo10_wms,
 	  'LVM Topo50': lvmTopo50_wms,
-	  'LVM Zemes karte (Auto)': lvmTopoAuto_wms,
+	  'LGIA Pamatkarte (Oficiālā)': lgiaOfficial_wms,
 	  'LVM OSM (WMS)': lvmOSM
 	
 	};
@@ -1669,7 +1672,7 @@ const lvmTopoAuto_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/o
   // [E] PAPLAŠINI tavu tileerror listeneri uz VISIEM slāņiem
   [
     osm, topo, esri, hot, cyclo, osmDe, osmFr, cartoLight,
-    lvmTopo50_wms, lvmTopo10_wms, lvmTopoAuto_wms, lvmOSM,
+    lvmTopo50_wms, lvmTopo10_wms, lgiaOfficial_wms, lvmOSM,
     hiking, cycling, rail, seamarks
   ].forEach(l => l.on('tileerror', (e) => {
     // nerādīt “salūzušo bildi” + logā redzēt avotu
