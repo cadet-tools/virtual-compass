@@ -1782,18 +1782,18 @@ scalePickCtl.onAdd = function(){
 
 
   // — Poga: Drukāt (LGIA)
-  const lgiaBtn = document.createElement('button');
-  lgiaBtn.id = 'lgiaPrintBtn';
-  lgiaBtn.type = 'button';
-  lgiaBtn.textContent = 'Drukāt (LGIA)';
-  Object.assign(lgiaBtn.style, {
-    display:'block', marginTop:'8px', width:'100%',
-    background:'rgba(0,0,0,.35)', color:'#fff',
-    border:'1px solid rgba(255,255,255,.25)', borderRadius:'6px',
-    padding:'4px 8px', cursor:'pointer', font:'12px/1.2 system-ui, sans-serif'
-  });
-  lgiaBtn.addEventListener('click', openLgIaPrintDialog);
-  wrap.appendChild(lgiaBtn);
+ // const lgiaBtn = document.createElement('button');
+//  lgiaBtn.id = 'lgiaPrintBtn';
+//  lgiaBtn.type = 'button';
+//  lgiaBtn.textContent = 'Drukāt (LGIA)';
+ // Object.assign(lgiaBtn.style, {
+//    display:'block', marginTop:'8px', width:'100%',
+//    background:'rgba(0,0,0,.35)', color:'#fff',
+//    border:'1px solid rgba(255,255,255,.25)', borderRadius:'6px',
+//    padding:'4px 8px', cursor:'pointer', font:'12px/1.2 system-ui, sans-serif'
+//  });
+//  lgiaBtn.addEventListener('click', openLgIaPrintDialog);
+//  wrap.appendChild(lgiaBtn);
 
 
 
