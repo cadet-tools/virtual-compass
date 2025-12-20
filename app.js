@@ -3100,6 +3100,34 @@ const overlays = {
     position: 'topright'
   }).addTo(map);
 
+
+// ierobežotājs onlinemap zoom
+
+function applyLayerZoomLimits(layer){
+  if (!map || !layer) return;
+  const minZ = Number.isFinite(layer.options?.minZoom) ? layer.options.minZoom : (map.options.minZoom ?? 0);
+  const maxZ = Number.isFinite(layer.options?.maxZoom) ? layer.options.maxZoom : (map.options.maxZoom ?? 22);
+
+  map.setMinZoom(minZ);
+  map.setMaxZoom(maxZ);
+
+  const z = map.getZoom();
+  if (z < minZ || z > maxZ) map.setZoom(Math.max(minZ, Math.min(maxZ, z)), { animate:false });
+}
+
+// kad maina base layeri:
+map.on('baselayerchange', (e) => {
+  applyLayerZoomLimits(e.layer);
+  try { syncScalePicker && syncScalePicker(); } catch(_){}
+});
+
+// uzreiz uz starta slāņa:
+applyLayerZoomLimits(osm);
+
+
+
+
+	
 // Ja ieslēdz/izslēdz režģus – nosakām, ko rādīt popupā.
 // Noteikums: "pēdējais ieslēgtais režģis" nosaka režīmu.
 //map.on('overlayadd',  (e)=>{
