@@ -2573,7 +2573,7 @@ body.print-mode #printNorthTR .northArrow{
   width:0; height:0; margin:0;
   border-left:3mm solid transparent;
   border-right:3mm solid transparent;
-  border-bottom:5mm solid #000;
+  border-bottom:2mm solid #000;
 margin-top: 1mm;
 }
 body.print-mode #printNorthTR .n{
