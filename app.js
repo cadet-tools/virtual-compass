@@ -7308,7 +7308,7 @@ function ensureDockOpen(){
 
 
 // ============================================================
-// === JAUNA FUNKCIJA: Drukas rāmja koordinātes (PIXEL-PERFECT FIX) ===
+// === JAUNA FUNKCIJA: Drukas rāmja koordinātes (FINAL HYBRID FIX) ===
 // ============================================================
 function addPrintGridLabels(map, scale, format, orient) {
 
@@ -7336,9 +7336,9 @@ function addPrintGridLabels(map, scale, format, orient) {
 
   if (!isLKS && !isUTM) return;
 
-  // --- 2. SAGATAVOJAM OVERLAY (Precīzi virs kartes) ---
-  const mapSize = map.getSize();
-  const mapEl   = document.getElementById('onlineMap');
+  // --- 2. SAGATAVOJAM OVERLAY ---
+  const mapSize = map.getSize(); // Leaflet pikseļu izmēri (filtrēšanai)
+  const mapEl   = document.getElementById('onlineMap'); // Karte (izmēriem mm)
 
   let overlay = document.getElementById('printGridOverlay');
   if (overlay) overlay.remove();
@@ -7346,7 +7346,7 @@ function addPrintGridLabels(map, scale, format, orient) {
   overlay = document.createElement('div');
   overlay.id = 'printGridOverlay';
   
-  // Overlayam jābūt identiskam ar kartes elementu
+  // Overlay ņem izmērus no kartes (mm), lai sakristu uz papīra
   Object.assign(overlay.style, {
     position: 'fixed',
     inset: '0',
@@ -7403,14 +7403,14 @@ function addPrintGridLabels(map, scale, format, orient) {
     document.head.appendChild(css);
   }
 
-  // --- 4. ROBEŽU APRĒĶINS ---
+  // --- 4. APRĒĶINI ---
   const tl = map.containerPointToLatLng([0, 0]);
   const br = map.containerPointToLatLng([mapSize.x, mapSize.y]);
   
   const step = getGridStep(scale);
   let getE, getN, getLabel, getBigInfo;
   let minE, maxE, minN, maxN;
-  let toPx; // Definējam šeit, lai ir pieejams ārpus blokiem
+  let toPx;
 
   if (isLKS) {
     const p1 = wgsToLKS(tl.lat, tl.lng);
@@ -7419,7 +7419,6 @@ function addPrintGridLabels(map, scale, format, orient) {
     minE = Math.min(p1.E, p2.E); maxE = Math.max(p1.E, p2.E);
     minN = Math.min(p1.N, p2.N); maxN = Math.max(p1.N, p2.N);
 
-    // Grid līnijas
     getE = (val) => ({ E: val, N: (minN + maxN) / 2 });
     getN = (val) => ({ E: (minE + maxE) / 2, N: val });
     
@@ -7466,20 +7465,22 @@ function addPrintGridLabels(map, scale, format, orient) {
     };
   }
 
-  // --- 5. ZĪMĒŠANA (LABOTS: Izmantojam getE un getN) ---
+  // --- 5. ZĪMĒŠANA (FILTRĒJAM pX, ZĪMĒJAM %) ---
   
   const startE = Math.floor(minE / step) * step;
   const endE   = Math.ceil(maxE / step) * step;
   const startN = Math.floor(minN / step) * step;
   const endN   = Math.ceil(maxN / step) * step;
 
-  function addEl(side, pxVal, txt) {
+  function addEl(side, pctVal, txt) {
       let d = document.createElement('div');
       d.className = 'pgl-number pgl-' + side;
+      
+      // Izmantojam PROCENTUS, lai būtu neatkarīgi no DPI/mēroga
       if (side === 'top' || side === 'bottom') {
-          d.style.left = pxVal + 'px';
+          d.style.left = pctVal + '%';
       } else {
-          d.style.top = pxVal + 'px';
+          d.style.top = pctVal + '%';
       }
       d.textContent = txt;
       overlay.appendChild(d);
@@ -7487,27 +7488,33 @@ function addPrintGridLabels(map, scale, format, orient) {
 
   // Vertikālās (Easting)
   for (let E = startE; E <= endE; E += step) {
-    // ŠEIT BIJA KĻŪDA: getE_Line -> getE
     const pt = toPx(getE(E)); 
     
-    // Ja pikselis ir redzams
+    // 1. Filtrējam pēc pikseļiem (lai nebūtu lieko skaitļu)
     if (pt.x >= -1 && pt.x <= mapSize.x + 1) {
+        
+      // 2. Pārvēršam uz procentiem (lai būtu pareizajā vietā uz papīra)
+      const pct = (pt.x / mapSize.x) * 100;
+      
       const txt = getLabel(E);
-      addEl('top', pt.x, txt);
-      addEl('bottom', pt.x, txt);
+      addEl('top', pct, txt);
+      addEl('bottom', pct, txt);
     }
   }
 
   // Horizontālās (Northing)
   for (let N = startN; N <= endN; N += step) {
-    // ŠEIT BIJA KĻŪDA: getN_Line -> getN
     const pt = toPx(getN(N));
     
-    // Ja pikselis ir redzams
+    // 1. Filtrējam pēc pikseļiem
     if (pt.y >= -1 && pt.y <= mapSize.y + 1) {
+        
+      // 2. Pārvēršam uz procentiem
+      const pct = (pt.y / mapSize.y) * 100;
+
       const txt = getLabel(N);
-      addEl('left', pt.y, txt);
-      addEl('right', pt.y, txt);
+      addEl('left', pct, txt);
+      addEl('right', pct, txt);
     }
   }
 
