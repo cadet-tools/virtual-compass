@@ -7308,7 +7308,7 @@ function ensureDockOpen(){
 
 
 // ============================================================
-// === JAUNA FUNKCIJA: Drukas rāmja koordinātes (LABOTA) ===
+// === JAUNA FUNKCIJA: Drukas rāmja koordinātes (LABOTA v3 - Overlay) ===
 // ============================================================
 function addPrintGridLabels(map, scale) {
   // --- 1. IEKŠĒJĀS PALĪGFUNKCIJAS ---
@@ -7334,28 +7334,56 @@ function addPrintGridLabels(map, scale) {
 
   if (!isLKS && !isUTM) return;
 
-  // 3. Iespricējam CSS drukas etiķetēm
-  // IZMAIŅA: Novākts 'overflow: visible' kartei, lai tā neizietu no rāmja.
+  // 3. Sagatavojam OVERLAY konteineru
+  // Tas būs precīza kartes kopija izmēros un pozīcijā, bet ar overflow: visible
+  let overlay = document.getElementById('printGridOverlay');
+  if (overlay) overlay.remove(); // Drošībai nodzēšam veco
+  
+  overlay = document.createElement('div');
+  overlay.id = 'printGridOverlay';
+  
+  // Kopējam izmērus no kartes, kas sagatavota drukai (tā jau ir mm izmēros)
+  const mapEl = document.getElementById('onlineMap');
+  overlay.style.width = mapEl.style.width;
+  overlay.style.height = mapEl.style.height;
+  
+  document.body.appendChild(overlay);
+  // Pievienojam tīrīšanas sarakstam
+  window.__printOverlayEls = window.__printOverlayEls || [];
+  window.__printOverlayEls.push(overlay);
+
+  // 4. Iespricējam CSS (lai overlay ir virs kartes un etiķetes ir pareizās vietās)
   if (!document.getElementById('print-grid-labels-css')) {
     const css = document.createElement('style');
     css.id = 'print-grid-labels-css';
     css.textContent = `
       @media print {
+        /* Overlay pozicionēšana identiski kartei */
+        #printGridOverlay {
+          position: fixed !important;
+          inset: 0 !important;
+          margin: auto !important;
+          z-index: 2147483647; /* Virs visa */
+          overflow: visible !important; /* Ļauj cipariem iziet ārpus rāmja */
+          pointer-events: none;
+          background: transparent;
+        }
+
         .pgl-number {
-          position: fixed !important; /* Pozicionējam attiecībā pret lapu */
+          position: absolute;
           font-family: 'Arial', sans-serif;
           font-weight: bold;
           font-size: 11pt;
           color: #000;
           line-height: 1;
-          pointer-events: none;
-          z-index: 2147483647; /* Virs visa cita */
+          white-space: nowrap;
         }
-        /* Korekcijas, lai cipari būtu tieši blakus rāmim */
-        .pgl-top    { transform: translate(-50%, -120%); }
-        .pgl-bottom { transform: translate(-50%, 20%); }
-        .pgl-left   { transform: translate(-120%, -50%); }
-        .pgl-right  { transform: translate(20%, -50%); }
+
+        /* Pozīcijas attiecībā pret koordinātes punktu (enkuru) */
+        .pgl-top    { transform: translate(-50%, -130%); top: 0; }
+        .pgl-bottom { transform: translate(-50%, 40%); bottom: 0; }
+        .pgl-left   { transform: translate(-130%, -50%); left: 0; }
+        .pgl-right  { transform: translate(40%, -50%); right: 0; }
         
         #printCornerInfo {
           position: fixed !important;
@@ -7372,13 +7400,10 @@ function addPrintGridLabels(map, scale) {
     document.head.appendChild(css);
   }
 
-  // 4. Sagatavojam datus
+  // 5. Sagatavojam datus
   const bounds = map.getBounds();
   const step = getGridStep(scale);
-  const mapSize = map.getSize();
-  
-  // IZMAIŅA: Iegūstam kartes nobīdi ekrānā/lapā, lai pareizi noliktu ciparus uz body
-  const mapRect = map.getContainer().getBoundingClientRect();
+  const mapSize = map.getSize(); // Pikseļu izmērs (iekšēji Leafletam)
 
   let toProj, getE, getN, getLabel, getBigInfo;
 
@@ -7387,9 +7412,11 @@ function addPrintGridLabels(map, scale) {
     const bl = wgsToLKS(bounds.getSouth(), bounds.getWest());
     const tr = wgsToLKS(bounds.getNorth(), bounds.getEast());
     
+    // Aprēķina režģa robežas
     const minE = Math.min(bl.E, tr.E), maxE = Math.max(bl.E, tr.E);
     const minN = Math.min(bl.N, tr.N), maxN = Math.max(bl.N, tr.N);
 
+    // Funkcijas līniju punktu iegūšanai
     getE = (val) => ({ E: val, N: (minN + maxN) / 2 });
     getN = (val) => ({ E: (minE + maxE) / 2, N: val });
     
@@ -7406,7 +7433,7 @@ function addPrintGridLabels(map, scale) {
       return Math.floor(cLKS.E / 100000); 
     };
 
-    drawLabels(minE, maxE, minN, maxN, step, getLabel, getN, getE, projToPx, mapSize, mapRect);
+    drawLabels(minE, maxE, minN, maxN, step, getLabel, getN, getE, projToPx, mapSize);
     
   } else if (isUTM) {
     // --- MGRS/UTM Loģika ---
@@ -7445,50 +7472,45 @@ function addPrintGridLabels(map, scale) {
        return "UTM " + zone;
     };
 
-    drawLabels(minE, maxE, minN, maxN, step, getLabel, getN, getE, projToPx, mapSize, mapRect);
+    drawLabels(minE, maxE, minN, maxN, step, getLabel, getN, getE, projToPx, mapSize);
   }
 
-  // Uzzīmējam "Lielo Skaitli"
+  // Uzzīmējam "Lielo Skaitli" stūrī
   if (getBigInfo) {
     try {
       const cornerDiv = document.createElement('div');
       cornerDiv.id = 'printCornerInfo';
       cornerDiv.textContent = getBigInfo();
       document.body.appendChild(cornerDiv);
-      window.__printOverlayEls = window.__printOverlayEls || [];
       window.__printOverlayEls.push(cornerDiv);
     } catch(e){}
   }
 
-  // IZMAIŅA: Funkcija tagad ņem vērā mapRect (kartes atrašanās vietu lapā)
-  function drawLabels(minE, maxE, minN, maxN, step, fmt, getN_Line, getE_Line, toPx, sz, rect) {
-    
+  // --- Zīmēšanas loģika ---
+  function drawLabels(minE, maxE, minN, maxN, step, fmt, getN_Line, getE_Line, toPx, sz) {
     const startE = Math.floor(minE / step) * step;
     const endE   = Math.ceil(maxE / step) * step;
     const startN = Math.floor(minN / step) * step;
     const endN   = Math.ceil(maxN / step) * step;
 
-    // Palīgs elementa izveidei uz BODY
+    // Palīgs elementa izveidei OVERLAY iekšpusē
     function addEl(cls, x, y, txt) {
         let d = document.createElement('div');
         d.className = 'pgl-number ' + cls;
-        // Pieskaitām kartes nobīdi (rect.left/top), lai trāpītu pareizā vietā uz ekrāna
-        d.style.left = (rect.left + x) + 'px';
-        d.style.top  = (rect.top + y) + 'px';
+        // Tā kā overlay ir precīzi virs kartes, mēs izmantojam relatīvās koordinātes (no kartes stūra)
+        d.style.left = x + 'px';
+        d.style.top  = y + 'px';
         d.textContent = txt;
-        document.body.appendChild(d);
-        // Pievienojam tīrīšanai
-        window.__printOverlayEls = window.__printOverlayEls || [];
-        window.__printOverlayEls.push(d);
+        overlay.appendChild(d);
     }
 
     // Vertikālās līnijas (Easting) -> Cipari Augšā/Apakšā
     for (let E = startE; E <= endE; E += step) {
       const pt = toPx(getE_Line(E));
-      // Pārbauda, vai līnija ir redzama kartes platumā
+      // Pārbauda, vai līnija ir redzama kartes platumā (ar nelielu rezervi)
       if (pt.x >= -2 && pt.x <= sz.x + 2) {
         const txt = fmt(E);
-        addEl('pgl-top', pt.x, 0, txt);       // Augšā (y=0 attiecībā pret karti)
+        addEl('pgl-top', pt.x, 0, txt);       // Augšā (y=0)
         addEl('pgl-bottom', pt.x, sz.y, txt); // Apakšā (y=height)
       }
     }
