@@ -7310,7 +7310,7 @@ function ensureDockOpen(){
 
 
 // ============================================================
-// === JAUNA FUNKCIJA: Drukas rāmja koordinātes (FINAL - STICKY EDGES) ===
+// === JAUNA FUNKCIJA: Drukas rāmja koordinātes (FINAL - TIGHT FIT) ===
 // ============================================================
 function addPrintGridLabels(map, scale, format, orient) {
   // --- 1. IEKŠĒJĀS PALĪGFUNKCIJAS ---
@@ -7336,7 +7336,7 @@ function addPrintGridLabels(map, scale, format, orient) {
 
   if (!isLKS && !isUTM) return;
 
-  // 3. Aprēķinām precīzus izmērus MM (identiski kā injectDynamicPrintStyle)
+  // 3. Aprēķinām precīzus izmērus MM
   const base = (format === 'A3')
     ? (orient === 'portrait' ? {w:277, h:400} : {w:400, h:277})
     : (orient === 'portrait' ? {w:190, h:277} : {w:277, h:190});
@@ -7352,23 +7352,22 @@ function addPrintGridLabels(map, scale, format, orient) {
   overlay = document.createElement('div');
   overlay.id = 'printGridOverlay';
   
-  // Piešķiram izmērus un pozīciju identiski kartei drukas režīmā
+  // KOREKCIJA: Samazinām overlay izmēru par 1.5mm, lai tas būtu precīzi rāmja IEKŠPUSĒ, nevis ārpusē
+  // Tas novērsīs skaitļu "aizpeldēšanu" pa labi un uz leju.
   Object.assign(overlay.style, {
     position: 'fixed',
     inset: '0',
     margin: 'auto',
-    width: mm.w + 'mm',
-    height: mm.h + 'mm',
+    width: `calc(${mm.w}mm - 1.5mm)`,  // ← Samazināts platums
+    height: `calc(${mm.h}mm - 1.5mm)`, // ← Samazināts augstums
     zIndex: '2147483647',
     pointerEvents: 'none',
     background: 'transparent',
-    overflow: 'visible', // Ļauj cipariem būt ārpusē
+    overflow: 'visible',
     border: 'none'
   });
   
   document.body.appendChild(overlay);
-  
-  // Pievienojam tīrīšanas sarakstam
   window.__printOverlayEls = window.__printOverlayEls || [];
   window.__printOverlayEls.push(overlay);
 
@@ -7391,25 +7390,22 @@ function addPrintGridLabels(map, scale, format, orient) {
           color: #000;
           line-height: 1;
           white-space: nowrap;
-          /* Centrējam elementu pret tā koordināti */
           transform: translate(-50%, -50%); 
         }
 
-        /* IZMAIŅA: Izmantojam 'top: 0' un 'bottom: 0' utt., lai 
-           cipari būtu "pielīmēti" rāmja malai no ārpuses.
-        */
-
-        /* Augšā: pozicionēts uz 0%, pavilkts uz augšu */
-        .pgl-top    { top: 0; margin-top: -5mm; }
+        /* KOREKCIJA: Samazinātas atkāpes (margin), lai cipari ir ciešāk klāt pie rāmja */
         
-        /* Apakšā: pozicionēts uz 100%, pavilkts uz leju */
-        .pgl-bottom { top: 100%; margin-top: 5mm; }
+        /* Augšā */
+        .pgl-top    { top: 0; margin-top: -3mm; } 
         
-        /* Pa kreisi: pozicionēts uz 0%, pavilkts pa kreisi */
-        .pgl-left   { left: 0; margin-left: -6mm; }
+        /* Apakšā */
+        .pgl-bottom { top: 100%; margin-top: 3mm; }
         
-        /* Pa labi: pozicionēts uz 100%, pavilkts pa labi */
-        .pgl-right  { left: 100%; margin-left: 6mm; }
+        /* Pa kreisi */
+        .pgl-left   { left: 0; margin-left: -4mm; }
+        
+        /* Pa labi */
+        .pgl-right  { left: 100%; margin-left: 4mm; }
         
         #printCornerInfo {
           position: fixed !important;
@@ -7500,59 +7496,45 @@ function addPrintGridLabels(map, scale, format, orient) {
     } catch(e){}
   }
 
-  // --- Zīmēšanas loģika ar stingru piesaisti malām ---
+  // --- Zīmēšanas loģika ---
   function drawLabels(minE, maxE, minN, maxN, step, fmt, getN_Line, getE_Line, toPx, sz) {
     const startE = Math.floor(minE / step) * step;
     const endE   = Math.ceil(maxE / step) * step;
     const startN = Math.floor(minN / step) * step;
     const endN   = Math.ceil(maxN / step) * step;
 
-    // Palīgs elementa izveidei
-    // side: 'top', 'bottom', 'left', 'right'
-    // posVal: pikseļu vērtība (x priekš top/bottom, y priekš left/right)
     function addEl(side, posVal, txt) {
         let d = document.createElement('div');
-        d.className = 'pgl-number pgl-' + side; // Piem: pgl-top
+        d.className = 'pgl-number pgl-' + side;
         
-        // Ja ir vertikāla līnija (top/bottom), mēs mainām tikai 'left' pozīciju
         if (side === 'top' || side === 'bottom') {
             d.style.left = posVal + 'px';
-            // top/bottom tiek kontrolēts caur CSS (top:0 vai top:100%)
-        } 
-        // Ja ir horizontāla līnija (left/right), mēs mainām tikai 'top' pozīciju
-        else {
+        } else {
             d.style.top = posVal + 'px';
-            // left/right tiek kontrolēts caur CSS (left:0 vai left:100%)
         }
-        
         d.textContent = txt;
         overlay.appendChild(d);
     }
 
-    // Vertikālās līnijas (Easting) -> Cipari Augšā/Apakšā
     for (let E = startE; E <= endE; E += step) {
       const pt = toPx(getE_Line(E));
-      // Pārbauda, vai līnija ir redzama kartes platumā
       if (pt.x >= -2 && pt.x <= sz.x + 2) {
         const txt = fmt(E);
-        addEl('top', pt.x, txt);    // Zīmējam augšā pie šī X
-        addEl('bottom', pt.x, txt); // Zīmējam apakšā pie šī X
+        addEl('top', pt.x, txt);
+        addEl('bottom', pt.x, txt);
       }
     }
 
-    // Horizontālās līnijas (Northing) -> Cipari Pa Kreisi/Pa Labi
     for (let N = startN; N <= endN; N += step) {
       const pt = toPx(getN_Line(N));
-      // Pārbauda, vai līnija ir redzama kartes augstumā
       if (pt.y >= -2 && pt.y <= sz.y + 2) {
         const txt = fmt(N);
-        addEl('left', pt.y, txt);   // Zīmējam pa kreisi pie šī Y
-        addEl('right', pt.y, txt);  // Zīmējam pa labi pie šī Y
+        addEl('left', pt.y, txt);
+        addEl('right', pt.y, txt);
       }
     }
   }
 }
-
 
 
 
