@@ -7501,7 +7501,7 @@ function addPrintGridLabels(map, scale, format, orient) {
          bigInfoText = "UTM Zone " + zone;
     }
   }
-
+}
 
 
 
