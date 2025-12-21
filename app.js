@@ -7483,23 +7483,28 @@ function addPrintGridLabels(map, scale, format, orient) {
     }
   }
 
- // --- LIELAIS SKAITLIS (Stūrī) ---
+  // --- LIELAIS SKAITLIS ---
   let bigInfoText = "";
   if (isLKS) {
-    // Iegūstam prefiksu (piem., 5)
-    const prefix = Math.floor(centerCoords.E / 100000);
-    // Noformējam to saprotami: "E: 500 000"
-    bigInfoText = "E: " + prefix + "00 000"; 
+    bigInfoText = Math.floor(centerCoords.E / 100000);
   } else {
-    // UTM gadījumā
     if (typeof toMGRS8 === 'function') {
          const c = map.getCenter();
          const mgrsFull = toMGRS8(c.lat, c.lng, false);
-         // MGRS parasti ir pašsaprotams (Zona + Kvadrāts), atstājam kā ir vai pieliekam "MGRS: "
-         bigInfoText = "MGRS: " + mgrsFull.split(' ').slice(0, 2).join(' ');
+         bigInfoText = mgrsFull.split(' ').slice(0, 2).join(' ');
     } else {
-         bigInfoText = "UTM Zone " + zone;
+         bigInfoText = "UTM " + zone;
     }
+  }
+
+  if (bigInfoText) {
+    try {
+      const cornerDiv = document.createElement('div');
+      cornerDiv.id = 'printCornerInfo';
+      cornerDiv.textContent = bigInfoText;
+      document.body.appendChild(cornerDiv);
+      window.__printOverlayEls.push(cornerDiv);
+    } catch(e){}
   }
 }
 
