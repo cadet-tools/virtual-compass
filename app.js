@@ -7308,9 +7308,9 @@ function ensureDockOpen(){
 
 
 // ============================================================
-// === JAUNA FUNKCIJA: Drukas rāmja koordinātes (LABOTA v3 - Overlay) ===
+// === JAUNA FUNKCIJA: Drukas rāmja koordinātes (FINAL FIX) ===
 // ============================================================
-function addPrintGridLabels(map, scale) {
+function addPrintGridLabels(map, scale, format, orient) {
   // --- 1. IEKŠĒJĀS PALĪGFUNKCIJAS ---
   
   const getGridStep = (s) => {
@@ -7334,39 +7334,54 @@ function addPrintGridLabels(map, scale) {
 
   if (!isLKS && !isUTM) return;
 
-  // 3. Sagatavojam OVERLAY konteineru
-  // Tas būs precīza kartes kopija izmēros un pozīcijā, bet ar overflow: visible
+  // 3. Aprēķinām precīzus izmērus MM (identiski kā injectDynamicPrintStyle)
+  // Šis ir KRITISKI SVARĪGI, lai overlay sakristu ar karti pikselis-pikselī
+  const base = (format === 'A3')
+    ? (orient === 'portrait' ? {w:277, h:400} : {w:400, h:277})
+    : (orient === 'portrait' ? {w:190, h:277} : {w:277, h:190});
+
+  const slackW = (orient === 'landscape' ? 2 : 0);
+  const slackH = (orient === 'landscape' ? 14 : 0);
+  const mm = { w: base.w - slackW, h: base.h - slackH };
+
+  // 4. Sagatavojam OVERLAY konteineru
   let overlay = document.getElementById('printGridOverlay');
-  if (overlay) overlay.remove(); // Drošībai nodzēšam veco
+  if (overlay) overlay.remove();
   
   overlay = document.createElement('div');
   overlay.id = 'printGridOverlay';
   
-  // Kopējam izmērus no kartes, kas sagatavota drukai (tā jau ir mm izmēros)
-  const mapEl = document.getElementById('onlineMap');
-  overlay.style.width = mapEl.style.width;
-  overlay.style.height = mapEl.style.height;
+  // Piešķiram izmērus un pozīciju identiski kartei drukas režīmā
+  // Tādējādi (0,0) overlayā būs (0,0) kartē
+  Object.assign(overlay.style, {
+    position: 'fixed',
+    inset: '0',
+    margin: 'auto',
+    width: mm.w + 'mm',
+    height: mm.h + 'mm',
+    zIndex: '2147483647',
+    pointerEvents: 'none',
+    background: 'transparent',
+    overflow: 'visible', // ŠIS ir tas, kas ļauj cipariem būt ārpus rāmja
+    border: 'none'
+  });
   
   document.body.appendChild(overlay);
+  
   // Pievienojam tīrīšanas sarakstam
   window.__printOverlayEls = window.__printOverlayEls || [];
   window.__printOverlayEls.push(overlay);
 
-  // 4. Iespricējam CSS (lai overlay ir virs kartes un etiķetes ir pareizās vietās)
+  // 5. Iespricējam CSS (Tikai fontiem un nobīdēm)
   if (!document.getElementById('print-grid-labels-css')) {
     const css = document.createElement('style');
     css.id = 'print-grid-labels-css';
     css.textContent = `
       @media print {
-        /* Overlay pozicionēšana identiski kartei */
-        #printGridOverlay {
-          position: fixed !important;
-          inset: 0 !important;
-          margin: auto !important;
-          z-index: 2147483647; /* Virs visa */
-          overflow: visible !important; /* Ļauj cipariem iziet ārpus rāmja */
-          pointer-events: none;
-          background: transparent;
+        /* Piespiežam overlay būt redzamam */
+        body.print-mode #printGridOverlay {
+          display: block !important;
+          visibility: visible !important;
         }
 
         .pgl-number {
@@ -7377,13 +7392,16 @@ function addPrintGridLabels(map, scale) {
           color: #000;
           line-height: 1;
           white-space: nowrap;
+          /* Centrējam elementu pret tā koordināti */
+          transform: translate(-50%, -50%); 
         }
 
-        /* Pozīcijas attiecībā pret koordinātes punktu (enkuru) */
-        .pgl-top    { transform: translate(-50%, -130%); top: 0; }
-        .pgl-bottom { transform: translate(-50%, 40%); bottom: 0; }
-        .pgl-left   { transform: translate(-130%, -50%); left: 0; }
-        .pgl-right  { transform: translate(40%, -50%); right: 0; }
+        /* Nobīdes no rāmja malām (lai cipari ir ārpusē) */
+        /* top:0 nozīmē uz līnijas gala, margin pavelk uz āru */
+        .pgl-top    { margin-top: -5mm; }
+        .pgl-bottom { margin-bottom: -5mm; }
+        .pgl-left   { margin-left: -6mm; }
+        .pgl-right  { margin-right: -6mm; }
         
         #printCornerInfo {
           position: fixed !important;
@@ -7394,16 +7412,20 @@ function addPrintGridLabels(map, scale) {
           font-size: 14pt;
           color: #000;
           z-index: 10000;
+          display: block !important;
+          visibility: visible !important;
         }
       }
     `;
     document.head.appendChild(css);
   }
 
-  // 5. Sagatavojam datus
+  // 6. Sagatavojam datus
   const bounds = map.getBounds();
   const step = getGridStep(scale);
-  const mapSize = map.getSize(); // Pikseļu izmērs (iekšēji Leafletam)
+  // Kartes izmērs pikseļos (Leaflet iekšējais). 
+  // Tā kā overlay sakrīt ar karti, mēs varam lietot šos pikseļus tieši overlayā.
+  const mapSize = map.getSize(); 
 
   let toProj, getE, getN, getLabel, getBigInfo;
 
@@ -7416,7 +7438,6 @@ function addPrintGridLabels(map, scale) {
     const minE = Math.min(bl.E, tr.E), maxE = Math.max(bl.E, tr.E);
     const minN = Math.min(bl.N, tr.N), maxN = Math.max(bl.N, tr.N);
 
-    // Funkcijas līniju punktu iegūšanai
     getE = (val) => ({ E: val, N: (minN + maxN) / 2 });
     getN = (val) => ({ E: (minE + maxE) / 2, N: val });
     
@@ -7486,8 +7507,9 @@ function addPrintGridLabels(map, scale) {
     } catch(e){}
   }
 
-  // --- Zīmēšanas loģika ---
+  // --- Zīmēšanas loģika (ATPAKAĻ PIE PIKSEĻIEM) ---
   function drawLabels(minE, maxE, minN, maxN, step, fmt, getN_Line, getE_Line, toPx, sz) {
+    // Noapaļojam uz režģa soļiem
     const startE = Math.floor(minE / step) * step;
     const endE   = Math.ceil(maxE / step) * step;
     const startN = Math.floor(minN / step) * step;
@@ -7497,7 +7519,7 @@ function addPrintGridLabels(map, scale) {
     function addEl(cls, x, y, txt) {
         let d = document.createElement('div');
         d.className = 'pgl-number ' + cls;
-        // Tā kā overlay ir precīzi virs kartes, mēs izmantojam relatīvās koordinātes (no kartes stūra)
+        // Izmantojam PIKSEĻUS, jo overlay izmērs sakrīt ar kartes izmēru
         d.style.left = x + 'px';
         d.style.top  = y + 'px';
         d.textContent = txt;
@@ -7507,7 +7529,7 @@ function addPrintGridLabels(map, scale) {
     // Vertikālās līnijas (Easting) -> Cipari Augšā/Apakšā
     for (let E = startE; E <= endE; E += step) {
       const pt = toPx(getE_Line(E));
-      // Pārbauda, vai līnija ir redzama kartes platumā (ar nelielu rezervi)
+      // Pārbauda, vai līnija ir redzama kartes platumā
       if (pt.x >= -2 && pt.x <= sz.x + 2) {
         const txt = fmt(E);
         addEl('pgl-top', pt.x, 0, txt);       // Augšā (y=0)
