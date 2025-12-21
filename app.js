@@ -7316,7 +7316,7 @@ function addPrintGridLabels(map, scale, format, orient) {
   
   // --- REGULĒŠANAS KLOĶI (Maini šos skaitļus, lai pielāgotu) ---
   const FRAME_SHRINK_MM = 1.0;  // Cik mm samazināt rāmi (lai cipari neietu prom no malām)
-  const LABEL_OFFSET_MM = 2.0;  // Attālums no līnijas gala līdz ciparam (mm)
+  const LABEL_OFFSET_MM = 0.5;  // Attālums no līnijas gala līdz ciparam (mm)
   const FONT_SIZE_PT    = 11;   // Ciparu izmērs (pt)
   // ------------------------------------------------------------
 
