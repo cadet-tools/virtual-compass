@@ -7308,7 +7308,7 @@ function ensureDockOpen(){
 
 
 // ============================================================
-// === JAUNA FUNKCIJA: Drukas rāmja koordinātes (PIXEL-PERFECT) ===
+// === JAUNA FUNKCIJA: Drukas rāmja koordinātes (PIXEL-PERFECT FIX) ===
 // ============================================================
 function addPrintGridLabels(map, scale, format, orient) {
 
@@ -7337,7 +7337,6 @@ function addPrintGridLabels(map, scale, format, orient) {
   if (!isLKS && !isUTM) return;
 
   // --- 2. SAGATAVOJAM OVERLAY (Precīzi virs kartes) ---
-  // Mēs izmantojam 'map.getSize()', kas drukas brīdī atgriež precīzus kartes pikseļus
   const mapSize = map.getSize();
   const mapEl   = document.getElementById('onlineMap');
 
@@ -7352,13 +7351,12 @@ function addPrintGridLabels(map, scale, format, orient) {
     position: 'fixed',
     inset: '0',
     margin: 'auto',
-    // Mēs ņemam izmērus tieši no kartes elementa, kas jau ir sagatavots drukai
     width: mapEl.style.width, 
     height: mapEl.style.height,
     zIndex: '2147483647',
     pointerEvents: 'none',
     background: 'transparent',
-    overflow: 'visible', // Ļaujam cipariem iziet ārpusē
+    overflow: 'visible',
     border: 'none'
   });
   
@@ -7383,7 +7381,6 @@ function addPrintGridLabels(map, scale, format, orient) {
           white-space: nowrap;
           transform: translate(-50%, -50%); 
         }
-        /* Pozicionēšana ar offsetu no rāmja malas */
         .pgl-top    { top: 0;   margin-top: -${LABEL_OFFSET_MM}mm; }
         .pgl-bottom { top: 100%; margin-top: ${LABEL_OFFSET_MM}mm; }
         .pgl-left   { left: 0;  margin-left: -${LABEL_OFFSET_MM}mm; }
@@ -7406,21 +7403,19 @@ function addPrintGridLabels(map, scale, format, orient) {
     document.head.appendChild(css);
   }
 
-  // --- 4. ROBEŽU APRĒĶINS (PIKSEĻI -> KOORDINĀTES) ---
-  // Mēs prasām Leafletam: "Kāda koordināte ir kreisajā augšējā stūrī (0,0) un labajā apakšējā?"
-  // Tas garantē, ka mēs strādājam TIKAI ar redzamo laukumu.
+  // --- 4. ROBEŽU APRĒĶINS ---
   const tl = map.containerPointToLatLng([0, 0]);
   const br = map.containerPointToLatLng([mapSize.x, mapSize.y]);
   
   const step = getGridStep(scale);
   let getE, getN, getLabel, getBigInfo;
   let minE, maxE, minN, maxN;
+  let toPx; // Definējam šeit, lai ir pieejams ārpus blokiem
 
   if (isLKS) {
     const p1 = wgsToLKS(tl.lat, tl.lng);
     const p2 = wgsToLKS(br.lat, br.lng);
     
-    // Aprēķinām redzamo apgabalu
     minE = Math.min(p1.E, p2.E); maxE = Math.max(p1.E, p2.E);
     minN = Math.min(p1.N, p2.N); maxN = Math.max(p1.N, p2.N);
 
@@ -7428,7 +7423,7 @@ function addPrintGridLabels(map, scale, format, orient) {
     getE = (val) => ({ E: val, N: (minN + maxN) / 2 });
     getN = (val) => ({ E: (minE + maxE) / 2, N: val });
     
-    var toPx = (p) => {
+    toPx = (p) => {
       const [lng, lat] = proj4('EPSG:3059', 'EPSG:4326', [p.E, p.N]);
       return map.latLngToContainerPoint([lat, lng]);
     };
@@ -7445,7 +7440,6 @@ function addPrintGridLabels(map, scale, format, orient) {
     const zone = getUtmZone(c.lng);
     const hemi = c.lat >= 0 ? 'N' : 'S';
 
-    // Konvertējam stūrus uz UTM, lai dabūtu min/max
     const u1 = window.llToUTMInZone(tl.lat, tl.lng, zone);
     const u2 = window.llToUTMInZone(br.lat, br.lng, zone);
 
@@ -7455,7 +7449,7 @@ function addPrintGridLabels(map, scale, format, orient) {
     getE = (val) => ({ easting: val, northing: (minN + maxN) / 2 });
     getN = (val) => ({ easting: (minE + maxE) / 2, northing: val });
 
-    var toPx = (p) => {
+    toPx = (p) => {
       try {
          const ll = window.utmToLL ? window.utmToLL(p.easting, p.northing, zone, hemi) : {lat:0, lon:0};
          return map.latLngToContainerPoint([ll.lat, ll.lon]);
@@ -7472,10 +7466,8 @@ function addPrintGridLabels(map, scale, format, orient) {
     };
   }
 
-  // --- 5. ZĪMĒŠANA (TIKAI REDZAMO) ---
+  // --- 5. ZĪMĒŠANA (LABOTS: Izmantojam getE un getN) ---
   
-  // Paplašinām ciklu nedaudz, lai noķertu līnijas, kas ir tieši uz robežas
-  // bet filtrēsim pēc pikseļiem
   const startE = Math.floor(minE / step) * step;
   const endE   = Math.ceil(maxE / step) * step;
   const startN = Math.floor(minN / step) * step;
@@ -7484,7 +7476,6 @@ function addPrintGridLabels(map, scale, format, orient) {
   function addEl(side, pxVal, txt) {
       let d = document.createElement('div');
       d.className = 'pgl-number pgl-' + side;
-      // Mēs izmantojam PIKSEĻUS (px), jo tie perfekti atbilst overlay izmēram
       if (side === 'top' || side === 'bottom') {
           d.style.left = pxVal + 'px';
       } else {
@@ -7496,11 +7487,10 @@ function addPrintGridLabels(map, scale, format, orient) {
 
   // Vertikālās (Easting)
   for (let E = startE; E <= endE; E += step) {
-    const pt = toPx(getE_Line(E));
+    // ŠEIT BIJA KĻŪDA: getE_Line -> getE
+    const pt = toPx(getE(E)); 
     
-    // KĻŪDU NOVĒRŠANA:
-    // Ja pikselis (pt.x) ir starp 0 un mapSize.x, tātad līnija ir redzama!
-    // Mēs atļaujam 1px kļūdu (>= -1 && <= width + 1)
+    // Ja pikselis ir redzams
     if (pt.x >= -1 && pt.x <= mapSize.x + 1) {
       const txt = getLabel(E);
       addEl('top', pt.x, txt);
@@ -7510,9 +7500,10 @@ function addPrintGridLabels(map, scale, format, orient) {
 
   // Horizontālās (Northing)
   for (let N = startN; N <= endN; N += step) {
-    const pt = toPx(getN_Line(N));
+    // ŠEIT BIJA KĻŪDA: getN_Line -> getN
+    const pt = toPx(getN(N));
     
-    // Ja pikselis (pt.y) ir starp 0 un mapSize.y, līnija ir redzama!
+    // Ja pikselis ir redzams
     if (pt.y >= -1 && pt.y <= mapSize.y + 1) {
       const txt = getLabel(N);
       addEl('left', pt.y, txt);
