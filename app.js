@@ -2569,16 +2569,29 @@ body.print-mode #printNorthTR svg,
 body.print-mode #printNorthTR canvas{ display: none !important; }
 
 /* pašas bultas ģeometrija un “N” */
-body.print-mode #printNorthTR .northArrow{
-  width:0; height:0; margin:0;
-  border-left:4mm solid transparent;
-  border-right:4mm solid transparent;
-  border-bottom:8mm solid #000;
-margin-top: 1mm;
+body.print-mode #printNorthTR .northArrow {
+  width: 6mm;          /* Platums */
+  height: 16mm;        /* Augstums - padarām to slaidāku */
+  margin: 0;
+  margin-top: 0;       
+  
+  /* Noņemam veco trīsstūra border-hack */
+  border: none !important; 
+  
+  /* Ievietojam SVG bultu (melnbalta, klasiska stila) */
+  background-image: url("data:image/svg+xml,%3Csvg width='24' height='60' viewBox='0 0 24 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 0 L24 45 L12 38 L0 45 Z' fill='black'/%3E%3Cpath d='M12 0 L12 55' stroke='black' stroke-width='2'/%3E%3C/svg%3E");
+  
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
 }
-body.print-mode #printNorthTR .n{
-  font:9pt/1 system-ui, sans-serif; font-weight:700; letter-spacing:1px; color:#000;
-  pointer-events:none;
+
+body.print-mode #printNorthTR .n {
+  font: 11pt/1 system-ui, sans-serif; /* Nedaudz lielāks fonts */
+  font-weight: 700; 
+  color: #000;
+  pointer-events: none;
+  margin-top: 4mm; /* Lai burts 'N' ir nedaudz zemāk par bultas asi */
 }
 
 
