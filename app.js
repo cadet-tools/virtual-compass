@@ -7305,12 +7305,11 @@ function ensureDockOpen(){
 
 
 // ============================================================
-// === JAUNA FUNKCIJA: Drukas rāmja koordinātes (Skolu/Jaunsargu vajadzībām) ===
+// === JAUNA FUNKCIJA: Drukas rāmja koordinātes (LABOTA) ===
 // ============================================================
 function addPrintGridLabels(map, scale) {
-  // --- 1. IEKŠĒJĀS PALĪGFUNKCIJAS (lai labotu ReferenceError) ---
+  // --- 1. IEKŠĒJĀS PALĪGFUNKCIJAS ---
   
-  // Aprēķina tīkla soli metros (kopija no initMap)
   const getGridStep = (s) => {
     if (s <=  7500)   return  200;
     if (s <= 15000)   return  500;
@@ -7320,7 +7319,6 @@ function addPrintGridLabels(map, scale) {
     return 10000;
   };
 
-  // UTM zonas aprēķins
   const getUtmZone = (lon) => Math.floor((lon + 180) / 6) + 1;
 
   // -----------------------------------------------------------
@@ -7334,26 +7332,27 @@ function addPrintGridLabels(map, scale) {
   if (!isLKS && !isUTM) return;
 
   // 3. Iespricējam CSS drukas etiķetēm
+  // IZMAIŅA: Novākts 'overflow: visible' kartei, lai tā neizietu no rāmja.
   if (!document.getElementById('print-grid-labels-css')) {
     const css = document.createElement('style');
     css.id = 'print-grid-labels-css';
     css.textContent = `
       @media print {
-        #onlineMap { overflow: visible !important; }
         .pgl-number {
-          position: absolute;
+          position: fixed !important; /* Pozicionējam attiecībā pret lapu */
           font-family: 'Arial', sans-serif;
           font-weight: bold;
           font-size: 11pt;
           color: #000;
           line-height: 1;
           pointer-events: none;
-          z-index: 9999;
+          z-index: 2147483647; /* Virs visa cita */
         }
-        .pgl-top    { top: -5mm;    transform: translateX(-50%); }
-        .pgl-bottom { bottom: -5mm; transform: translateX(-50%); }
-        .pgl-left   { left: -6mm;   transform: translateY(-50%); }
-        .pgl-right  { right: -6mm;  transform: translateY(-50%); }
+        /* Korekcijas, lai cipari būtu tieši blakus rāmim */
+        .pgl-top    { transform: translate(-50%, -120%); }
+        .pgl-bottom { transform: translate(-50%, 20%); }
+        .pgl-left   { transform: translate(-120%, -50%); }
+        .pgl-right  { transform: translate(20%, -50%); }
         
         #printCornerInfo {
           position: fixed !important;
@@ -7372,8 +7371,11 @@ function addPrintGridLabels(map, scale) {
 
   // 4. Sagatavojam datus
   const bounds = map.getBounds();
-  const step = getGridStep(scale); // Izmantojam lokālo funkciju
+  const step = getGridStep(scale);
   const mapSize = map.getSize();
+  
+  // IZMAIŅA: Iegūstam kartes nobīdi ekrānā/lapā, lai pareizi noliktu ciparus uz body
+  const mapRect = map.getContainer().getBoundingClientRect();
 
   let toProj, getE, getN, getLabel, getBigInfo;
 
@@ -7401,14 +7403,13 @@ function addPrintGridLabels(map, scale) {
       return Math.floor(cLKS.E / 100000); 
     };
 
-    drawLabels(minE, maxE, minN, maxN, step, getLabel, getN, getE, projToPx, mapSize);
+    drawLabels(minE, maxE, minN, maxN, step, getLabel, getN, getE, projToPx, mapSize, mapRect);
     
   } else if (isUTM) {
     // --- MGRS/UTM Loģika ---
     const c = map.getCenter();
-    const zone = getUtmZone(c.lng); // Izmantojam lokālo funkciju
+    const zone = getUtmZone(c.lng);
     
-    // Pārvēršam stūrus (izmanto window.llToUTMInZone, kas ir pieejams globāli)
     const nw = window.llToUTMInZone(bounds.getNorthWest().lat, bounds.getNorthWest().lng, zone);
     const se = window.llToUTMInZone(bounds.getSouthEast().lat, bounds.getSouthEast().lng, zone);
 
@@ -7421,14 +7422,8 @@ function addPrintGridLabels(map, scale) {
     getN = (val) => ({ easting: (minE + maxE) / 2, northing: val });
 
     const projToPx = (p) => {
-      // Šeit jābūt uzmanīgam, ja utmToLL nav globāls. 
-      // Lielākā daļa MGRS funkciju tev ir iekšpusē, bet mēģināsim iztikt ar pieejamo.
-      // Ja utmToLL nav pieejams, MGRS etiķetes var nestrādāt, bet LKS strādās.
       try {
          const hemi = (c.lat >= 0 ? 'N' : 'S');
-         // Mēģinām atrast globālu vai logā pieejamu funkciju, vai aptuvenu konversiju
-         // Ja Tavā kodā utmToLL nav window objektā, šis var būt klupšanas akmens.
-         // Bet LKS gadījumā (kas ir prioritāte) viss būs kārtībā.
          const ll = window.utmToLL ? window.utmToLL(p.easting, p.northing, zone, hemi) : {lat:0, lon:0};
          return map.latLngToContainerPoint([ll.lat, ll.lon]);
       } catch(e) { return {x:-100, y:-100}; }
@@ -7437,7 +7432,6 @@ function addPrintGridLabels(map, scale) {
     getLabel = (val) => String(Math.floor(val / 1000) % 100).padStart(2, '0');
 
     getBigInfo = () => {
-       // Mēģinām atrast toMGRS8. Ja nav pieejams globāli, atgriežam 'UTM'
        if (typeof toMGRS8 === 'function') {
          const mgrsFull = toMGRS8(c.lat, c.lng, false);
          return mgrsFull.split(' ').slice(0, 2).join(' ');
@@ -7448,7 +7442,7 @@ function addPrintGridLabels(map, scale) {
        return "UTM " + zone;
     };
 
-    drawLabels(minE, maxE, minN, maxN, step, getLabel, getN, getE, projToPx, mapSize);
+    drawLabels(minE, maxE, minN, maxN, step, getLabel, getN, getE, projToPx, mapSize, mapRect);
   }
 
   // Uzzīmējam "Lielo Skaitli"
@@ -7463,36 +7457,51 @@ function addPrintGridLabels(map, scale) {
     } catch(e){}
   }
 
-  function drawLabels(minE, maxE, minN, maxN, step, fmt, getN_Line, getE_Line, toPx, sz) {
-    const mapEl = document.getElementById('onlineMap');
+  // IZMAIŅA: Funkcija tagad ņem vērā mapRect (kartes atrašanās vietu lapā)
+  function drawLabels(minE, maxE, minN, maxN, step, fmt, getN_Line, getE_Line, toPx, sz, rect) {
+    
     const startE = Math.floor(minE / step) * step;
     const endE   = Math.ceil(maxE / step) * step;
     const startN = Math.floor(minN / step) * step;
     const endN   = Math.ceil(maxN / step) * step;
 
+    // Palīgs elementa izveidei uz BODY
+    function addEl(cls, x, y, txt) {
+        let d = document.createElement('div');
+        d.className = 'pgl-number ' + cls;
+        // Pieskaitām kartes nobīdi (rect.left/top), lai trāpītu pareizā vietā uz ekrāna
+        d.style.left = (rect.left + x) + 'px';
+        d.style.top  = (rect.top + y) + 'px';
+        d.textContent = txt;
+        document.body.appendChild(d);
+        // Pievienojam tīrīšanai
+        window.__printOverlayEls = window.__printOverlayEls || [];
+        window.__printOverlayEls.push(d);
+    }
+
+    // Vertikālās līnijas (Easting) -> Cipari Augšā/Apakšā
     for (let E = startE; E <= endE; E += step) {
       const pt = toPx(getE_Line(E));
+      // Pārbauda, vai līnija ir redzama kartes platumā
       if (pt.x >= -2 && pt.x <= sz.x + 2) {
         const txt = fmt(E);
-        let d1 = document.createElement('div'); d1.className = 'pgl-number pgl-top';
-        d1.style.left = pt.x + 'px'; d1.textContent = txt; mapEl.appendChild(d1);
-        let d2 = document.createElement('div'); d2.className = 'pgl-number pgl-bottom';
-        d2.style.left = pt.x + 'px'; d2.textContent = txt; mapEl.appendChild(d2);
+        addEl('pgl-top', pt.x, 0, txt);       // Augšā (y=0 attiecībā pret karti)
+        addEl('pgl-bottom', pt.x, sz.y, txt); // Apakšā (y=height)
       }
     }
+
+    // Horizontālās līnijas (Northing) -> Cipari Pa Kreisi/Pa Labi
     for (let N = startN; N <= endN; N += step) {
       const pt = toPx(getN_Line(N));
+      // Pārbauda, vai līnija ir redzama kartes augstumā
       if (pt.y >= -2 && pt.y <= sz.y + 2) {
         const txt = fmt(N);
-        let d1 = document.createElement('div'); d1.className = 'pgl-number pgl-left';
-        d1.style.top = pt.y + 'px'; d1.textContent = txt; mapEl.appendChild(d1);
-        let d2 = document.createElement('div'); d2.className = 'pgl-number pgl-right';
-        d2.style.top = pt.y + 'px'; d2.textContent = txt; mapEl.appendChild(d2);
+        addEl('pgl-left', 0, pt.y, txt);      // Pa kreisi (x=0)
+        addEl('pgl-right', sz.x, pt.y, txt);  // Pa labi (x=width)
       }
     }
   }
 }
-
 
 
 	
