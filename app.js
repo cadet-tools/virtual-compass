@@ -7310,11 +7310,18 @@ function ensureDockOpen(){
 
 
 // ============================================================
-// === JAUNA FUNKCIJA: Drukas rāmja koordinātes (FINAL - TIGHT FIT) ===
+// === JAUNA FUNKCIJA: Drukas rāmja koordinātes (REGULĒJAMA) ===
 // ============================================================
 function addPrintGridLabels(map, scale, format, orient) {
-  // --- 1. IEKŠĒJĀS PALĪGFUNKCIJAS ---
   
+  // --- REGULĒŠANAS KLOĶI (Maini šos skaitļus, lai pielāgotu) ---
+  const FRAME_SHRINK_MM = 1.0;  // Cik mm samazināt rāmi (lai cipari neietu prom no malām)
+  const LABEL_OFFSET_MM = 2.0;  // Attālums no līnijas gala līdz ciparam (mm)
+  const FONT_SIZE_PT    = 11;   // Ciparu izmērs (pt)
+  // ------------------------------------------------------------
+
+
+  // 1. Iekšējās palīgfunkcijas
   const getGridStep = (s) => {
     if (s <=  7500)   return  200;
     if (s <= 15000)   return  500;
@@ -7326,9 +7333,7 @@ function addPrintGridLabels(map, scale, format, orient) {
 
   const getUtmZone = (lon) => Math.floor((lon + 180) / 6) + 1;
 
-  // -----------------------------------------------------------
-
-  // 2. Nosakām, kurš režģis ir aktīvs
+  // 2. Pārbaude
   const isLKS = (window.lksGrid && map.hasLayer(window.lksGrid)) || 
                 (window.lksLabels && map.hasLayer(window.lksLabels));
   const isUTM = (window.utmGrid && map.hasLayer(window.utmGrid)) || 
@@ -7336,7 +7341,7 @@ function addPrintGridLabels(map, scale, format, orient) {
 
   if (!isLKS && !isUTM) return;
 
-  // 3. Aprēķinām precīzus izmērus MM
+  // 3. Aprēķinām kartes izmērus (MM)
   const base = (format === 'A3')
     ? (orient === 'portrait' ? {w:277, h:400} : {w:400, h:277})
     : (orient === 'portrait' ? {w:190, h:277} : {w:277, h:190});
@@ -7345,67 +7350,53 @@ function addPrintGridLabels(map, scale, format, orient) {
   const slackH = (orient === 'landscape' ? 14 : 0);
   const mm = { w: base.w - slackW, h: base.h - slackH };
 
-  // 4. Sagatavojam OVERLAY konteineru
+  // 4. Sagatavojam OVERLAY
   let overlay = document.getElementById('printGridOverlay');
   if (overlay) overlay.remove();
   
   overlay = document.createElement('div');
   overlay.id = 'printGridOverlay';
   
-  // KOREKCIJA: Samazinām overlay izmēru par 1.5mm, lai tas būtu precīzi rāmja IEKŠPUSĒ, nevis ārpusē
-  // Tas novērsīs skaitļu "aizpeldēšanu" pa labi un uz leju.
+  // Iestatām izmēru, atņemot FRAME_SHRINK_MM, lai kompensētu rāmja biezumu
   Object.assign(overlay.style, {
     position: 'fixed',
     inset: '0',
     margin: 'auto',
-    width: `calc(${mm.w}mm - 1.5mm)`,  // ← Samazināts platums
-    height: `calc(${mm.h}mm - 1.5mm)`, // ← Samazināts augstums
+    width: `calc(${mm.w}mm - ${FRAME_SHRINK_MM}mm)`,
+    height: `calc(${mm.h}mm - ${FRAME_SHRINK_MM}mm)`,
     zIndex: '2147483647',
     pointerEvents: 'none',
     background: 'transparent',
     overflow: 'visible',
-    border: 'none'
+    border: 'none' // Debug: vari uzlikt '1px solid red', lai redzētu robežas
   });
   
   document.body.appendChild(overlay);
   window.__printOverlayEls = window.__printOverlayEls || [];
   window.__printOverlayEls.push(overlay);
 
-  // 5. Iespricējam CSS - PRECIZITĀTEI
+  // 5. CSS
   if (!document.getElementById('print-grid-labels-css')) {
     const css = document.createElement('style');
     css.id = 'print-grid-labels-css';
     css.textContent = `
       @media print {
-        #printGridOverlay {
-          display: block !important;
-          visibility: visible !important;
-        }
-
+        #printGridOverlay { display: block !important; visibility: visible !important; }
         .pgl-number {
           position: absolute;
           font-family: 'Arial', sans-serif;
           font-weight: bold;
-          font-size: 11pt;
+          font-size: ${FONT_SIZE_PT}pt;
           color: #000;
           line-height: 1;
           white-space: nowrap;
           transform: translate(-50%, -50%); 
         }
-
-        /* KOREKCIJA: Samazinātas atkāpes (margin), lai cipari ir ciešāk klāt pie rāmja */
-        
-        /* Augšā */
-        .pgl-top    { top: 0; margin-top: -3mm; } 
-        
-        /* Apakšā */
-        .pgl-bottom { top: 100%; margin-top: 3mm; }
-        
-        /* Pa kreisi */
-        .pgl-left   { left: 0; margin-left: -4mm; }
-        
-        /* Pa labi */
-        .pgl-right  { left: 100%; margin-left: 4mm; }
+        /* Pozīcijas ar OFFSET regulēšanu */
+        .pgl-top    { top: 0;   margin-top: -${LABEL_OFFSET_MM}mm; }
+        .pgl-bottom { top: 100%; margin-top: ${LABEL_OFFSET_MM}mm; }
+        .pgl-left   { left: 0;  margin-left: -${LABEL_OFFSET_MM}mm; }
+        .pgl-right  { left: 100%; margin-left: ${LABEL_OFFSET_MM}mm; }
         
         #printCornerInfo {
           position: fixed !important;
@@ -7424,12 +7415,12 @@ function addPrintGridLabels(map, scale, format, orient) {
     document.head.appendChild(css);
   }
 
-  // 6. Sagatavojam datus
+  // 6. Dati
   const bounds = map.getBounds();
   const step = getGridStep(scale);
   const mapSize = map.getSize(); 
 
-  let toProj, getE, getN, getLabel, getBigInfo;
+  let getE, getN, getLabel, getBigInfo;
 
   if (isLKS) {
     const bl = wgsToLKS(bounds.getSouth(), bounds.getWest());
@@ -7440,7 +7431,8 @@ function addPrintGridLabels(map, scale, format, orient) {
     getE = (val) => ({ E: val, N: (minN + maxN) / 2 });
     getN = (val) => ({ E: (minE + maxE) / 2, N: val });
     
-    const projToPx = (p) => {
+    // Konversija uz pikseļiem
+    var toPx = (p) => {
       const [lng, lat] = proj4('EPSG:3059', 'EPSG:4326', [p.E, p.N]);
       return map.latLngToContainerPoint([lat, lng]);
     };
@@ -7451,7 +7443,7 @@ function addPrintGridLabels(map, scale, format, orient) {
       const cLKS = wgsToLKS(c.lat, c.lng);
       return Math.floor(cLKS.E / 100000); 
     };
-    drawLabels(minE, maxE, minN, maxN, step, getLabel, getN, getE, projToPx, mapSize);
+    drawLabels(minE, maxE, minN, maxN, step, getLabel, getN, getE, toPx, mapSize);
     
   } else if (isUTM) {
     const c = map.getCenter();
@@ -7464,7 +7456,7 @@ function addPrintGridLabels(map, scale, format, orient) {
     getE = (val) => ({ easting: val, northing: (minN + maxN) / 2 });
     getN = (val) => ({ easting: (minE + maxE) / 2, northing: val });
 
-    const projToPx = (p) => {
+    var toPx = (p) => {
       try {
          const hemi = (c.lat >= 0 ? 'N' : 'S');
          const ll = window.utmToLL ? window.utmToLL(p.easting, p.northing, zone, hemi) : {lat:0, lon:0};
@@ -7478,12 +7470,9 @@ function addPrintGridLabels(map, scale, format, orient) {
          const mgrsFull = toMGRS8(c.lat, c.lng, false);
          return mgrsFull.split(' ').slice(0, 2).join(' ');
        }
-       if (window.toMGRS8) {
-         return window.toMGRS8(c.lat, c.lng, false).split(' ').slice(0, 2).join(' ');
-       }
        return "UTM " + zone;
     };
-    drawLabels(minE, maxE, minN, maxN, step, getLabel, getN, getE, projToPx, mapSize);
+    drawLabels(minE, maxE, minN, maxN, step, getLabel, getN, getE, toPx, mapSize);
   }
 
   if (getBigInfo) {
@@ -7496,41 +7485,49 @@ function addPrintGridLabels(map, scale, format, orient) {
     } catch(e){}
   }
 
-  // --- Zīmēšanas loģika ---
+  // --- 7. Zīmēšana ar PROCENTIEM (Fix) ---
   function drawLabels(minE, maxE, minN, maxN, step, fmt, getN_Line, getE_Line, toPx, sz) {
     const startE = Math.floor(minE / step) * step;
     const endE   = Math.ceil(maxE / step) * step;
     const startN = Math.floor(minN / step) * step;
     const endN   = Math.ceil(maxN / step) * step;
 
-    function addEl(side, posVal, txt) {
+    function addEl(side, valPct, txt) {
         let d = document.createElement('div');
         d.className = 'pgl-number pgl-' + side;
         
+        // Izmantojam % pozīciju, kas ir daudz precīzāka drukai nekā px
         if (side === 'top' || side === 'bottom') {
-            d.style.left = posVal + 'px';
+            d.style.left = valPct + '%';
         } else {
-            d.style.top = posVal + 'px';
+            d.style.top = valPct + '%';
         }
         d.textContent = txt;
         overlay.appendChild(d);
     }
 
+    // Vertikālās (Easting)
     for (let E = startE; E <= endE; E += step) {
       const pt = toPx(getE_Line(E));
-      if (pt.x >= -2 && pt.x <= sz.x + 2) {
+      // Pārvēršam pikseļus procentos attiecībā pret kartes platumu
+      const pct = (pt.x / sz.x) * 100;
+      
+      if (pct >= -0.5 && pct <= 100.5) { // Atļaujam nelielu nobīdi malās
         const txt = fmt(E);
-        addEl('top', pt.x, txt);
-        addEl('bottom', pt.x, txt);
+        addEl('top', pct, txt);
+        addEl('bottom', pct, txt);
       }
     }
 
+    // Horizontālās (Northing)
     for (let N = startN; N <= endN; N += step) {
       const pt = toPx(getN_Line(N));
-      if (pt.y >= -2 && pt.y <= sz.y + 2) {
+      const pct = (pt.y / sz.y) * 100;
+      
+      if (pct >= -0.5 && pct <= 100.5) {
         const txt = fmt(N);
-        addEl('left', pt.y, txt);
-        addEl('right', pt.y, txt);
+        addEl('left', pct, txt);
+        addEl('right', pct, txt);
       }
     }
   }
