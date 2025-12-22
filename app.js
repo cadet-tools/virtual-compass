@@ -2390,7 +2390,8 @@ await new Promise(r => requestAnimationFrame(r));
 
     // [JAUNS] Uzzīmējam rāmja koordinātes un lielo skaitli
     addPrintGridLabels(map, scale); 
-
+	// grafiskais merogs
+	addPrintScaleBar(scale);
     window.print();
 
    // ==================== CLEANUP: PRECĪZS ATJAUNOJUMS ====================
@@ -7555,7 +7556,85 @@ function addPrintGridLabels(map, scale, format, orient) {
 
 
 
+// ============================================================
+// === PAPILDINĀJUMS: Grafiskā mēroga skala (Lineāls) ===
+// ============================================================
+function addPrintScaleBar(scale) {
+  // 1. Aprēķinām piemērotu garumu (lai būtu ap 4cm uz papīra)
+  const targetMm = 40; 
+  const metersInTarget = (targetMm * scale) / 1000;
+  
+  // Standarta soļi (metros), lai lineāls būtu "apaļš" skaitlis
+  const steps = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
+  let dist = steps[0];
+  for(let s of steps) {
+     if (s <= metersInTarget) dist = s;
+     else break;
+  }
 
+  // Pārvēršam atpakaļ uz milimetriem papīrā
+  const mm = (dist * 1000) / scale;
+  
+  // Noformējam tekstu (m vai km)
+  let label = dist + ' m';
+  if (dist >= 1000) label = (dist/1000) + ' km';
+
+  // 2. Izveidojam elementu
+  const bar = document.createElement('div');
+  bar.id = 'printScaleBar';
+  bar.innerHTML = `
+    <div class="label">${label}</div>
+    <div class="bar" style="width: ${mm.toFixed(2)}mm;"></div>
+  `;
+  document.body.appendChild(bar);
+
+  // 3. Pievienojam tīrīšanas sarakstam (lai tas pazūd pēc drukas)
+  if (window.__printOverlayEls) {
+    window.__printOverlayEls.push(bar);
+  }
+
+  // 4. Ievietojam CSS (tikai vienreiz, ja vēl nav)
+  if (!document.getElementById('printScaleBarCSS')) {
+    const css = document.createElement('style');
+    css.id = 'printScaleBarCSS';
+    css.textContent = `
+      @media print {
+        /* Ar !important pārrakstām jebkuru 'display:none', kas varētu būt uzlikts */
+        body.print-mode #printScaleBar {
+          display: flex !important;
+          visibility: visible !important;
+          position: fixed !important;
+          bottom: 7mm !important; /* Mazliet virs apakšējās malas */
+          left: 50% !important;
+          transform: translateX(-50%) !important;
+          flex-direction: column;
+          align-items: center;
+          color: #000;
+          z-index: 2147483647;
+          pointer-events: none;
+        }
+        body.print-mode #printScaleBar .label {
+          font: 9pt/1 system-ui, sans-serif;
+          margin-bottom: 1px;
+          font-weight: 600;
+        }
+        body.print-mode #printScaleBar .bar {
+          height: 4px;
+          border: 1.5px solid #000;
+          border-top: none; /* "U" forma */
+          position: relative;
+          box-sizing: border-box;
+        }
+        /* Vidus svītriņa */
+        body.print-mode #printScaleBar .bar::after {
+          content: ""; position: absolute; top: 0; left: 50%; 
+          height: 3px; width: 1px; background: #000;
+        }
+      }
+    `;
+    document.head.appendChild(css);
+  }
+}
 
 
 	
