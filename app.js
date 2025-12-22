@@ -1707,7 +1707,16 @@ function gridStepForScale(scale){
   return 10000;
 }
 
+// Mazāko grīdlīniju skaits vienā “lielajā” kvadrātā (UTM/MGRS vajadzībām)
+function gridMinorDivisionsForScale(scale){
+  // Pie detalizēta skata (≤ 1:30k) atstājam TIKAI galvenās līnijas (divs = 1),
+  // lai nebūtu mulsinošu starplīniju, kas traucē lasīt koordinātes.
+  if (scale <= 30000)   return 1; 
 
+  if (scale <= 60000)   return 4;      // 2 km → 500 m starpas
+  if (scale <= 120000)  return 5;      // 5 km → 1 km starpas
+  return 5;                            // 10 km → 2 km starpas
+}
 
 
 
