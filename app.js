@@ -1458,7 +1458,7 @@ function installTileErrorWatch(layer, opts){
 
 	  // ===== Base slāņi =====  
  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap',
+    attribution: '© OpenStreetMap',
     subdomains: 'abc',         // ADD
     maxZoom: 20,               // ADD
     maxNativeZoom: 19,         // KEEP
@@ -1472,7 +1472,7 @@ function installTileErrorWatch(layer, opts){
 	  
 // REPLACE: Esri World Topo Map (Stabila, ātra, ar reljefu)
 const topo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-  attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community',
+  attribution: '© Esri World Topo Map',
   maxZoom: 20,
   maxNativeZoom: 19, // Esri parasti iet līdz 19, tālāk digital zoom
   updateWhenIdle: true,
@@ -1484,7 +1484,7 @@ const topo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/W
   const esri = L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     {
-      attribution: 'Tiles &copy; Esri',
+      attribution: '© Esri',
       subdomains: 'abc',       // ADD (lai {s} strādā vienādi)
       maxZoom: 20,             // ADD
       maxNativeZoom: 19,       // ADD
@@ -1495,7 +1495,7 @@ const topo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/W
 
 	  
   const hot = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
-    attribution: '&copy; OSM, HOT',
+    attribution: '© OSM',
     subdomains: 'abc',         // ADD
     maxZoom: 20,               // KEEP
     maxNativeZoom: 19,         // ADD
@@ -1505,7 +1505,7 @@ const topo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/W
 
 	  
   const cyclo = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
-    attribution: '&copy; OSM, CyclOSM',
+    attribution: '© OSM, © CyclOSM',
     subdomains: 'abc',         // ADD
     maxZoom: 20,               // KEEP
     maxNativeZoom: 20,         // ADD (serveris atbalsta līdz 20)
@@ -1516,7 +1516,7 @@ const topo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/W
 	  
 	// OSM German style (tīrāks stils, labs kā pamats)
   const osmDe = L.tileLayer('https://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors, tiles by openstreetmap.de',
+    attribution: '© OSM',
     subdomains: 'abc',         // ADD
     maxZoom: 20,               // ADD
     maxNativeZoom: 19,         // ADD
@@ -1527,7 +1527,7 @@ const topo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/W
 	  
 	// OSM France (osmfr)
   const osmFr = L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors, tiles by openstreetmap.fr',
+    attribution: '© OSM',
     subdomains: 'abc',         // ADD
     maxZoom: 20,               // KEEP
     maxNativeZoom: 20,         // ADD
@@ -1537,7 +1537,7 @@ const topo = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/W
 	
 	// CartoDB Positron (gaišs, “bez trokšņa” — labs kā pamats datu pārklājumiem)
   const cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap contributors, © CARTO',
+    attribution: '© OSM, © CARTO',
     subdomains: 'abcd',        // KEEP
     maxZoom: 20,               // KEEP
     maxNativeZoom: 20,         // ADD
@@ -1596,7 +1596,7 @@ const lvmTopo10_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
     maxNativeZoom: 19,         // ADD
     detectRetina: false,       // ADD
     errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=',
-    attribution: '© waymarkedtrails.org, © OSM līdzstrādnieki'
+    attribution: '© waymarkedtrails.org, © OSM'
   });
 
 	  
@@ -1606,7 +1606,7 @@ const lvmTopo10_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
     maxNativeZoom: 19,         // ADD
     detectRetina: false,       // ADD
     errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=',
-    attribution: '© waymarkedtrails.org, © OSM līdzstrādnieki'
+    attribution: '© waymarkedtrails.org, © OSM'
   });
 
 	  
@@ -1629,7 +1629,7 @@ const lvmTopo10_wms = L.tileLayer.wms('https://lvmgeoserver.lvm.lv/geoserver/ows
     maxNativeZoom: 19,         // ADD
     detectRetina: false,       // ADD
     errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=',
-    attribution: '© OpenSeaMap, dati © OSM (ODbL)'
+    attribution: '© OpenSeaMap, © OSM (ODbL)'
   });
 
 
