@@ -2600,7 +2600,7 @@ body.print-mode #printNorthTR .n{
         visibility: visible !important;
         
         /* Ierobežojam platumu līdz 40% no lapas, lai neuzietu virsū centram */
-        max-width: ${mm.w * 0.40}mm; 
+        max-width: ${mm.w * 0.50}mm; 
         
         /* GALVENAIS: Atļaujam teksta laušanu */
         white-space: normal !important; 
