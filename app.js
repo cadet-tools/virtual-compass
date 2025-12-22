@@ -1695,26 +1695,18 @@ function getCurrentScale(){
 
 // ——— Solis pēc kartes mēroga (1:xxxx) ———
 // ——— Solis pēc kartes mēroga (1:xxxx) ———
-function gridStepForScale(scale){ 
-  // OBLIGĀTI: Ja mērogs ir mazāks par 30 000 (t.sk. 1:5000), 
-  // mēs joprojām atgriežam 1000 metru soli.
-  if (scale <= 30000)   return 1000;
-
-  // Tālākā loģika attālinātiem skatiem paliek kā bija
+function gridStepForScale(scale){
+  // Pie 1:5000 (un līdz 1:7500) lietojam 200m soli.
+  // Tas uz papīra dos 4cm atstarpes - ideāli 1:25k protraktoram.
+  if (scale <=  7500)   return  200;
+  
+  if (scale <= 15000)   return  500;
+  if (scale <= 30000)   return 1000;   // 1:25k standartkarte
   if (scale <= 60000)   return 2000;
   if (scale <= 120000)  return 5000;
   return 10000;
 }
 
-// Papildus: lai nebūtu "sīko" līniju starpā, kas jauc galvu
-function gridMinorDivisionsForScale(scale){
-  // Pie detalizēta skata atstājam TIKAI galvenās līnijas (divs = 1)
-  if (scale <= 30000)   return 1; 
-
-  if (scale <= 60000)   return 4;
-  if (scale <= 120000)  return 5;
-  return 5;
-}
 
 
 
@@ -2968,19 +2960,28 @@ function redraw() {
 
     const thin = document.body.classList.contains('print-mode');
     
-    const lineStyle = { 
+    // Definējam divus stilus:
+    // 1. Biezas līnijas pilnajiem kilometriem (Major)
+    const styleMajor = { 
       color: '#000000', 
-      weight: thin ? 0.6 : 2.6, 
-      opacity: 0.95, 
+      weight: thin ? 1.2 : 3.0, // Biezākas
+      opacity: 1.0, 
+      interactive: false,
+      pane: 'gridPane'
+    };
+
+    // 2. Plānas līnijas starpposmiem (Minor - 200m, 500m utt)
+    const styleMinor = { 
+      color: '#000000', 
+      weight: thin ? 0.4 : 1.5, // Plānākas
+      opacity: 0.8, 
       interactive: false,
       pane: 'gridPane'
     };
 
     const b = map.getBounds();
     const scale = getCurrentScale();
-    
-    // Šeit mēs vienmēr saņemsim 1000, ja veicāt 1. soļa labojumu
-    const step = gridStepForScale(scale); 
+    const step = gridStepForScale(scale); // Tagad atgriezīs 200 pie 1:5000
 
     const bl = wgsToLKS(b.getSouth(), b.getWest());
     const tr = wgsToLKS(b.getNorth(), b.getEast());
@@ -3006,26 +3007,39 @@ function redraw() {
       return L.latLng(xy[1], xy[0]);
     });
 
-    // === SVARĪGI: Segmentācijas solis ===
-    // Lai līnija būtu precīza un sekotu zemes izliekumam, 
-    // mēs liekam starppunktus ik pēc 200 metriem (vai biežāk).
-    // Tas novērš to "8 metru kļūdu" pie liela mēroga.
-    const segmentStep = 200; 
+    // Segmentācija precizitātei (ik pa 100m, lai līnija sekotu zemes izliekumam)
+    const segmentStep = 100; 
 
     // --- Vertikālās līnijas (E) ---
     for (let E = E_min; E <= E_max; E += step) {
+      // Pārbaudām: vai šis ir pilns kilometrs? (dalās ar 1000 bez atlikuma)
+      // Math.abs, lai novērstu sīkas peldošā punkta kļūdas
+      const isMajor = Math.abs(E % 1000) < 1; 
+      const currentStyle = isMajor ? styleMajor : styleMinor;
+
       const pts = [];
-      // Ģenerējam daudz punktu gar līniju
       for (let N = N_min; N <= N_max; N += segmentStep) {
           pts.push({ E: E, N: N });
       }
-      pts.push({ E: E, N: N_max }); // Pieliekam precīzu beigu punktu
+      pts.push({ E: E, N: N_max });
 
-      L.polyline(toLatLngs(pts), lineStyle).addTo(grid);
+      L.polyline(toLatLngs(pts), currentStyle).addTo(grid);
 
+      // Etiķetes liekam tikai pie centra līnijas, lai nepārblīvētu
+      // VAI liekam pie visām, ja vēlaties
       const labelPos = toLatLngs([{ E, N: centerN }])[0];
+      
+      // Etiķetes teksts: Ja pilns km -> "E 510", ja mazais -> "200"
+      let txt = "";
+      if (isMajor) {
+         txt = `E ${Math.floor(E)}`; // Pilns skaitlis
+      } else {
+         // Paņemam tikai pēdējos 3 ciparus (piem. 200, 400)
+         txt = String(E).slice(-3); 
+      }
+
       L.marker(labelPos, {
-        icon: L.divIcon({ ...labelStyle, html: `<span>E ${E}</span>` }),
+        icon: L.divIcon({ ...labelStyle, html: `<span>${txt}</span>` }),
         interactive: false,
         pane: 'gridLabelPane'
       }).addTo(labels);
@@ -3033,17 +3047,28 @@ function redraw() {
 
     // --- Horizontālās līnijas (N) ---
     for (let N = N_min; N <= N_max; N += step) {
+      const isMajor = Math.abs(N % 1000) < 1; 
+      const currentStyle = isMajor ? styleMajor : styleMinor;
+
       const pts = [];
       for (let E = E_min; E <= E_max; E += segmentStep) {
           pts.push({ E: E, N: N });
       }
       pts.push({ E: E_max, N: N });
 
-      L.polyline(toLatLngs(pts), lineStyle).addTo(grid);
+      L.polyline(toLatLngs(pts), currentStyle).addTo(grid);
 
       const labelPos = toLatLngs([{ E: centerE, N }])[0];
+      
+      let txt = "";
+      if (isMajor) {
+         txt = `N ${Math.floor(N)}`;
+      } else {
+         txt = String(N).slice(-3);
+      }
+
       L.marker(labelPos, {
-        icon: L.divIcon({ ...labelStyle, html: `<span>N ${N}</span>` }), 
+        icon: L.divIcon({ ...labelStyle, html: `<span>${txt}</span>` }), 
         interactive: false,
         pane: 'gridLabelPane'
       }).addTo(labels);
