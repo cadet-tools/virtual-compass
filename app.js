@@ -1694,24 +1694,26 @@ function getCurrentScale(){
 
 
 // ——— Solis pēc kartes mēroga (1:xxxx) ———
-// Saskaņots ar drukas realitāti, lai kvadrāti ir ērti nolasāmi.
-function gridStepForScale(scale){      // atgriež metrus
-  if (scale <=  7500)   return  200;   // 1:5k–1:7.5k → 200 m
-  if (scale <= 15000)   return  500;   // 1:10k–1:15k → 500 m
-  if (scale <= 30000)   return 1000;   // 1:25k–1:30k → 1 km
-  if (scale <= 60000)   return 2000;   // 1:50k–1:60k → 2 km
-  if (scale <= 120000)  return 5000;   // 1:75k–1:120k → 5 km
-  return 10000;                        // tālāk → 10 km
+// ——— Solis pēc kartes mēroga (1:xxxx) ———
+function gridStepForScale(scale){ 
+  // OBLIGĀTI: Ja mērogs ir mazāks par 30 000 (t.sk. 1:5000), 
+  // mēs joprojām atgriežam 1000 metru soli.
+  if (scale <= 30000)   return 1000;
+
+  // Tālākā loģika attālinātiem skatiem paliek kā bija
+  if (scale <= 60000)   return 2000;
+  if (scale <= 120000)  return 5000;
+  return 10000;
 }
 
-// Mazāko grīdlīniju skaits vienā “lielajā” kvadrātā (UTM smalkajām līnijām)
+// Papildus: lai nebūtu "sīko" līniju starpā, kas jauc galvu
 function gridMinorDivisionsForScale(scale){
-  if (scale <=  7500)   return 2;      // 200 m → 100 m starpas
-  if (scale <= 15000)   return 2;      // 500 m → 250 m starpas
-  if (scale <= 30000)   return 4;      // 1 km → 250 m starpas
-  if (scale <= 60000)   return 4;      // 2 km → 500 m starpas
-  if (scale <= 120000)  return 5;      // 5 km → 1 km starpas
-  return 5;                            // 10 km → 2 km starpas
+  // Pie detalizēta skata atstājam TIKAI galvenās līnijas (divs = 1)
+  if (scale <= 30000)   return 1; 
+
+  if (scale <= 60000)   return 4;
+  if (scale <= 120000)  return 5;
+  return 5;
 }
 
 
@@ -2958,7 +2960,7 @@ function createLKSGridLayers() {
 
   const labelStyle = { className: 'lks-grid-label' };
 
-  function redraw() {
+function redraw() {
     grid.clearLayers();
     labels.clearLayers();
     
@@ -2966,7 +2968,6 @@ function createLKSGridLayers() {
 
     const thin = document.body.classList.contains('print-mode');
     
-    // Līnijas bez pointer-events
     const lineStyle = { 
       color: '#000000', 
       weight: thin ? 0.6 : 2.6, 
@@ -2977,7 +2978,9 @@ function createLKSGridLayers() {
 
     const b = map.getBounds();
     const scale = getCurrentScale();
-    const step = gridStepForScale(scale);
+    
+    // Šeit mēs vienmēr saņemsim 1000, ja veicāt 1. soļa labojumu
+    const step = gridStepForScale(scale); 
 
     const bl = wgsToLKS(b.getSouth(), b.getWest());
     const tr = wgsToLKS(b.getNorth(), b.getEast());
@@ -3003,9 +3006,21 @@ function createLKSGridLayers() {
       return L.latLng(xy[1], xy[0]);
     });
 
+    // === SVARĪGI: Segmentācijas solis ===
+    // Lai līnija būtu precīza un sekotu zemes izliekumam, 
+    // mēs liekam starppunktus ik pēc 200 metriem (vai biežāk).
+    // Tas novērš to "8 metru kļūdu" pie liela mēroga.
+    const segmentStep = 200; 
+
     // --- Vertikālās līnijas (E) ---
     for (let E = E_min; E <= E_max; E += step) {
-      const pts = [{ E, N: N_min }, { E, N: N_max }];
+      const pts = [];
+      // Ģenerējam daudz punktu gar līniju
+      for (let N = N_min; N <= N_max; N += segmentStep) {
+          pts.push({ E: E, N: N });
+      }
+      pts.push({ E: E, N: N_max }); // Pieliekam precīzu beigu punktu
+
       L.polyline(toLatLngs(pts), lineStyle).addTo(grid);
 
       const labelPos = toLatLngs([{ E, N: centerN }])[0];
@@ -3018,7 +3033,12 @@ function createLKSGridLayers() {
 
     // --- Horizontālās līnijas (N) ---
     for (let N = N_min; N <= N_max; N += step) {
-      const pts = [{ E: E_min, N }, { E: E_max, N }];
+      const pts = [];
+      for (let E = E_min; E <= E_max; E += segmentStep) {
+          pts.push({ E: E, N: N });
+      }
+      pts.push({ E: E_max, N: N });
+
       L.polyline(toLatLngs(pts), lineStyle).addTo(grid);
 
       const labelPos = toLatLngs([{ E: centerE, N }])[0];
