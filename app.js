@@ -2940,7 +2940,7 @@ function createLKSGridLayers() {
   
   const SCALE_OFFSETS = [
     // 1:5000 (Jūsu atrastie skaitļi)
-    { maxScale: 7500,  E: -18, N: -38 }, 
+    { maxScale: 7500,  E: -18, N: -40 }, 
     
     // 1:10 000 (Ja vajag citu, mainiet šeit)
     { maxScale: 15000, E: 0,   N: 0 },   
