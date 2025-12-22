@@ -7515,12 +7515,20 @@ function addPrintGridLabels(map, scale, format, orient) {
     }
   }
 
-  // --- LIELAIS SKAITLIS (Ar paskaidrojumu) ---
+// --- LIELAIS SKAITLIS (Ar paskaidrojumu E un N) ---
   let bigInfoText = "";
   if (isLKS) {
-    const prefix = Math.floor(centerCoords.E / 100000);
-    bigInfoText = "E: " + prefix + "00 000"; 
+    // 1. Aprēķinām E (Austrumu) bāzi (piem., 5) -> 500 000
+    const prefixE = Math.floor(centerCoords.E / 100000);
+    
+    // 2. Aprēķinām N (Ziemeļu) bāzi (piem., 63) -> 6 300 000
+    const prefixN = Math.floor(centerCoords.N / 100000);
+    
+    // 3. Saliekam abus kopā vienā rindā
+    // Rezultāts būs: "E: 500 000   N: 6 300 000"
+    bigInfoText = "E: " + prefixE + "00 000    N: " + prefixN + "00 000"; 
   } else {
+    // UTM gadījumā
     if (typeof toMGRS8 === 'function') {
          const c = map.getCenter();
          const mgrsFull = toMGRS8(c.lat, c.lng, false);
@@ -7540,7 +7548,6 @@ function addPrintGridLabels(map, scale, format, orient) {
     } catch(e){}
   }
 }
-
 
 
 
