@@ -1818,7 +1818,7 @@ scalePickCtl.onAdd = function(){
   const printBtn = document.createElement('button');
   printBtn.id = 'preparePrintBtn';
   printBtn.type = 'button';
-  printBtn.textContent = 'Sagatavot karti (PDF)';
+  printBtn.textContent = 'Sagatavot karti (PDF/drukai)';
   Object.assign(printBtn.style, {
     display: 'block',
     marginTop: '8px',
