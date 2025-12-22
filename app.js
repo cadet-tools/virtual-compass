@@ -2930,19 +2930,19 @@ map.setView([56.9496, 24.1052], 13);
 
 // ====== LKS-92 režģa ģenerators (LABOTS - KĀ MGRS) ======
 // ====== LKS-92 režģa ģenerators (AR ETIĶEŠU FONU) ======
+// ====== LKS-92 režģa ģenerators (LABOTS: PRECIZITĀTE + HIERARHIJA) ======
 function createLKSGridLayers() {
   const grid = L.layerGroup();
   const labels = L.layerGroup();
 
-	
-  // 1. Iespricējam CSS, lai etiķetes izskatītos kā MGRS (melns fons, balts teksts)
+  // 1. Iespricējam CSS
   if (!document.getElementById('lks-grid-css')) {
     const el = document.createElement('style');
     el.id = 'lks-grid-css';
     el.textContent = `
       .lks-grid-label span {
         display: inline-block;
-        background: rgba(0, 0, 0, 0.55); /* Tumšs fons kā MGRS */
+        background: rgba(0, 0, 0, 0.55);
         color: #fff;
         padding: 2px 6px;
         border-radius: 6px;
@@ -2950,7 +2950,7 @@ function createLKSGridLayers() {
         text-shadow: 0 1px 0 #000, 0 0 3px #000;
         white-space: nowrap;
         user-select: none;
-        pointer-events: none; /* Lai netraucē klikšķiem */
+        pointer-events: none;
       }
     `;
     document.head.appendChild(el);
@@ -2966,19 +2966,29 @@ function createLKSGridLayers() {
 
     const thin = document.body.classList.contains('print-mode');
     
-    // Līnijas bez pointer-events
-    const lineStyle = { 
+    // STILI:
+    // Major = Pilnie kilometri (bieza līnija)
+    const styleMajor = { 
       color: '#000000', 
-      weight: thin ? 0.6 : 2.6, 
-      opacity: 0.95, 
-      interactive: false,
-      pane: 'gridPane'
+      weight: thin ? 1.2 : 2.8, 
+      opacity: 1.0, 
+      interactive: false, 
+      pane: 'gridPane' 
+    };
+    // Minor = 200m starplīnijas (plāna līnija) - protraktora lietošanai
+    const styleMinor = { 
+      color: '#000000', 
+      weight: thin ? 0.4 : 1.2, 
+      opacity: 0.7, 
+      interactive: false, 
+      pane: 'gridPane' 
     };
 
     const b = map.getBounds();
     const scale = getCurrentScale();
-    const step = gridStepForScale(scale);
+    const step = gridStepForScale(scale); // Pie 1:5000 šeit būs 200m
 
+    // Pārvēršam skata robežas uz LKS
     const bl = wgsToLKS(b.getSouth(), b.getWest());
     const tr = wgsToLKS(b.getNorth(), b.getEast());
 
@@ -2987,12 +2997,13 @@ function createLKSGridLayers() {
     const minN_raw = Math.min(bl.N, tr.N);
     const maxN_raw = Math.max(bl.N, tr.N);
 
+    // Noapaļojam uz tuvāko soli
     const E_min = Math.floor(minE_raw / step) * step;
     const E_max = Math.ceil(maxE_raw / step) * step;
     const N_min = Math.floor(minN_raw / step) * step;
     const N_max = Math.ceil(maxN_raw / step) * step;
 
-    // Centra aprēķins etiķešu pozicionēšanai
+    // Centrs etiķetēm
     const c = map.getCenter();
     const cLKS = wgsToLKS(c.lat, c.lng);
     const centerE = Math.max(E_min, Math.min(E_max, cLKS.E));
@@ -3003,14 +3014,32 @@ function createLKSGridLayers() {
       return L.latLng(xy[1], xy[0]);
     });
 
+    // PRECIZITĀTES LABOJUMS:
+    // Zīmējam punktus ik pēc 100m, lai līnija sekotu zemes izliekumam.
+    // Tas novērš "taisno līniju" kļūdu (8-10m nobīdi).
+    const segmentStep = 100; 
+
     // --- Vertikālās līnijas (E) ---
     for (let E = E_min; E <= E_max; E += step) {
-      const pts = [{ E, N: N_min }, { E, N: N_max }];
-      L.polyline(toLatLngs(pts), lineStyle).addTo(grid);
+      // Pārbaude: vai šis ir pilns kilometrs? (dalās ar 1000)
+      const isMajor = Math.abs(E % 1000) < 1;
+      const currentStyle = isMajor ? styleMajor : styleMinor;
 
+      // Veidojam izliektu līniju
+      const pts = [];
+      for (let N = N_min; N <= N_max; N += segmentStep) {
+         pts.push({ E: E, N: N });
+      }
+      pts.push({ E: E, N: N_max }); // beigu punkts
+      
+      L.polyline(toLatLngs(pts), currentStyle).addTo(grid);
+
+      // Etiķete
       const labelPos = toLatLngs([{ E, N: centerN }])[0];
+      let txt = isMajor ? `E ${Math.floor(E)}` : String(E).slice(-3);
+      
       L.marker(labelPos, {
-        icon: L.divIcon({ ...labelStyle, html: `<span>E ${E}</span>` }),
+        icon: L.divIcon({ ...labelStyle, html: `<span>${txt}</span>` }),
         interactive: false,
         pane: 'gridLabelPane'
       }).addTo(labels);
@@ -3018,12 +3047,22 @@ function createLKSGridLayers() {
 
     // --- Horizontālās līnijas (N) ---
     for (let N = N_min; N <= N_max; N += step) {
-      const pts = [{ E: E_min, N }, { E: E_max, N }];
-      L.polyline(toLatLngs(pts), lineStyle).addTo(grid);
+      const isMajor = Math.abs(N % 1000) < 1;
+      const currentStyle = isMajor ? styleMajor : styleMinor;
+
+      const pts = [];
+      for (let E = E_min; E <= E_max; E += segmentStep) {
+         pts.push({ E: E, N: N });
+      }
+      pts.push({ E: E_max, N: N });
+
+      L.polyline(toLatLngs(pts), currentStyle).addTo(grid);
 
       const labelPos = toLatLngs([{ E: centerE, N }])[0];
+      let txt = isMajor ? `N ${Math.floor(N)}` : String(N).slice(-3);
+
       L.marker(labelPos, {
-        icon: L.divIcon({ ...labelStyle, html: `<span>N ${N}</span>` }), 
+        icon: L.divIcon({ ...labelStyle, html: `<span>${txt}</span>` }), 
         interactive: false,
         pane: 'gridLabelPane'
       }).addTo(labels);
