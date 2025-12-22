@@ -7412,7 +7412,7 @@ function addPrintGridLabels(map, scale, format, orient) {
         .pgl-top { 
             top: 0;   
             transform: translate(-50%, -100%); 
-            margin-top: -5mm; 
+            margin-top: -1mm; 
         }
 
         /* APAKŠA: Ennojam teksta augšu (y: 0%) pie rāmja un nolaižam/paceļam par -5mm */
