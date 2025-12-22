@@ -2947,7 +2947,7 @@ function createLKSGridLayers() {
     
     // 1:25 000 (Ja šeit tīkls bija precīzs bez korekcijas, atstājiet 0,0. 
     // Ja vajag labot, ierakstiet šeit savus mērījumus šim mērogam)
-    { maxScale: 30000, E: 0,   N: -12 },   
+    { maxScale: 30000, E: 0,   N: -8 },   
     
     // Visiem pārējiem (lielākiem mērogiem)
     { maxScale: Infinity, E: 0, N: 0 }   
