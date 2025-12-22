@@ -2940,8 +2940,8 @@ function createLKSGridLayers() {
   // Ja tīkls vizuāli ir "pa kreisi un uz leju" no objekta,
   // mums tas jābīda "pa labi (+E)" un "uz augšu (+N)".
   // Mainiet šos skaitļus (metros), kamēr tīkls sakrīt ar karti perfekti.
-  const FIX_OFFSET_E = 7; 
-  const FIX_OFFSET_N = 7; 
+  const FIX_OFFSET_E = -13; 
+  const FIX_OFFSET_N = -24; 
 
   // 1. Iespricējam CSS
   if (!document.getElementById('lks-grid-css')) {
