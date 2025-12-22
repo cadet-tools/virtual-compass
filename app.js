@@ -2475,7 +2475,7 @@ function injectDynamicPrintStyle(fmt, orient){
     @media print {
       html, body { height:auto !important; overflow:hidden !important; }
       #resizeHandle{ display:none !important; }
-      body.print-mode > *:not(#canvasContainer):not(#printScaleTop):not(#printTitleTL):not(#printNorthTR):not(#printSourceBL):not(#printGridBR):not(#printGridOverlay):not(#printCornerInfo){ display:none !important; }
+      body.print-mode > *:not(#canvasContainer):not(#printScaleTop):not(#printTitleTL):not(#printNorthTR):not(#printSourceBL):not(#printGridBR):not(#printGridOverlay):not(#printCornerInfo):not(#printScaleBar){ display:none !important; }
       body.print-mode #canvasContainer > *:not(#onlineMap){ display:none !important; }
       body.print-mode #onlineMap{
         position: fixed !important;
