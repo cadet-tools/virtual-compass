@@ -7458,11 +7458,11 @@ function addPrintGridLabels(map, scale, format, orient) {
         /* LIELAIS SKAITLIS AR PASKAIDROJUMU */
         #printCornerInfo {
           position: fixed !important;
-          right: 42mm !important;
-          bottom: 6mm !important;
+          right: 45mm !important;
+          bottom: 5mm !important;
           font-family: 'Arial', sans-serif;
           font-weight: bold;
-          font-size: 14pt;
+          font-size: 11pt;
           color: #000;
           z-index: 10000;
           display: block !important;
