@@ -2931,9 +2931,17 @@ map.setView([56.9496, 24.1052], 13);
 // ====== LKS-92 režģa ģenerators (LABOTS - KĀ MGRS) ======
 // ====== LKS-92 režģa ģenerators (AR ETIĶEŠU FONU) ======
 // ====== LKS-92 režģa ģenerators (LABOTS: PRECIZITĀTE + HIERARHIJA) ======
+// ====== LKS-92 režģa ģenerators (AR KALIBRĀCIJU) ======
 function createLKSGridLayers() {
   const grid = L.layerGroup();
   const labels = L.layerGroup();
+
+  // === KALIBRĀCIJAS IESTATĪJUMI ===
+  // Ja tīkls vizuāli ir "pa kreisi un uz leju" no objekta,
+  // mums tas jābīda "pa labi (+E)" un "uz augšu (+N)".
+  // Mainiet šos skaitļus (metros), kamēr tīkls sakrīt ar karti perfekti.
+  const FIX_OFFSET_E = 7; 
+  const FIX_OFFSET_N = 7; 
 
   // 1. Iespricējam CSS
   if (!document.getElementById('lks-grid-css')) {
@@ -2966,8 +2974,6 @@ function createLKSGridLayers() {
 
     const thin = document.body.classList.contains('print-mode');
     
-    // STILI:
-    // Major = Pilnie kilometri (bieza līnija)
     const styleMajor = { 
       color: '#000000', 
       weight: thin ? 1.2 : 2.8, 
@@ -2975,7 +2981,6 @@ function createLKSGridLayers() {
       interactive: false, 
       pane: 'gridPane' 
     };
-    // Minor = 200m starplīnijas (plāna līnija) - protraktora lietošanai
     const styleMinor = { 
       color: '#000000', 
       weight: thin ? 0.4 : 1.2, 
@@ -2986,9 +2991,8 @@ function createLKSGridLayers() {
 
     const b = map.getBounds();
     const scale = getCurrentScale();
-    const step = gridStepForScale(scale); // Pie 1:5000 šeit būs 200m
+    const step = gridStepForScale(scale);
 
-    // Pārvēršam skata robežas uz LKS
     const bl = wgsToLKS(b.getSouth(), b.getWest());
     const tr = wgsToLKS(b.getNorth(), b.getEast());
 
@@ -2997,7 +3001,6 @@ function createLKSGridLayers() {
     const minN_raw = Math.min(bl.N, tr.N);
     const maxN_raw = Math.max(bl.N, tr.N);
 
-    // Noapaļojam uz tuvāko soli
     const E_min = Math.floor(minE_raw / step) * step;
     const E_max = Math.ceil(maxE_raw / step) * step;
     const N_min = Math.floor(minN_raw / step) * step;
@@ -3014,28 +3017,29 @@ function createLKSGridLayers() {
       return L.latLng(xy[1], xy[0]);
     });
 
-    // PRECIZITĀTES LABOJUMS:
-    // Zīmējam punktus ik pēc 100m, lai līnija sekotu zemes izliekumam.
-    // Tas novērš "taisno līniju" kļūdu (8-10m nobīdi).
+    // Segmentācijas solis (līnijas precizitāte)
     const segmentStep = 100; 
 
     // --- Vertikālās līnijas (E) ---
     for (let E = E_min; E <= E_max; E += step) {
-      // Pārbaude: vai šis ir pilns kilometrs? (dalās ar 1000)
       const isMajor = Math.abs(E % 1000) < 1;
       const currentStyle = isMajor ? styleMajor : styleMinor;
 
-      // Veidojam izliektu līniju
+      // Pielietojam KALIBRĀCIJU zīmēšanai
+      // (Etiķetē rakstām oriģinālo "E", bet zīmējam nobīdītu par FIX_OFFSET)
+      const drawE = E + FIX_OFFSET_E;
+
       const pts = [];
       for (let N = N_min; N <= N_max; N += segmentStep) {
-         pts.push({ E: E, N: N });
+         pts.push({ E: drawE, N: N + FIX_OFFSET_N });
       }
-      pts.push({ E: E, N: N_max }); // beigu punkts
+      // Pēdējais punkts arī jābīda
+      pts.push({ E: drawE, N: N_max + FIX_OFFSET_N });
       
       L.polyline(toLatLngs(pts), currentStyle).addTo(grid);
 
-      // Etiķete
-      const labelPos = toLatLngs([{ E, N: centerN }])[0];
+      // Etiķetes pozīcija arī jābīda, lai tā sēdētu uz līnijas
+      const labelPos = toLatLngs([{ E: drawE, N: centerN + FIX_OFFSET_N }])[0];
       let txt = isMajor ? `E ${Math.floor(E)}` : String(E).slice(-3);
       
       L.marker(labelPos, {
@@ -3050,15 +3054,17 @@ function createLKSGridLayers() {
       const isMajor = Math.abs(N % 1000) < 1;
       const currentStyle = isMajor ? styleMajor : styleMinor;
 
+      const drawN = N + FIX_OFFSET_N;
+
       const pts = [];
       for (let E = E_min; E <= E_max; E += segmentStep) {
-         pts.push({ E: E, N: N });
+         pts.push({ E: E + FIX_OFFSET_E, N: drawN });
       }
-      pts.push({ E: E_max, N: N });
+      pts.push({ E: E_max + FIX_OFFSET_E, N: drawN });
 
       L.polyline(toLatLngs(pts), currentStyle).addTo(grid);
 
-      const labelPos = toLatLngs([{ E: centerE, N }])[0];
+      const labelPos = toLatLngs([{ E: centerE + FIX_OFFSET_E, N: drawN }])[0];
       let txt = isMajor ? `N ${Math.floor(N)}` : String(N).slice(-3);
 
       L.marker(labelPos, {
