@@ -2588,10 +2588,28 @@ body.print-mode #printNorthTR .n{
 
 
       /* BOTTOM-LEFT – avots */
+/* BOTTOM-LEFT – avots (Labots: vairākas rindas) */
       body.print-mode #printSourceBL{
-        position:fixed !important; left:10mm !important; bottom:6mm !important;
-        font:10pt/1.2 system-ui, sans-serif; color:#000; visibility:visible !important;
-        max-width:${mm.w/1.5}mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+        position: fixed !important; 
+        left: 10mm !important; 
+        bottom: 6mm !important;
+        
+        /* Samazinām fontu un rindu augstumu, lai 2 rindas neizskatītos slikti */
+        font: 9pt/1.1 system-ui, sans-serif; 
+        color: #000; 
+        visibility: visible !important;
+        
+        /* Ierobežojam platumu līdz 40% no lapas, lai neuzietu virsū centram */
+        max-width: ${mm.w * 0.40}mm; 
+        
+        /* GALVENAIS: Atļaujam teksta laušanu */
+        white-space: normal !important; 
+        overflow: visible !important; 
+        text-overflow: clip !important;
+        
+        /* Izlīdzināšana */
+        text-align: left;
+        z-index: 2147483647;
       }
 
       /* BOTTOM-RIGHT – režģa tips (UTM/LKS) */
