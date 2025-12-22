@@ -7623,7 +7623,7 @@ function addPrintScaleBar(scale) {
           visibility: visible !important;
           position: fixed !important;
           bottom: 7mm !important; /* Mazliet virs apakšējās malas */
-          left: 50% !important;
+          left: 70% !important;
           transform: translateX(-50%) !important;
           flex-direction: column;
           align-items: center;
