@@ -7308,17 +7308,20 @@ function ensureDockOpen(){
 
 
 // ============================================================
-// === JAUNA FUNKCIJA: Drukas rāmja koordinātes (SALABOTS NOVIETOJUMS) ===
+// === JAUNA FUNKCIJA: Drukas rāmja koordinātes (3 CIPARI + TAVS CSS) ===
 // ============================================================
 function addPrintGridLabels(map, scale, format, orient) {
 
   // --- 1. IEGŪSTAM PRECĪZUS RĀMJA IZMĒRUS (MM) ---
-  const base = (format === 'A3')
-    ? (orient === 'portrait' ? {w:277, h:400} : {w:400, h:277})
-    : (orient === 'portrait' ? {w:190, h:277} : {w:277, h:190});
+  const isA3 = (format === 'A3');
+  const isPortrait = (orient === 'portrait');
 
-  const slackW = (orient === 'landscape' ? 2 : 0);
-  const slackH = (orient === 'landscape' ? 14 : 0);
+  const base = isA3
+    ? (isPortrait ? {w:277, h:400} : {w:400, h:277})
+    : (isPortrait ? {w:190, h:277} : {w:277, h:190});
+
+  const slackW = (!isPortrait ? 2 : 0);
+  const slackH = (!isPortrait ? 14 : 0);
   
   const paperW_mm = base.w - slackW;
   const paperH_mm = base.h - slackH;
@@ -7374,8 +7377,7 @@ function addPrintGridLabels(map, scale, format, orient) {
   window.__printOverlayEls = window.__printOverlayEls || [];
   window.__printOverlayEls.push(overlay);
 
-  // --- 5. CSS STILI (LABOTS) ---
-  // Šeit ir galvenās izmaiņas pozicionēšanā
+  // --- 5. CSS STILI (TAVS NOVIETOJUMS + JAUNIE FONTU IZMĒRI) ---
   if (!document.getElementById('print-grid-labels-css')) {
     const css = document.createElement('style');
     css.id = 'print-grid-labels-css';
@@ -7386,42 +7388,55 @@ function addPrintGridLabels(map, scale, format, orient) {
         .pgl-number {
           position: absolute;
           font-family: 'Arial', sans-serif;
-          font-weight: bold;
-          font-size: 10pt;
-          color: #000;
           line-height: 1;
           white-space: nowrap;
-          /* Noņemam globālo translate(-50%, -50%), izmantosim specifiskus zemāk */
+          color: #000;
         }
 
-        /* AUGŠA: Ennojam teksta apakšu (y: -100%) pie rāmja un paceļam par 1mm */
+        /* LIELIE SKAITĻI (PILNIE KM) */
+        .pgl-major {
+            font-weight: bold;
+            font-size: 11pt; 
+        }
+
+        /* MAZIE SKAITĻI (STARPLĪNIJAS) */
+        .pgl-minor {
+            font-weight: normal; 
+            font-size: 8pt;     
+            letter-spacing: -0.5px;
+        }
+
+        /* --- TAVS NORĀDĪTAIS NOVIETOJUMS --- */
+        
+        /* AUGŠA: Ennojam teksta apakšu (y: -100%) pie rāmja un paceļam/nolaižam par 5mm */
         .pgl-top { 
             top: 0;   
             transform: translate(-50%, -100%); 
             margin-top: 5mm; 
         }
 
-        /* APAKŠA: Ennojam teksta augšu (y: 0%) pie rāmja un nolaižam par 1mm */
+        /* APAKŠA: Ennojam teksta augšu (y: 0%) pie rāmja un nolaižam/paceļam par -5mm */
         .pgl-bottom { 
             top: 100%; 
             transform: translate(-50%, 0);     
             margin-top: -5mm; 
         }
 
-        /* KREISĀ PUSE: Ennojam teksta labo malu (x: -100%) pie rāmja un pabīdam 1mm */
+        /* KREISĀ PUSE */
         .pgl-left { 
             left: 0;  
             transform: translate(-100%, -50%); 
             margin-left: -1mm; 
         }
 
-        /* LABĀ PUSE: Ennojam teksta kreiso malu (x: 0%) pie rāmja un pabīdam 1mm */
+        /* LABĀ PUSE */
         .pgl-right { 
             left: 100%; 
             transform: translate(0, -50%);     
             margin-left: 1mm; 
         }
         
+        /* LIELAIS SKAITLIS AR PASKAIDROJUMU */
         #printCornerInfo {
           position: fixed !important;
           right: 42mm !important;
@@ -7450,17 +7465,32 @@ function addPrintGridLabels(map, scale, format, orient) {
   };
   const step = getGridStep(scale);
 
-  const fmt = (val) => String(Math.floor(val / 1000) % 100).padStart(2, '0');
+  // Standarta formatētājs pilnajiem kilometriem (01, 02...)
+  const fmtFull = (val) => String(Math.floor(val / 1000) % 100).padStart(2, '0');
 
-  function addEl(side, percent, txt) {
+  // Funkcija, kas izlemj, ko rakstīt (04 vai 042)
+  function processLabel(val) {
+      const m = val % 1000;
+      
+      if (m === 0) {
+          // Pilns kilometrs -> "04" (Liels)
+          return { txt: fmtFull(val), isMajor: true };
+      } else {
+          // Starplīnija -> "042" (3 cipari: 04 km + 2 simti m)
+          const kmPart = fmtFull(val);
+          const mPart  = Math.floor(m / 100); 
+          return { txt: kmPart + mPart, isMajor: false };
+      }
+  }
+
+  // Funkcija elementa pievienošanai ar klasi (Major/Minor)
+  function addEl(side, percent, txt, isMajor) {
     let d = document.createElement('div');
-    d.className = 'pgl-number pgl-' + side;
+    d.className = 'pgl-number pgl-' + side + (isMajor ? ' pgl-major' : ' pgl-minor');
     
-    if (side === 'top' || side === 'bottom') {
-      d.style.left = percent + '%';
-    } else {
-      d.style.top = percent + '%';
-    }
+    if (side === 'top' || side === 'bottom') d.style.left = percent + '%';
+    else d.style.top = percent + '%';
+    
     d.textContent = txt;
     overlay.appendChild(d);
   }
@@ -7469,35 +7499,31 @@ function addPrintGridLabels(map, scale, format, orient) {
   for (let E = Math.ceil(minE / step) * step; E <= Math.floor(maxE / step) * step; E += step) {
     const pct = ((E - minE) / worldW_m) * 100;
     if (pct >= -0.1 && pct <= 100.1) {
-      addEl('top', pct, fmt(E));
-      addEl('bottom', pct, fmt(E));
+      const { txt, isMajor } = processLabel(E);
+      addEl('top', pct, txt, isMajor);
+      addEl('bottom', pct, txt, isMajor);
     }
   }
-
+  
   // --- HORIZONTĀLĀS LĪNIJAS (Northing) ---
   for (let N = Math.ceil(minN / step) * step; N <= Math.floor(maxN / step) * step; N += step) {
     const pct = ((maxN - N) / worldH_m) * 100;
     if (pct >= -0.1 && pct <= 100.1) {
-      addEl('left', pct, fmt(N));
-      addEl('right', pct, fmt(N));
+      const { txt, isMajor } = processLabel(N);
+      addEl('left', pct, txt, isMajor);
+      addEl('right', pct, txt, isMajor);
     }
   }
 
- // --- LIELAIS SKAITLIS (Stūrī) ---
+  // --- LIELAIS SKAITLIS (Ar paskaidrojumu) ---
   let bigInfoText = "";
   if (isLKS) {
-    // 1. Iegūstam pirmo ciparu (piem., 5)
     const prefix = Math.floor(centerCoords.E / 100000);
-    
-    // 2. Pievienojam paskaidrojumu un nulles
-    // Rezultāts būs: "E: 500 000"
     bigInfoText = "E: " + prefix + "00 000"; 
   } else {
-    // UTM gadījumā
     if (typeof toMGRS8 === 'function') {
          const c = map.getCenter();
          const mgrsFull = toMGRS8(c.lat, c.lng, false);
-         // Pievienojam paskaidrojumu MGRS:
          bigInfoText = "MGRS: " + mgrsFull.split(' ').slice(0, 2).join(' ');
     } else {
          bigInfoText = "UTM Zone " + zone;
