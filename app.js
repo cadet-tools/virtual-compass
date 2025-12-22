@@ -2682,12 +2682,12 @@ function buildPrintFooterLgIa(scaleVal, title){
 // Atpazīst aktīvo režģi (UTM vai LKS), skat. globālās references uz grid slāņiem.
 function getActiveGridLabel(){
   try{
-    if (window.lksGrid && map.hasLayer(window.lksGrid)) return 'Režģis: LKS-92';
-    if (window.lksLabels && map.hasLayer(window.lksLabels)) return 'Režģis: LKS-92';
-    if (window.utmGrid && map.hasLayer(window.utmGrid)) return 'Režģis: UTM/MGRS';
-    if (window.utmLabels && map.hasLayer(window.utmLabels)) return 'Režģis: UTM/MGRS';
+    if (window.lksGrid && map.hasLayer(window.lksGrid)) return 'Tīkls: LKS-92';
+    if (window.lksLabels && map.hasLayer(window.lksLabels)) return 'Tīkls: LKS-92';
+    if (window.utmGrid && map.hasLayer(window.utmGrid)) return 'Tīkls: UTM/MGRS';
+    if (window.utmLabels && map.hasLayer(window.utmLabels)) return 'Tīkls: UTM/MGRS';
   }catch(e){}
-  return 'Režģis: nav';
+  return 'Tīkls: nav';
 }
 
 
