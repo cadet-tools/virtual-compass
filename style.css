@@ -2324,13 +2324,30 @@ a.nav-link.active {
 }
 
 	
-/* --- SMART SEARCH STILI --- */
+/* --- SMART SEARCH STILI (LABOTS NOVIETOJUMS) --- */
 .smart-search-container {
+    /* 1. SOLIS: Izraujam no standarta plūsmas */
+    position: absolute !important; 
+    
+    /* 2. SOLIS: Pabīdam pa labi no Zoom pogām */
+    /* Zoom pogas parasti ir ap 30-40px platas + 10px mala. 
+       Liekam 50px vai vairāk, lai būtu blakus */
+    left: 52px !important; 
+    top: 0px !important;
+
+    /* 3. SOLIS: Izlīdzinām augstumu */
+    /* Leaflet pogām augšā standarta margin ir 10px, tāpēc liekam to pašu */
+    margin-top: 10px !important; 
+    margin-left: 0 !important;
+    
+    /* Lai neaiziet nākamajā rindā */
+    clear: none !important; 
+
+    /* VIZUĀLAIS (tavs esošais stils) */
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    margin-top: 10px; 
-    margin-left: 50px; /* Lai nepārklājas ar tālummaiņas pogām, ja tās ir kreisajā pusē */
+    z-index: 2000; /* Drošībai, lai ir virs kartes slāņiem */
 }
 
 .search-wrap {
