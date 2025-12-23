@@ -3132,6 +3132,44 @@ function createLKSGridLayers() {
 map.whenReady(() => {
 
 
+
+
+
+/* --- Latviešu valodas definīcija priekš Routing Machine --- */
+if (typeof L.Routing !== 'undefined') {
+    L.Routing.Localization.prototype.lv = {
+        directions: {
+            N: 'ziemeļiem',
+            NE: 'ziemeļaustrumiem',
+            E: 'austrumiem',
+            SE: 'dienvidaustrumiem',
+            S: 'dienvidiem',
+            SW: 'dienvidrietumiem',
+            W: 'rietumiem',
+            NW: 'ziemeļrietumiem'
+        },
+        instructions: {
+            // Vienkāršoti tulkojumi
+            'Head': ['Dodies uz {dir}', 'uz {dir}'],
+            'Continue': ['Turpiniet braukt uz {dir}', 'uz {dir}'],
+            'TurnAround': ['Apgriezieties braukšanai pretējā virzienā'],
+            'WaypointReached': ['Galamērķis sasniegts'],
+            'Roundabout': ['Izbrauciet apli {exitStr}'],
+            'DestinationReached': ['Galamērķis sasniegts'],
+        },
+        formatOrder: function(n) { return n + '.'; }
+    };
+}
+
+
+
+
+
+
+
+
+	
+
 // LL → UTM piespiedu zonā (izmantojam centra zonu, lai režģis nepazūd)
 function llToUTMInZone(lat, lon, zone){
   const phi  = deg2rad(lat);
