@@ -2422,3 +2422,74 @@ a.nav-link.active {
 @media print {
     .smart-search-container { display: none !important; }
 }
+
+
+
+/* --- LEAFLET ROUTING MACHINE DARK THEME --- */
+
+/* Pamatpanelis */
+.leaflet-routing-container {
+    background-color: rgba(27, 31, 37, 0.95) !important;
+    color: #fff !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5) !important;
+    font-family: system-ui, sans-serif !important;
+    width: 320px !important;
+    margin-top: 10px !important;
+    margin-left: 10px !important;
+}
+
+/* Ievades lauki maršrutam */
+.leaflet-routing-geocoders input {
+    background-color: rgba(0, 0, 0, 0.3) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: #fff !important;
+    border-radius: 4px;
+    padding: 6px;
+    width: 90%;
+}
+
+/* Saraksts ar pagriezieniem (maršruta leģenda) */
+.leaflet-routing-alt {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.leaflet-routing-alt tr:hover {
+    background-color: rgba(255,255,255,0.1) !important;
+    cursor: pointer;
+}
+
+.leaflet-routing-alt-time {
+    font-weight: bold;
+    color: #4CAF50; /* Zaļš laiks */
+}
+
+/* Noņemam baltos fonus ikonām, ja tādi ir */
+.leaflet-routing-icon {
+    background-image: none !important; 
+    /* Varam pievienot savas ikonas, ja vajag */
+}
+
+/* Poga, kas pievieno jaunu punktu (+) */
+.leaflet-routing-add-waypoint {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border-radius: 50%;
+}
+
+/* Kļūdu paziņojumi */
+.leaflet-routing-error {
+    background-color: #3e2020;
+    color: #ffaaaa;
+}
+
+/* "Smart Search" novietojums (saglabājam, lai ir pa labi no zoom pogām) */
+.smart-search-container {
+    position: absolute !important;
+    left: 52px !important;
+    top: 0px !important;
+    margin-top: 10px !important;
+    z-index: 2000;
+}
