@@ -3253,19 +3253,19 @@ map.whenReady(() => {
     map.addControl(searchControl);
 
 
-    // --- 5. SOLIS: MARŠRUTĒŠANAS LOĢIKA ---
+// --- 5. SOLIS: MARŠRUTĒŠANAS LOĢIKA (SALABOTA) ---
     let routingControl = null;
     let isRoutingMode = false;
 
     document.getElementById('toggleRouteBtn').addEventListener('click', () => {
-        // Drošības pārbaude
+        // 1. Pārbaudām, vai bibliotēka ir ielādēta
         if (typeof L.Routing === 'undefined') {
-            alert("⚠️ Kļūda: Nav ielādēta maršrutēšanas bibliotēka (leaflet-routing-machine).");
+            alert("⚠️ Kļūda: Maršrutēšanas spraudnis (leaflet-routing-machine) nav ielādēts!");
             return;
         }
 
-        // *** SVARĪGI: DEFINĒJAM LATVIEŠU VALODU ŠEIT ***
-        // Tas garantē, ka bibliotēka to atradīs tieši pirms izmantošanas
+        // 2. IEMĀCĀM LATVIEŠU VALODU (Definējam tieši šeit, lai garantētu, ka tā eksistē)
+        // Mēs to darām katru reizi vai pārbaudām, vai jau ir, lai novērstu kļūdu.
         if (!L.Routing.Localization.prototype.lv) {
             L.Routing.Localization.prototype.lv = {
                 directions: {
@@ -3290,6 +3290,7 @@ map.whenReady(() => {
             };
         }
 
+        // 3. Tālākā loģika (ieslēgt/izslēgt)
         isRoutingMode = !isRoutingMode;
         const btn = document.getElementById('toggleRouteBtn');
         const input = document.getElementById('smartSearchInput');
@@ -3298,7 +3299,7 @@ map.whenReady(() => {
 
         if (isRoutingMode) {
             // IESLĒDZ MARŠRUTĒŠANU
-            btn.style.background = '#4CAF50';
+            btn.style.background = '#4CAF50'; // Zaļš
             input.style.display = 'none';
             searchBtn.style.display = 'none';
             resultsDiv.style.display = 'none';
@@ -3307,23 +3308,29 @@ map.whenReady(() => {
                 try {
                     routingControl = L.Routing.control({
                         waypoints: [
-                            L.latLng(56.946, 24.105), // Rīga
-                            null 
+                            L.latLng(56.946, 24.105), // Rīga (sākums)
+                            null // Beigas (tukšs)
                         ],
                         routeWhileDragging: true,
                         geocoder: new MyCustomGeocoder(),
-                        language: 'lv', // Tagad tas 100% strādās
+                        language: 'lv', // Tagad tas strādās, jo 'lv' ir definēts augstāk
                         showAlternatives: true,
                         lineOptions: {
                             styles: [{color: '#00ccff', opacity: 0.8, weight: 6}]
                         },
                         createMarker: function(i, wp, nWps) {
+                            // Ļaujam bīdīt punktus
                             return L.marker(wp.latLng, { draggable: true });
                         }
                     }).addTo(map);
                 } catch (e) {
                     console.error("Routing error:", e);
                     alert("Neizdevās palaist maršrutētāju: " + e.message);
+                    // Atceļam režīmu kļūdas gadījumā
+                    isRoutingMode = false;
+                    btn.style.background = '';
+                    input.style.display = 'block';
+                    searchBtn.style.display = 'block';
                 }
             } else {
                 routingControl.getContainer().style.display = 'block';
@@ -3336,6 +3343,7 @@ map.whenReady(() => {
             
             if (routingControl) {
                 routingControl.getContainer().style.display = 'none';
+                // routingControl.setWaypoints([]); // Ja gribi notīrīt maršrutu pavisam
             }
         }
     });
