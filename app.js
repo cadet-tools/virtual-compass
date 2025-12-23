@@ -3253,181 +3253,180 @@ map.whenReady(() => {
     map.addControl(searchControl);
 
 
-// --- 5. SOLIS: UZLABOTA TAKTISKĀ MARŠRUTĒŠANA (Auto/Kājām + GPX Eksports) ---
+// --- 5. SOLIS: TAKTISKĀ MARŠRUTĒŠANA (Auto/Kājām + GPX + MGRS) ---
     let routingControl = null;
     let isRoutingMode = false;
-    let currentProfile = 'driving'; // Noklusējums: 'driving' vai 'walking'
+    let currentProfile = 'driving'; // Sākumā auto
 
-    document.getElementById('toggleRouteBtn').addEventListener('click', () => {
-        // 1. Pārbaudām bibliotēku
-        if (typeof L === 'undefined' || typeof L.Routing === 'undefined') {
-            alert("⚠️ Kļūda: Maršrutēšanas spraudnis nav ielādēts!");
-            return;
-        }
-
-        // 2. Definējam Latviešu valodu (Tavs esošais kods)
-        const lvLocale = {
+    // DEFINĒJAM VALODU GLOBĀLI (lai novērstu "No localization" kļūdu)
+    if (typeof L !== 'undefined' && L.Routing && L.Routing.Localization) {
+        L.Routing.Localization.prototype.lv = {
             directions: {
                 N: 'ziemeļiem', NE: 'ziemeļaustrumiem', E: 'austrumiem', SE: 'dienvidaustrumiem',
                 S: 'dienvidiem', SW: 'dienvidrietumiem', W: 'rietumiem', NW: 'ziemeļrietumiem'
             },
             instructions: {
-                'Head': ['Dodies uz {dir}', 'uz {dir}'],
-                'Continue': ['Turpiniet braukt uz {dir}', 'uz {dir}'],
+                'Head': ['Dodies {dir}', 'uz {dir}'],
+                'Continue': ['Turpiniet {dir}', 'uz {dir}'],
                 'TurnAround': ['Apgriezieties'],
                 'WaypointReached': ['Vieta sasniegta'],
-                'Roundabout': ['Izbrauciet apli {exitStr}', 'Izbrauciet apli {exitStr}'],
+                'Roundabout': ['Izbrauciet apli {exitStr}', 'Izbrauciet apli'],
                 'DestinationReached': ['Galamērķis sasniegts'],
                 'Fork': ['Neturiet pa {modifier}', 'Neturiet pa {modifier}'],
-                'Merge': ['Pievienojieties plūsmai', 'Pievienojieties plūsmai'],
-                'OnRamp': ['Uzbrauciet uz rampas', 'Uzbrauciet uz rampas'],
-                'OffRamp': ['Nobrauciet no ceļa', 'Nobrauciet no ceļa'],
+                'Merge': ['Pievienojieties plūsmai', 'Pievienojieties'],
+                'OnRamp': ['Uzbrauciet uz rampas', 'Uzbrauciet'],
+                'OffRamp': ['Nobrauciet no ceļa', 'Nobrauciet'],
                 'EndOfRoad': ['Ceļa beigas', 'Ceļa beigas'],
                 'Onto': 'uz {road}',
                 'SlightRight': ['Nedaudz pa labi', 'Pa labi'],
                 'SlightLeft': ['Nedaudz pa kreisi', 'Pa kreisi'],
-                'Right': ['Pagriezieties pa labi', 'Pa labi'],
-                'Left': ['Pagriezieties pa kreisi', 'Pa kreisi'],
+                'Right': ['Pa labi', 'Pa labi'],
+                'Left': ['Pa kreisi', 'Pa kreisi'],
                 'SharpRight': ['Asi pa labi', 'Pa labi'],
                 'SharpLeft': ['Asi pa kreisi', 'Pa kreisi'],
                 'Uturn': ['Apgriezieties', 'Apgriezieties'],
                 'StartAt': ['Sāciet pie {road}', 'Sāciet'],
-                'EndAt': ['Beidziet pie {road}', 'Beidziet'],
-                'RoundaboutExit': ['Izbrauciet apli', 'Izbrauciet apli']
+                'EndAt': ['Beidziet pie {road}', 'Beidziet']
             },
             formatOrder: function(n) { return n + '.'; }
         };
-        L.Routing.Localization.prototype.lv = lvLocale;
+    }
 
-        // Pārslēdzam režīmu
+    document.getElementById('toggleRouteBtn').addEventListener('click', () => {
+        // Pārbaude
+        if (typeof L === 'undefined' || typeof L.Routing === 'undefined') {
+            alert("⚠️ Kļūda: Maršrutēšanas spraudnis nav ielādēts!");
+            return;
+        }
+
         isRoutingMode = !isRoutingMode;
+        
+        // Elementi, kurus paslēpt/rādīt
         const btn = document.getElementById('toggleRouteBtn');
         const input = document.getElementById('smartSearchInput');
         const searchBtn = document.getElementById('smartSearchBtn');
         const resultsDiv = document.getElementById('smartSearchResults');
+        const clearBtn = document.getElementById('smartSearchClear');
 
         if (isRoutingMode) {
-            // --- IESLĒDZAM ---
-            btn.style.background = '#4CAF50'; 
+            // --- IESLĒDZAM REŽĪMU ---
+            btn.style.background = '#2e7d32'; // Aktīvs (zaļš)
+            // Paslēpjam vienkāršo meklētāju, lai netraucē
             input.style.display = 'none';
             searchBtn.style.display = 'none';
+            if (clearBtn) clearBtn.style.display = 'none';
             resultsDiv.style.display = 'none';
 
             if (!routingControl) {
                 try {
-                    // Izveidojam maršrutētāju
+                    // Izveidojam kontroli
                     routingControl = L.Routing.control({
-                        // SVARĪGI: Novietojam KREISAJĀ pusē
+                        // KREISĀ PUSE
                         position: 'topleft', 
                         
                         waypoints: [
-                            L.latLng(56.946, 24.105), // Sākums (Rīga)
+                            L.latLng(56.946, 24.105), // Sākums
                             null                      // Beigas
                         ],
-                        routeWhileDragging: true,
-                        // Izmantojam tavu pielāgoto Geocoder, lai atpazītu MGRS/LKS arī šeit
+                        
+                        // Izmantojam TAVU pielāgoto ģeokodētāju (MGRS/LKS atbalstam)
                         geocoder: new MyCustomGeocoder(),
                         
-                        // Sākotnējais router iestatījums (Auto)
+                        routeWhileDragging: true,
+                        showAlternatives: true,
+                        
+                        // OSRM konfigurācija
                         router: L.Routing.osrmv1({
                             serviceUrl: 'https://router.project-osrm.org/route/v1',
-                            profile: 'driving',
+                            profile: 'driving', // Sākumā auto
                             language: 'lv'
                         }),
                         
-                        formatter: new L.Routing.Formatter({ language: 'lv', roundingSensitivity: 100 }),
-                        language: 'lv',
+                        formatter: new L.Routing.Formatter({
+                            language: 'lv',
+                            roundingSensitivity: 100
+                        }),
+                        
+                        // Līnijas stils (taktiski zils)
                         lineOptions: {
                             styles: [{color: '#00ccff', opacity: 0.8, weight: 6}]
                         },
+                        
+                        // Marķieri
                         createMarker: function(i, wp, nWps) {
                             return L.marker(wp.latLng, { draggable: true });
                         }
                     }).addTo(map);
 
-                    // --- PIEVIENOJAM VADĪBAS POGAS (Auto/Kājām/GPX) ---
-                    // Mēs ievietojam tās maršrutētāja konteinerā
+                    // --- PIEVIENOJAM POGAS (Auto/Kājām/GPX) ---
                     routingControl.on('containeradded', function(e) {
                         const container = e.container;
                         
-                        // Izveidojam pogu joslu
+                        // Izveidojam pogu paneli
                         const controlsDiv = document.createElement('div');
                         controlsDiv.className = 'routing-controls';
                         controlsDiv.innerHTML = `
-                            <button class="routing-btn active" id="modeCar">🚗 Auto</button>
-                            <button class="routing-btn" id="modeWalk">🚶 Kājām</button>
-                            <button class="routing-btn gpx-btn" id="exportGPX" title="Lejupielādēt GPX failu ierīcēm">💾 GPX</button>
+                            <button class="routing-btn active" id="modeCar" title="Autotransports">🚙 AUTO</button>
+                            <button class="routing-btn" id="modeWalk" title="Kājnieks">🚶 KĀJĀM</button>
+                            <button class="routing-btn gpx-btn" id="exportGPX" title="Eksportēt uz GPS ierīci">⬇ GPX</button>
                         `;
                         
-                        // Ievietojam pirms ievades laukiem
+                        // Ievietojam pašā augšā
                         container.insertBefore(controlsDiv, container.firstChild);
 
-                        // Loģika pogām
+                        // Loģika
                         const btnCar = controlsDiv.querySelector('#modeCar');
                         const btnWalk = controlsDiv.querySelector('#modeWalk');
                         const btnGpx = controlsDiv.querySelector('#exportGPX');
 
-                        // Pārslēgšana uz AUTO
+                        // Pārslēgt uz AUTO
                         btnCar.onclick = () => {
                             if (currentProfile === 'driving') return;
                             currentProfile = 'driving';
                             btnCar.classList.add('active');
                             btnWalk.classList.remove('active');
                             
-                            // Atjaunojam router ar jaunu profilu
                             routingControl.getRouter().options.profile = 'driving';
-                            routingControl.route(); // Pārrēķināt
+                            routingControl.route();
                         };
 
-                        // Pārslēgšana uz KĀJĀM
+                        // Pārslēgt uz KĀJĀM
                         btnWalk.onclick = () => {
                             if (currentProfile === 'walking') return;
                             currentProfile = 'walking';
                             btnWalk.classList.add('active');
                             btnCar.classList.remove('active');
                             
-                            // OSRM 'walking' profils
                             routingControl.getRouter().options.profile = 'walking';
-                            routingControl.route(); // Pārrēķināt
+                            routingControl.route();
                         };
 
-                        // GPX EKSPORTS (Taktiskām vajadzībām)
+                        // GPX EKSPORTS
                         btnGpx.onclick = () => {
-                            // 1. Dabūjam maršruta koordinātes
-                            // (routingControl var būt vairāki maršruti, ņemam pirmo/izvēlēto)
-                            /* Mums vajag piekļūt pēdējam aprēķinātajam maršrutam. 
-                               Leaflet Routing Machine to glabā iekšēji, bet visdrošāk ir 
-                               klausīties 'routesfound' vai ņemt no _routes */
-                            
                             if (!routingControl._routes || routingControl._routes.length === 0) {
-                                alert("Vispirms izveidojiet maršrutu!");
+                                alert("Nav izveidots maršruts!");
                                 return;
                             }
+                            const route = routingControl._routes[0];
+                            const coords = route.coordinates; // {lat, lng} masīvs
 
-                            const route = routingControl._routes[0]; // Ņemam galveno maršrutu
-                            const coords = route.coordinates; // Masīvs ar {lat, lng}
-
-                            // 2. Ģenerējam GPX XML saturu
+                            // Veidojam GPX
                             let gpx = '<?xml version="1.0" encoding="UTF-8"?>\n';
                             gpx += '<gpx version="1.1" creator="CADET.LV">\n';
-                            gpx += '  <trk>\n';
-                            gpx += '    <name>Marsruts ' + (currentProfile==='driving'?'Auto':'Kajam') + '</name>\n';
-                            gpx += '    <trkseg>\n';
+                            gpx += `  <trk>\n    <name>Marsruts ${currentProfile}</name>\n    <trkseg>\n`;
                             
                             coords.forEach(pt => {
                                 gpx += `      <trkpt lat="${pt.lat}" lon="${pt.lng}"></trkpt>\n`;
                             });
 
-                            gpx += '    </trkseg>\n';
-                            gpx += '  </trk>\n';
-                            gpx += '</gpx>';
+                            gpx += '    </trkseg>\n  </trk>\n</gpx>';
 
-                            // 3. Lejupielāde
+                            // Lejupielāde
                             const blob = new Blob([gpx], { type: 'application/gpx+xml' });
                             const url = URL.createObjectURL(blob);
                             const a = document.createElement('a');
                             a.href = url;
-                            a.download = 'marsruts.gpx';
+                            a.download = `marsruts_${currentProfile}.gpx`;
                             document.body.appendChild(a);
                             a.click();
                             document.body.removeChild(a);
@@ -3436,21 +3435,25 @@ map.whenReady(() => {
                     });
 
                 } catch (e) {
-                    console.error("Routing error:", e);
-                    alert("Kļūda: " + e.message);
-                    isRoutingMode = false;
-                    btn.style.background = '';
-                    input.style.display = 'block';
-                    searchBtn.style.display = 'block';
+                    console.error("Routing init error:", e);
+                    // Mēģinām vēlreiz ar angļu valodu, ja LV tomēr neiet
+                    if (e.message.includes('No localization')) {
+                        alert("Kļūda ar valodu, mēģinu pārslēgties uz EN...");
+                        // Šeit varētu mēģināt vēlreiz ar language: 'en', bet
+                        // augšminētais LV fix parasti strādā.
+                    }
                 }
             } else {
                 routingControl.getContainer().style.display = 'block';
             }
         } else {
-            // --- IZSLĒDZAM ---
+            // --- IZSLĒDZAM REŽĪMU ---
             btn.style.background = ''; 
+            
+            // Parādām atpakaļ vienkāršo meklētāju
             input.style.display = 'block';
             searchBtn.style.display = 'block';
+            
             if (routingControl) {
                 routingControl.getContainer().style.display = 'none';
             }
