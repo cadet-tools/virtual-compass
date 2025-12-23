@@ -2324,3 +2324,84 @@ a.nav-link.active {
 }
 
 	
+/* --- SMART SEARCH STILI --- */
+.smart-search-container {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin-top: 10px; 
+    margin-left: 50px; /* Lai nepārklājas ar tālummaiņas pogām, ja tās ir kreisajā pusē */
+}
+
+.search-wrap {
+    display: flex;
+    background: rgba(27, 31, 37, 0.95); /* Tavs dock1 tonis */
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+
+.search-wrap input {
+    background: transparent;
+    border: none;
+    color: #fff;
+    padding: 6px 10px;
+    width: 220px;
+    font-family: system-ui, sans-serif;
+    font-size: 14px;
+    outline: none;
+}
+
+.search-wrap input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.search-wrap button {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 6px;
+    transition: background 0.2s;
+    font-size: 14px;
+    margin-left: 4px;
+}
+
+.search-wrap button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Rezultātu saraksts (adresēm) */
+.search-results {
+    margin-top: 6px;
+    background: rgba(27, 31, 37, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+    color: #fff;
+    font-size: 13px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+}
+
+.search-item {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    cursor: pointer;
+}
+
+.search-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.search-item:last-child {
+    border-bottom: none;
+}
+
+/* Drukājot paslēpjam meklētāju */
+@media print {
+    .smart-search-container { display: none !important; }
+}
