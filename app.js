@@ -3264,31 +3264,39 @@ map.whenReady(() => {
             return;
         }
 
-        // 2. IEMĀCĀM LATVIEŠU VALODU (Definējam tieši šeit, lai garantētu, ka tā eksistē)
-        // Mēs to darām katru reizi vai pārbaudām, vai jau ir, lai novērstu kļūdu.
-        if (!L.Routing.Localization.prototype.lv) {
-            L.Routing.Localization.prototype.lv = {
-                directions: {
-                    N: 'ziemeļiem', NE: 'ziemeļaustrumiem', E: 'austrumiem', SE: 'dienvidaustrumiem',
-                    S: 'dienvidiem', SW: 'dienvidrietumiem', W: 'rietumiem', NW: 'ziemeļrietumiem'
-                },
-                instructions: {
-                    'Head': ['Dodies uz {dir}', 'uz {dir}'],
-                    'Continue': ['Turpiniet braukt uz {dir}', 'uz {dir}'],
-                    'TurnAround': ['Apgriezieties braukšanai pretējā virzienā'],
-                    'WaypointReached': ['Vieta sasniegta'],
-                    'Roundabout': ['Izbrauciet apli {exitStr}'],
-                    'DestinationReached': ['Galamērķis sasniegts'],
-                    'Fork': ['Neturiet pa {modifier}', 'Neturiet pa {modifier}'],
-                    'Merge': ['Pievienojieties plūsmai', 'Pievienojieties plūsmai'],
-                    'OnRamp': ['Uzbrauciet uz rampas', 'Uzbrauciet uz rampas'],
-                    'OffRamp': ['Nobrauciet no ceļa', 'Nobrauciet no ceļa'],
-                    'EndOfRoad': ['Ceļa beigas', 'Ceļa beigas'],
-                    'Onto': 'uz {road}',
-                },
-                formatOrder: function(n) { return n + '.'; }
-            };
-        }
+        // 2. IEMĀCĀM LATVIEŠU VALODU (Papildināts ar trūkstošajiem manevriem)
+        // Definējam prototipu, lai novērstu "No localization" kļūdu
+        L.Routing.Localization.prototype.lv = {
+            directions: {
+                N: 'ziemeļiem', NE: 'ziemeļaustrumiem', E: 'austrumiem', SE: 'dienvidaustrumiem',
+                S: 'dienvidiem', SW: 'dienvidrietumiem', W: 'rietumiem', NW: 'ziemeļrietumiem'
+            },
+            instructions: {
+                // Pamata manevri
+                'Head': ['Dodies uz {dir}', 'uz {dir}'],
+                'Continue': ['Turpiniet braukt uz {dir}', 'uz {dir}'],
+                'TurnAround': ['Apgriezieties braukšanai pretējā virzienā'],
+                'WaypointReached': ['Vieta sasniegta'],
+                'Roundabout': ['Izbrauciet apli {exitStr}', 'Izbrauciet apli {exitStr}'],
+                'DestinationReached': ['Galamērķis sasniegts'],
+                'Fork': ['Neturiet pa {modifier}', 'Neturiet pa {modifier}'],
+                'Merge': ['Pievienojieties plūsmai', 'Pievienojieties plūsmai'],
+                'OnRamp': ['Uzbrauciet uz rampas', 'Uzbrauciet uz rampas'],
+                'OffRamp': ['Nobrauciet no ceļa', 'Nobrauciet no ceļa'],
+                'EndOfRoad': ['Ceļa beigas', 'Ceļa beigas'],
+                'Onto': 'uz {road}',
+                
+                // TRŪKSTOŠIE MANEVRI (kas izraisīja kļūdu)
+                'SlightRight': ['Nedaudz pa labi', 'Pa labi'],
+                'SlightLeft': ['Nedaudz pa kreisi', 'Pa kreisi'],
+                'Right': ['Pagriezieties pa labi', 'Pa labi'],
+                'Left': ['Pagriezieties pa kreisi', 'Pa kreisi'],
+                'SharpRight': ['Asi pa labi', 'Pa labi'],
+                'SharpLeft': ['Asi pa kreisi', 'Pa kreisi'],
+                'Uturn': ['Apgriezieties', 'Apgriezieties']
+            },
+            formatOrder: function(n) { return n + '.'; }
+        };
 
         // 3. Tālākā loģika (ieslēgt/izslēgt)
         isRoutingMode = !isRoutingMode;
@@ -3313,7 +3321,20 @@ map.whenReady(() => {
                         ],
                         routeWhileDragging: true,
                         geocoder: new MyCustomGeocoder(),
-                        language: 'lv', // Tagad tas strādās, jo 'lv' ir definēts augstāk
+                        
+                        // Eksplicīti norādām maršrutētāju (OSRM)
+                        router: L.Routing.osrmv1({
+                            serviceUrl: 'https://router.project-osrm.org/route/v1',
+                            language: 'lv' // Sūta valodas pieprasījumu arī serverim
+                        }),
+                        
+                        // Eksplicīti norādām formatētāju ar mūsu valodu
+                        formatter: new L.Routing.Formatter({
+                            language: 'lv',
+                            roundingSensitivity: 1000
+                        }),
+
+                        language: 'lv', // Dubulta drošība
                         showAlternatives: true,
                         lineOptions: {
                             styles: [{color: '#00ccff', opacity: 0.8, weight: 6}]
