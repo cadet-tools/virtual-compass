@@ -3263,7 +3263,194 @@ applyLayerZoomLimits(osm);
 
 
 
+/* =================================================================
+   SMART SEARCH INTEGRĀCIJA (MGRS + LKS-92 + WGS84 + ADRESES)
+   Ievietot app.js faila beigās vai map.whenReady() blokā.
+   ================================================================= */
 
+map.whenReady(() => {
+    
+    // Pārbaudam, vai vajadzīgās bibliotēkas ir ielādētas
+    if (typeof L === 'undefined') return;
+
+    L.Control.SmartSearch = L.Control.extend({
+        options: {
+            position: 'topleft',
+            placeholder: 'Meklēt: Adrese, MGRS, LKS-92...'
+        },
+
+        onAdd: function (map) {
+            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control smart-search-container');
+            
+            // Novēršam kartes klikšķus caur paneli
+            L.DomEvent.disableClickPropagation(container);
+            L.DomEvent.disableScrollPropagation(container);
+
+            // HTML struktūra
+            container.innerHTML = `
+                <div class="search-wrap">
+                    <input type="text" id="smartSearchInput" placeholder="${this.options.placeholder}">
+                    <button id="smartSearchBtn" title="Meklēt">🔍</button>
+                    <button id="smartSearchClear" title="Notīrīt" style="display:none;">✕</button>
+                </div>
+                <div id="smartSearchResults" class="search-results" style="display:none;"></div>
+            `;
+
+            return container;
+        },
+
+        onRemove: function(map) {
+            // Tīrīšana ja vajag
+        }
+    });
+
+    // Pievienojam kontroli kartei
+    map.addControl(new L.Control.SmartSearch());
+
+    // --- LOĢIKA ---
+
+    const input = document.getElementById('smartSearchInput');
+    const btn = document.getElementById('smartSearchBtn');
+    const clearBtn = document.getElementById('smartSearchClear');
+    const resultsDiv = document.getElementById('smartSearchResults');
+    let currentMarker = null;
+
+    // Funkcija marķiera uzlikšanai
+    function placeResultMarker(lat, lng, label, subLabel = '') {
+        if (currentMarker) map.removeLayer(currentMarker);
+        
+        currentMarker = L.marker([lat, lng]).addTo(map)
+            .bindPopup(`<b>${label}</b><br>${subLabel}`)
+            .openPopup();
+            
+        map.setView([lat, lng], 14, { animate: true });
+        
+        // Parādīt "notīrīt" pogu
+        clearBtn.style.display = 'block';
+        input.value = label;
+        resultsDiv.style.display = 'none';
+    }
+
+    // Galvenā meklēšanas funkcija
+    async function executeSearch() {
+        const raw = input.value.trim();
+        if (!raw) return;
+
+        resultsDiv.style.display = 'none';
+        resultsDiv.innerHTML = '';
+
+        // 1. MGRS (ja bibliotēka ir ielādēta)
+        if (typeof mgrs !== 'undefined') {
+            const cleanMGRS = raw.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+            // Regex: 1-2 cipari + burts + sekojoši cipari/burti
+            if (/^\d{1,2}[A-Z]/.test(cleanMGRS) && cleanMGRS.length >= 4) {
+                try {
+                    const point = mgrs.toPoint(cleanMGRS); // Atgriež [lon, lat]
+                    placeResultMarker(point[1], point[0], `MGRS: ${cleanMGRS}`);
+                    return;
+                } catch (e) {
+                    // Nav derīgs MGRS, turpinām tālāk
+                }
+            }
+        }
+
+        // 2. Skaitļu apstrāde (WGS84 vai LKS-92)
+        const normalized = raw.replace(',', '.');
+        const numbers = normalized.match(/-?\d+(\.\d+)?/g);
+
+        if (numbers && numbers.length >= 2) {
+            const n1 = parseFloat(numbers[0]);
+            const n2 = parseFloat(numbers[1]);
+
+            // A) WGS84 (Lat/Lon) - parastiLatvijā Lat ir 55-58, Lon 20-29
+            // Pārbaudām vai ir ģeogrāfiskajās robežās
+            if (Math.abs(n1) <= 90 && Math.abs(n2) <= 180) {
+                // Mēģinām uzminēt secību. Latvijā Lat > Lon
+                let lat = n1, lon = n2;
+                // Ja lietotājs ievadīja otrādi (Google stils bieži ir Lat, Lon, bet GeoJSON Lon, Lat)
+                // Šeit pieņemam standartu Lat, Lon, bet ja n1 ir 24 un n2 ir 57, apgriežam
+                if (n1 > 20 && n1 < 30 && n2 > 55 && n2 < 60) { lat = n2; lon = n1; }
+                
+                placeResultMarker(lat, lon, `WGS84: ${lat}, ${lon}`);
+                return;
+            }
+
+            // B) LKS-92 (X, Y)
+            // Latvijas LKS parasti ir simtos tūkstošu. X ap 200000-700000, Y ap 200000-400000 (vai 6milj)
+            // proj4 definīcija jau ir tavā app.js
+            if (typeof proj4 !== 'undefined') {
+                let x = n1, y = n2;
+                // LKS-92 koordinātu maiņa (N/E vs X/Y)
+                // Parasti X (North) ir 6xxxxxx vai 3xxxxx, Y (East) ir 3xxxxx-6xxxxx
+                // Tavā piemērā bija loģika, kas atpazīst > 5000000
+                if (n1 > 5000000) { y = n1; x = n2; } // Ja pirmais ir milzīgs, tas ir Y (North/N)
+                else if (n2 > 5000000) { x = n1; y = n2; }
+                else { x = n1; y = n2; } // Pieņemam x, y
+
+                try {
+                    // Pārvēršam uz WGS84, lai parādītu kartē
+                    const wgs = proj4('EPSG:3059', 'EPSG:4326', [x, y]);
+                    // Pārbaude vai iekrīt Latvijā (aptuveni)
+                    if (wgs[1] > 55 && wgs[1] < 59 && wgs[0] > 20 && wgs[0] < 30) {
+                        placeResultMarker(wgs[1], wgs[0], `LKS-92: ${Math.round(x)}, ${Math.round(y)}`);
+                        return;
+                    }
+                } catch(e) {}
+            }
+        }
+
+        // 3. ADREŠU MEKLĒŠANA (Nominatim API)
+        // Ja neviens no augstākajiem nenostrādāja, pieņemam, ka tā ir adrese
+        btn.innerHTML = '⏳'; // Ielādes indikators
+        try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(raw)}&limit=5&countrycodes=lv`);
+            const data = await response.json();
+            
+            if (data && data.length > 0) {
+                if (data.length === 1) {
+                    // Ja tikai 1 rezultāts, uzreiz rādām
+                    const r = data[0];
+                    placeResultMarker(r.lat, r.lon, r.display_name.split(',')[0], r.display_name);
+                } else {
+                    // Ja vairāki, rādām sarakstu
+                    resultsDiv.style.display = 'block';
+                    data.forEach(r => {
+                        const item = document.createElement('div');
+                        item.className = 'search-item';
+                        item.textContent = r.display_name;
+                        item.onclick = () => {
+                            placeResultMarker(r.lat, r.lon, r.display_name.split(',')[0], r.display_name);
+                        };
+                        resultsDiv.appendChild(item);
+                    });
+                }
+            } else {
+                alert('Nekas netika atrasts.');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Kļūda meklējot adresi.');
+        } finally {
+            btn.innerHTML = '🔍';
+        }
+    }
+
+    // Notikumi
+    btn.addEventListener('click', executeSearch);
+    input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') executeSearch();
+    });
+    
+    // Notīrīšanas poga
+    clearBtn.addEventListener('click', () => {
+        input.value = '';
+        if (currentMarker) map.removeLayer(currentMarker);
+        currentMarker = null;
+        resultsDiv.style.display = 'none';
+        clearBtn.style.display = 'none';
+    });
+
+});
 	
 // Ja ieslēdz/izslēdz režģus – nosakām, ko rādīt popupā.
 // Noteikums: "pēdējais ieslēgtais režģis" nosaka režīmu.
