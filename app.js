@@ -3265,7 +3265,7 @@ map.whenReady(() => {
         }
 
         // 2. IEMĀCĀM LATVIEŠU VALODU (Papildināts ar trūkstošajiem manevriem)
-        // Definējam prototipu, lai novērstu "No localization" kļūdu
+        // Definējam prototipu ar VISIEM iespējamajiem manevriem, lai novērstu kļūdu
         L.Routing.Localization.prototype.lv = {
             directions: {
                 N: 'ziemeļiem', NE: 'ziemeļaustrumiem', E: 'austrumiem', SE: 'dienvidaustrumiem',
@@ -3286,7 +3286,7 @@ map.whenReady(() => {
                 'EndOfRoad': ['Ceļa beigas', 'Ceļa beigas'],
                 'Onto': 'uz {road}',
                 
-                // TRŪKSTOŠIE MANEVRI (kas izraisīja kļūdu)
+                // TRŪKSTOŠIE MANEVRI (kas izraisīja kļūdu "No localization")
                 'SlightRight': ['Nedaudz pa labi', 'Pa labi'],
                 'SlightLeft': ['Nedaudz pa kreisi', 'Pa kreisi'],
                 'Right': ['Pagriezieties pa labi', 'Pa labi'],
@@ -3322,10 +3322,11 @@ map.whenReady(() => {
                         routeWhileDragging: true,
                         geocoder: new MyCustomGeocoder(),
                         
-                        // Eksplicīti norādām maršrutētāju (OSRM)
+                        // Eksplicīti norādām maršrutētāju (OSRM) un valodu
                         router: L.Routing.osrmv1({
                             serviceUrl: 'https://router.project-osrm.org/route/v1',
-                            language: 'lv' // Sūta valodas pieprasījumu arī serverim
+                            language: 'lv', // Sūta valodas pieprasījumu serverim
+                            profile: 'driving'
                         }),
                         
                         // Eksplicīti norādām formatētāju ar mūsu valodu
@@ -3334,13 +3335,13 @@ map.whenReady(() => {
                             roundingSensitivity: 1000
                         }),
 
-                        language: 'lv', // Dubulta drošība
+                        language: 'lv', // Dubulta drošība kontrolei
                         showAlternatives: true,
                         lineOptions: {
                             styles: [{color: '#00ccff', opacity: 0.8, weight: 6}]
                         },
                         createMarker: function(i, wp, nWps) {
-                            // Ļaujam bīdīt punktus
+                            // Ļaujam bīdīt punktus, lai mainītu maršrutu
                             return L.marker(wp.latLng, { draggable: true });
                         }
                     }).addTo(map);
@@ -3364,7 +3365,7 @@ map.whenReady(() => {
             
             if (routingControl) {
                 routingControl.getContainer().style.display = 'none';
-                // routingControl.setWaypoints([]); // Ja gribi notīrīt maršrutu pavisam
+                // routingControl.setWaypoints([]); // Ja vēlies notīrīt maršrutu pavisam, atkomentē šo
             }
         }
     });
