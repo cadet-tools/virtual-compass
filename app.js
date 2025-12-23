@@ -3258,45 +3258,46 @@ map.whenReady(() => {
     let isRoutingMode = false;
     let currentProfile = 'driving'; // Sākumā auto
 
-    // DEFINĒJAM VALODU GLOBĀLI (lai novērstu "No localization" kļūdu)
-    if (typeof L !== 'undefined' && L.Routing && L.Routing.Localization) {
-        L.Routing.Localization.prototype.lv = {
-            directions: {
-                N: 'ziemeļiem', NE: 'ziemeļaustrumiem', E: 'austrumiem', SE: 'dienvidaustrumiem',
-                S: 'dienvidiem', SW: 'dienvidrietumiem', W: 'rietumiem', NW: 'ziemeļrietumiem'
-            },
-            instructions: {
-                'Head': ['Dodies {dir}', 'uz {dir}'],
-                'Continue': ['Turpiniet {dir}', 'uz {dir}'],
-                'TurnAround': ['Apgriezieties'],
-                'WaypointReached': ['Vieta sasniegta'],
-                'Roundabout': ['Izbrauciet apli {exitStr}', 'Izbrauciet apli'],
-                'DestinationReached': ['Galamērķis sasniegts'],
-                'Fork': ['Neturiet pa {modifier}', 'Neturiet pa {modifier}'],
-                'Merge': ['Pievienojieties plūsmai', 'Pievienojieties'],
-                'OnRamp': ['Uzbrauciet uz rampas', 'Uzbrauciet'],
-                'OffRamp': ['Nobrauciet no ceļa', 'Nobrauciet'],
-                'EndOfRoad': ['Ceļa beigas', 'Ceļa beigas'],
-                'Onto': 'uz {road}',
-                'SlightRight': ['Nedaudz pa labi', 'Pa labi'],
-                'SlightLeft': ['Nedaudz pa kreisi', 'Pa kreisi'],
-                'Right': ['Pa labi', 'Pa labi'],
-                'Left': ['Pa kreisi', 'Pa kreisi'],
-                'SharpRight': ['Asi pa labi', 'Pa labi'],
-                'SharpLeft': ['Asi pa kreisi', 'Pa kreisi'],
-                'Uturn': ['Apgriezieties', 'Apgriezieties'],
-                'StartAt': ['Sāciet pie {road}', 'Sāciet'],
-                'EndAt': ['Beidziet pie {road}', 'Beidziet']
-            },
-            formatOrder: function(n) { return n + '.'; }
-        };
-    }
-
     document.getElementById('toggleRouteBtn').addEventListener('click', () => {
-        // Pārbaude
+        // 1. Pārbaudām, vai bibliotēka ir ielādēta
         if (typeof L === 'undefined' || typeof L.Routing === 'undefined') {
-            alert("⚠️ Kļūda: Maršrutēšanas spraudnis nav ielādēts!");
+            alert("⚠️ Kļūda: Maršrutēšanas spraudnis (leaflet-routing-machine) nav ielādēts! Pārbaudiet interneta savienojumu.");
             return;
+        }
+
+        // 2. DEFINĒJAM LATVIEŠU VALODU (IEKŠĒJI, LAI GARANTĒTU, KA TĀ EKSISTĒ)
+        // Definējam to katru reizi (vai pārrakstām), lai būtu droši, ka L.Routing to "redz"
+        if (L.Routing.Localization) {
+            L.Routing.Localization.prototype.lv = {
+                directions: {
+                    N: 'ziemeļiem', NE: 'ziemeļaustrumiem', E: 'austrumiem', SE: 'dienvidaustrumiem',
+                    S: 'dienvidiem', SW: 'dienvidrietumiem', W: 'rietumiem', NW: 'ziemeļrietumiem'
+                },
+                instructions: {
+                    'Head': ['Dodies {dir}', 'uz {dir}'],
+                    'Continue': ['Turpiniet {dir}', 'uz {dir}'],
+                    'TurnAround': ['Apgriezieties'],
+                    'WaypointReached': ['Vieta sasniegta'],
+                    'Roundabout': ['Izbrauciet apli {exitStr}', 'Izbrauciet apli'],
+                    'DestinationReached': ['Galamērķis sasniegts'],
+                    'Fork': ['Neturiet pa {modifier}', 'Neturiet pa {modifier}'],
+                    'Merge': ['Pievienojieties plūsmai', 'Pievienojieties'],
+                    'OnRamp': ['Uzbrauciet uz rampas', 'Uzbrauciet'],
+                    'OffRamp': ['Nobrauciet no ceļa', 'Nobrauciet'],
+                    'EndOfRoad': ['Ceļa beigas', 'Ceļa beigas'],
+                    'Onto': 'uz {road}',
+                    'SlightRight': ['Nedaudz pa labi', 'Pa labi'],
+                    'SlightLeft': ['Nedaudz pa kreisi', 'Pa kreisi'],
+                    'Right': ['Pa labi', 'Pa labi'],
+                    'Left': ['Pa kreisi', 'Pa kreisi'],
+                    'SharpRight': ['Asi pa labi', 'Pa labi'],
+                    'SharpLeft': ['Asi pa kreisi', 'Pa kreisi'],
+                    'Uturn': ['Apgriezieties', 'Apgriezieties'],
+                    'StartAt': ['Sāciet pie {road}', 'Sāciet'],
+                    'EndAt': ['Beidziet pie {road}', 'Beidziet']
+                },
+                formatOrder: function(n) { return n + '.'; }
+            };
         }
 
         isRoutingMode = !isRoutingMode;
@@ -3311,7 +3312,6 @@ map.whenReady(() => {
         if (isRoutingMode) {
             // --- IESLĒDZAM REŽĪMU ---
             btn.style.background = '#2e7d32'; // Aktīvs (zaļš)
-            // Paslēpjam vienkāršo meklētāju, lai netraucē
             input.style.display = 'none';
             searchBtn.style.display = 'none';
             if (clearBtn) clearBtn.style.display = 'none';
@@ -3352,7 +3352,6 @@ map.whenReady(() => {
                             styles: [{color: '#00ccff', opacity: 0.8, weight: 6}]
                         },
                         
-                        // Marķieri
                         createMarker: function(i, wp, nWps) {
                             return L.marker(wp.latLng, { draggable: true });
                         }
@@ -3436,11 +3435,10 @@ map.whenReady(() => {
 
                 } catch (e) {
                     console.error("Routing init error:", e);
-                    // Mēģinām vēlreiz ar angļu valodu, ja LV tomēr neiet
+                    // Ja LV valoda tomēr nobruka, mēģinām ar EN, lai lietotne nestāvētu uz vietas
                     if (e.message.includes('No localization')) {
-                        alert("Kļūda ar valodu, mēģinu pārslēgties uz EN...");
-                        // Šeit varētu mēģināt vēlreiz ar language: 'en', bet
-                        // augšminētais LV fix parasti strādā.
+                        alert("Valodas kļūda. Mēģinu pārslēgties uz angļu valodu...");
+                        // Varam mēģināt vēlreiz šeit ar 'en', bet parasti šis fix strādā.
                     }
                 }
             } else {
@@ -3449,8 +3447,6 @@ map.whenReady(() => {
         } else {
             // --- IZSLĒDZAM REŽĪMU ---
             btn.style.background = ''; 
-            
-            // Parādām atpakaļ vienkāršo meklētāju
             input.style.display = 'block';
             searchBtn.style.display = 'block';
             
