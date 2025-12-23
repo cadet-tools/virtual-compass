@@ -806,45 +806,23 @@
 
 
 
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
   <title>CADET.LV Interaktīvais kompass © Jānis Eglis</title>
 
-  <!-- Trešo pušu CSS vispirms -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+  <script src="https://unpkg.com/mgrs@1.0.0/dist/mgrs.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/proj4@2.10.0/dist/proj4.min.js"></script>
 
-
-
-
-
-  <!-- Tavs CSS pēc tam, lai var pārrakstīt -->
   <link rel="stylesheet" href="style.css?v=2025-09-29-01">
-
-  <!-- (pēc vajadzības) vieta JS ģenerētiem stiliem -->
   <style id="runtime-styles"></style>
 
-  <!-- Leaflet JS pirms tava koda -->
-  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- MGRS DECODER -->
-  <script src="https://unpkg.com/mgrs@1.0.0/dist/mgrs.js"></script>
-<!-- Leaflet Routing Machine -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-
-
-
-
-
-	
-<!-- Tikai vecajiem pārlūkiem (Chrome 60 u.c.) -->
-<script nomodule src="https://cdn.jsdelivr.net/npm/core-js-bundle/minified.js"></script>
-<script nomodule src="https://cdn.jsdelivr.net/npm/resize-observer-polyfill@1.5.1/dist/ResizeObserver.global.js"></script>
-
-
-
-
-<script src="https://cdn.jsdelivr.net/npm/proj4@2.10.0/dist/proj4.min.js"></script>
+  <script nomodule src="https://cdn.jsdelivr.net/npm/core-js-bundle/minified.js"></script>
+  <script nomodule src="https://cdn.jsdelivr.net/npm/resize-observer-polyfill@1.5.1/dist/ResizeObserver.global.js"></script>
 <style>
   /* plānas etiķetes režģa malās */
   .grid-label{font:12px/1.1 system-ui,Segoe UI,Arial; padding:2px 4px; background:#fff8; border:1px solid #0003; border-radius:4px; }
