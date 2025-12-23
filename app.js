@@ -3254,7 +3254,7 @@ map.whenReady(() => {
 
 
 // --- 5. SOLIS: TAKTISKĀ MARŠRUTĒŠANA (Auto/Kājām + GPX + MGRS) ---
-    // LABOJUMS: Izmantojam 'en' lokāli, bet pārrakstām tekstus uz LV
+    // APVIENOTS: Valodas labojums + Taktiskās pogas
     let routingControl = null;
     let isRoutingMode = false;
     let currentProfile = 'driving'; // Sākumā auto
@@ -3262,12 +3262,12 @@ map.whenReady(() => {
     document.getElementById('toggleRouteBtn').addEventListener('click', () => {
         // 1. Pārbaudām, vai bibliotēka ir ielādēta
         if (typeof L === 'undefined' || typeof L.Routing === 'undefined') {
-            alert("⚠️ Kļūda: Maršrutēšanas spraudnis (leaflet-routing-machine) nav ielādēts!");
+            alert("⚠️ Kļūda: Maršrutēšanas spraudnis nav ielādēts!");
             return;
         }
 
-        // 2. PĀRRAKSTĀM ANGĻU VALODU AR LATVIEŠU TEKSTIEM
-        // Tas novērš kļūdu "No localization for language 'lv'", jo 'en' bibliotēkā vienmēr ir.
+        // 2. "APMĀNĀM" BIBLIOTĒKU: Pārrakstām angļu valodu uz latviešu
+        // Tas garantē, ka bibliotēka nestrīdas par trūkstošu 'lv' failu, bet teksts ir latviski.
         if (L.Routing.Localization) {
             L.Routing.Localization.prototype.en = {
                 directions: {
@@ -3312,7 +3312,9 @@ map.whenReady(() => {
 
         if (isRoutingMode) {
             // --- IESLĒDZAM REŽĪMU ---
-            btn.style.background = '#2e7d32'; // Aktīvs (zaļš)
+            btn.style.background = '#2e7d32'; // Aktīvs (taktiski zaļš)
+            
+            // Paslēpjam vienkāršo meklētāju, lai netraucē
             input.style.display = 'none';
             searchBtn.style.display = 'none';
             if (clearBtn) clearBtn.style.display = 'none';
@@ -3322,7 +3324,7 @@ map.whenReady(() => {
                 try {
                     // Izveidojam kontroli
                     routingControl = L.Routing.control({
-                        // KREISĀ PUSE
+                        // PRASĪBA: KREISĀ PUSE
                         position: 'topleft', 
                         
                         waypoints: [
@@ -3330,26 +3332,26 @@ map.whenReady(() => {
                             null                      // Beigas
                         ],
                         
-                        // Izmantojam TAVU pielāgoto ģeokodētāju
+                        // PRASĪBA: Tavs pielāgotais ģeokodētājs (MGRS/LKS)
                         geocoder: new MyCustomGeocoder(),
                         
                         routeWhileDragging: true,
                         showAlternatives: true,
                         
-                        // OSRM konfigurācija - SŪTAM 'en', LAI NAV KĻŪDU
+                        // OSRM konfigurācija (LIETOJAM 'en', LAI NAV KĻŪDU)
                         router: L.Routing.osrmv1({
                             serviceUrl: 'https://router.project-osrm.org/route/v1',
-                            profile: 'driving',
-                            language: 'en' // Serveris domā, ka angliski
+                            profile: 'driving', // Sākumā auto
+                            language: 'en'      // Serverim sakām 'en', bet browserī rādīsies mūsu tulkojums
                         }),
                         
-                        // Formatētājs arī lieto 'en', kurš tagad ir mūsu latviešu tulkojums
+                        // Formatētājs arī lieto 'en' (kas tagad ir latviski)
                         formatter: new L.Routing.Formatter({
                             language: 'en',
                             roundingSensitivity: 100
                         }),
                         
-                        language: 'en', // Dubulta drošība - bibliotēka lietos 'en' atslēgu
+                        language: 'en', // Dubulta drošība
                         
                         lineOptions: {
                             styles: [{color: '#00ccff', opacity: 0.8, weight: 6}]
@@ -3360,7 +3362,7 @@ map.whenReady(() => {
                         }
                     }).addTo(map);
 
-                    // --- PIEVIENOJAM POGAS (Auto/Kājām/GPX) ---
+                    // --- PRASĪBA: VADĪBAS POGAS (Auto/Kājām/GPX) ---
                     routingControl.on('containeradded', function(e) {
                         const container = e.container;
                         
@@ -3402,7 +3404,7 @@ map.whenReady(() => {
                             routingControl.route();
                         };
 
-                        // GPX EKSPORTS
+                        // PRASĪBA: GPX EKSPORTS
                         btnGpx.onclick = () => {
                             if (!routingControl._routes || routingControl._routes.length === 0) {
                                 alert("Nav izveidots maršruts!");
@@ -3443,6 +3445,8 @@ map.whenReady(() => {
         } else {
             // --- IZSLĒDZAM REŽĪMU ---
             btn.style.background = ''; 
+            
+            // Atjaunojam parasto meklētāju
             input.style.display = 'block';
             searchBtn.style.display = 'block';
             
