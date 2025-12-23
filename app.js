@@ -3253,20 +3253,19 @@ map.whenReady(() => {
     map.addControl(searchControl);
 
 
-// --- 5. SOLIS: MARŠRUTĒŠANAS LOĢIKA (SALABOTA) ---
+// --- 5. SOLIS: MARŠRUTĒŠANAS LOĢIKA (UZLABOTA UN DROŠA) ---
     let routingControl = null;
     let isRoutingMode = false;
 
     document.getElementById('toggleRouteBtn').addEventListener('click', () => {
         // 1. Pārbaudām, vai bibliotēka ir ielādēta
-        if (typeof L.Routing === 'undefined') {
+        if (typeof L === 'undefined' || typeof L.Routing === 'undefined') {
             alert("⚠️ Kļūda: Maršrutēšanas spraudnis (leaflet-routing-machine) nav ielādēts!");
             return;
         }
 
-        // 2. IEMĀCĀM LATVIEŠU VALODU (Papildināts ar trūkstošajiem manevriem)
-        // Definējam prototipu ar VISIEM iespējamajiem manevriem, lai novērstu kļūdu
-        L.Routing.Localization.prototype.lv = {
+        // 2. DEFINĒJAM LATVIEŠU VALODU (pilns saraksts)
+        const lvLocale = {
             directions: {
                 N: 'ziemeļiem', NE: 'ziemeļaustrumiem', E: 'austrumiem', SE: 'dienvidaustrumiem',
                 S: 'dienvidiem', SW: 'dienvidrietumiem', W: 'rietumiem', NW: 'ziemeļrietumiem'
@@ -3286,19 +3285,35 @@ map.whenReady(() => {
                 'EndOfRoad': ['Ceļa beigas', 'Ceļa beigas'],
                 'Onto': 'uz {road}',
                 
-                // TRŪKSTOŠIE MANEVRI (kas izraisīja kļūdu "No localization")
+                // Papildu manevri (kas var izraisīt kļūdas, ja trūkst)
                 'SlightRight': ['Nedaudz pa labi', 'Pa labi'],
                 'SlightLeft': ['Nedaudz pa kreisi', 'Pa kreisi'],
                 'Right': ['Pagriezieties pa labi', 'Pa labi'],
                 'Left': ['Pagriezieties pa kreisi', 'Pa kreisi'],
                 'SharpRight': ['Asi pa labi', 'Pa labi'],
                 'SharpLeft': ['Asi pa kreisi', 'Pa kreisi'],
-                'Uturn': ['Apgriezieties', 'Apgriezieties']
+                'Uturn': ['Apgriezieties', 'Apgriezieties'],
+                'StartAt': ['Sāciet pie {road}', 'Sāciet'],
+                'EndAt': ['Beidziet pie {road}', 'Beidziet'],
+                'RoundaboutExit': ['Izbrauciet apli', 'Izbrauciet apli']
             },
             formatOrder: function(n) { return n + '.'; }
         };
 
-        // 3. Tālākā loģika (ieslēgt/izslēgt)
+        // Ievietojam valodu bibliotēkas prototipā
+        L.Routing.Localization.prototype.lv = lvLocale;
+
+        // Drošības pārbaude: mēģinām inicializēt valodu
+        let safeLanguage = 'lv';
+        try {
+            new L.Routing.Localization('lv');
+            console.log("✅ Latviešu valoda veiksmīgi ielādēta maršrutētājā.");
+        } catch (err) {
+            console.error("⚠️ Neizdevās ielādēt LV valodu, pārslēdzos uz EN:", err);
+            safeLanguage = 'en'; // Fallback, lai lietotne nenobruktu
+        }
+
+        // 3. IESLĒGT / IZSLĒGT REŽĪMU
         isRoutingMode = !isRoutingMode;
         const btn = document.getElementById('toggleRouteBtn');
         const input = document.getElementById('smartSearchInput');
@@ -3306,7 +3321,7 @@ map.whenReady(() => {
         const resultsDiv = document.getElementById('smartSearchResults');
 
         if (isRoutingMode) {
-            // IESLĒDZ MARŠRUTĒŠANU
+            // --- IESLĒDZ ---
             btn.style.background = '#4CAF50'; // Zaļš
             input.style.display = 'none';
             searchBtn.style.display = 'none';
@@ -3316,38 +3331,39 @@ map.whenReady(() => {
                 try {
                     routingControl = L.Routing.control({
                         waypoints: [
-                            L.latLng(56.946, 24.105), // Rīga (sākums)
-                            null // Beigas (tukšs)
+                            L.latLng(56.946, 24.105), // Sākums (Rīga)
+                            null                      // Beigas (lietotājs ievadīs)
                         ],
                         routeWhileDragging: true,
                         geocoder: new MyCustomGeocoder(),
                         
-                        // Eksplicīti norādām maršrutētāju (OSRM) un valodu
+                        // Konfigurējam OSRM serveri
                         router: L.Routing.osrmv1({
                             serviceUrl: 'https://router.project-osrm.org/route/v1',
-                            language: 'lv', // Sūta valodas pieprasījumu serverim
+                            language: safeLanguage, // Sūtam serverim pareizo kodu
                             profile: 'driving'
                         }),
                         
-                        // Eksplicīti norādām formatētāju ar mūsu valodu
+                        // Konfigurējam teksta formatētāju
                         formatter: new L.Routing.Formatter({
-                            language: 'lv',
+                            language: safeLanguage,
                             roundingSensitivity: 1000
                         }),
 
-                        language: 'lv', // Dubulta drošība kontrolei
+                        language: safeLanguage, // Dubulta drošība
                         showAlternatives: true,
                         lineOptions: {
                             styles: [{color: '#00ccff', opacity: 0.8, weight: 6}]
                         },
                         createMarker: function(i, wp, nWps) {
-                            // Ļaujam bīdīt punktus, lai mainītu maršrutu
+                            // Ļaujam bīdīt punktus
                             return L.marker(wp.latLng, { draggable: true });
                         }
                     }).addTo(map);
                 } catch (e) {
                     console.error("Routing error:", e);
                     alert("Neizdevās palaist maršrutētāju: " + e.message);
+                    
                     // Atceļam režīmu kļūdas gadījumā
                     isRoutingMode = false;
                     btn.style.background = '';
@@ -3358,14 +3374,14 @@ map.whenReady(() => {
                 routingControl.getContainer().style.display = 'block';
             }
         } else {
-            // IZSLĒDZ MARŠRUTĒŠANU
+            // --- IZSLĒDZ ---
             btn.style.background = ''; 
             input.style.display = 'block';
             searchBtn.style.display = 'block';
             
             if (routingControl) {
                 routingControl.getContainer().style.display = 'none';
-                // routingControl.setWaypoints([]); // Ja vēlies notīrīt maršrutu pavisam, atkomentē šo
+                // routingControl.setWaypoints([]); // Atkomentē, ja vēlies notīrīt maršrutu pie aizvēršanas
             }
         }
     });
