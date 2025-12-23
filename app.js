@@ -3135,32 +3135,32 @@ map.whenReady(() => {
 
 
 
-/* --- Latviešu valodas definīcija priekš Routing Machine --- */
-if (typeof L.Routing !== 'undefined') {
-    L.Routing.Localization.prototype.lv = {
-        directions: {
-            N: 'ziemeļiem',
-            NE: 'ziemeļaustrumiem',
-            E: 'austrumiem',
-            SE: 'dienvidaustrumiem',
-            S: 'dienvidiem',
-            SW: 'dienvidrietumiem',
-            W: 'rietumiem',
-            NW: 'ziemeļrietumiem'
-        },
-        instructions: {
-            // Vienkāršoti tulkojumi
-            'Head': ['Dodies uz {dir}', 'uz {dir}'],
-            'Continue': ['Turpiniet braukt uz {dir}', 'uz {dir}'],
-            'TurnAround': ['Apgriezieties braukšanai pretējā virzienā'],
-            'WaypointReached': ['Galamērķis sasniegts'],
-            'Roundabout': ['Izbrauciet apli {exitStr}'],
-            'DestinationReached': ['Galamērķis sasniegts'],
-        },
-        formatOrder: function(n) { return n + '.'; }
-    };
-}
+if (typeof L === 'undefined') return;
 
+    // --- 1. SOLIS: DEFINĒJAM LATVIEŠU VALODU (OBLIGĀTI PIRMS KONTROLES) ---
+    if (typeof L.Routing !== 'undefined') {
+        L.Routing.Localization.prototype.lv = {
+            directions: {
+                N: 'ziemeļiem', NE: 'ziemeļaustrumiem', E: 'austrumiem', SE: 'dienvidaustrumiem',
+                S: 'dienvidiem', SW: 'dienvidrietumiem', W: 'rietumiem', NW: 'ziemeļrietumiem'
+            },
+            instructions: {
+                'Head': ['Dodies uz {dir}', 'uz {dir}'],
+                'Continue': ['Turpiniet braukt uz {dir}', 'uz {dir}'],
+                'TurnAround': ['Apgriezieties braukšanai pretējā virzienā'],
+                'WaypointReached': ['Vieta sasniegta'],
+                'Roundabout': ['Izbrauciet apli {exitStr}'],
+                'DestinationReached': ['Galamērķis sasniegts'],
+                'Fork': ['Neturiet pa {modifier}', 'Neturiet pa {modifier}'],
+                'Merge': ['Pievienojieties plūsmai', 'Pievienojieties plūsmai'],
+                'OnRamp': ['Uzbrauciet uz rampas', 'Uzbrauciet uz rampas'],
+                'OffRamp': ['Nobrauciet no ceļa', 'Nobrauciet no ceļa'],
+                'EndOfRoad': ['Ceļa beigas', 'Ceļa beigas'],
+                'Onto': 'uz {road}',
+            },
+            formatOrder: function(n) { return n + '.'; }
+        };
+    }
 
 
 
