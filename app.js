@@ -3254,6 +3254,7 @@ map.whenReady(() => {
 
 
 // --- 5. SOLIS: TAKTISKĀ MARŠRUTĒŠANA (Auto/Kājām + GPX + MGRS) ---
+    // LABOJUMS: Izmantojam 'en' lokāli, bet pārrakstām tekstus uz LV
     let routingControl = null;
     let isRoutingMode = false;
     let currentProfile = 'driving'; // Sākumā auto
@@ -3261,14 +3262,14 @@ map.whenReady(() => {
     document.getElementById('toggleRouteBtn').addEventListener('click', () => {
         // 1. Pārbaudām, vai bibliotēka ir ielādēta
         if (typeof L === 'undefined' || typeof L.Routing === 'undefined') {
-            alert("⚠️ Kļūda: Maršrutēšanas spraudnis (leaflet-routing-machine) nav ielādēts! Pārbaudiet interneta savienojumu.");
+            alert("⚠️ Kļūda: Maršrutēšanas spraudnis (leaflet-routing-machine) nav ielādēts!");
             return;
         }
 
-        // 2. DEFINĒJAM LATVIEŠU VALODU (IEKŠĒJI, LAI GARANTĒTU, KA TĀ EKSISTĒ)
-        // Definējam to katru reizi (vai pārrakstām), lai būtu droši, ka L.Routing to "redz"
+        // 2. PĀRRAKSTĀM ANGĻU VALODU AR LATVIEŠU TEKSTIEM
+        // Tas novērš kļūdu "No localization for language 'lv'", jo 'en' bibliotēkā vienmēr ir.
         if (L.Routing.Localization) {
-            L.Routing.Localization.prototype.lv = {
+            L.Routing.Localization.prototype.en = {
                 directions: {
                     N: 'ziemeļiem', NE: 'ziemeļaustrumiem', E: 'austrumiem', SE: 'dienvidaustrumiem',
                     S: 'dienvidiem', SW: 'dienvidrietumiem', W: 'rietumiem', NW: 'ziemeļrietumiem'
@@ -3329,25 +3330,27 @@ map.whenReady(() => {
                             null                      // Beigas
                         ],
                         
-                        // Izmantojam TAVU pielāgoto ģeokodētāju (MGRS/LKS atbalstam)
+                        // Izmantojam TAVU pielāgoto ģeokodētāju
                         geocoder: new MyCustomGeocoder(),
                         
                         routeWhileDragging: true,
                         showAlternatives: true,
                         
-                        // OSRM konfigurācija
+                        // OSRM konfigurācija - SŪTAM 'en', LAI NAV KĻŪDU
                         router: L.Routing.osrmv1({
                             serviceUrl: 'https://router.project-osrm.org/route/v1',
-                            profile: 'driving', // Sākumā auto
-                            language: 'lv'
+                            profile: 'driving',
+                            language: 'en' // Serveris domā, ka angliski
                         }),
                         
+                        // Formatētājs arī lieto 'en', kurš tagad ir mūsu latviešu tulkojums
                         formatter: new L.Routing.Formatter({
-                            language: 'lv',
+                            language: 'en',
                             roundingSensitivity: 100
                         }),
                         
-                        // Līnijas stils (taktiski zils)
+                        language: 'en', // Dubulta drošība - bibliotēka lietos 'en' atslēgu
+                        
                         lineOptions: {
                             styles: [{color: '#00ccff', opacity: 0.8, weight: 6}]
                         },
@@ -3373,7 +3376,6 @@ map.whenReady(() => {
                         // Ievietojam pašā augšā
                         container.insertBefore(controlsDiv, container.firstChild);
 
-                        // Loģika
                         const btnCar = controlsDiv.querySelector('#modeCar');
                         const btnWalk = controlsDiv.querySelector('#modeWalk');
                         const btnGpx = controlsDiv.querySelector('#exportGPX');
@@ -3407,9 +3409,8 @@ map.whenReady(() => {
                                 return;
                             }
                             const route = routingControl._routes[0];
-                            const coords = route.coordinates; // {lat, lng} masīvs
+                            const coords = route.coordinates;
 
-                            // Veidojam GPX
                             let gpx = '<?xml version="1.0" encoding="UTF-8"?>\n';
                             gpx += '<gpx version="1.1" creator="CADET.LV">\n';
                             gpx += `  <trk>\n    <name>Marsruts ${currentProfile}</name>\n    <trkseg>\n`;
@@ -3420,7 +3421,6 @@ map.whenReady(() => {
 
                             gpx += '    </trkseg>\n  </trk>\n</gpx>';
 
-                            // Lejupielāde
                             const blob = new Blob([gpx], { type: 'application/gpx+xml' });
                             const url = URL.createObjectURL(blob);
                             const a = document.createElement('a');
@@ -3435,11 +3435,7 @@ map.whenReady(() => {
 
                 } catch (e) {
                     console.error("Routing init error:", e);
-                    // Ja LV valoda tomēr nobruka, mēģinām ar EN, lai lietotne nestāvētu uz vietas
-                    if (e.message.includes('No localization')) {
-                        alert("Valodas kļūda. Mēģinu pārslēgties uz angļu valodu...");
-                        // Varam mēģināt vēlreiz šeit ar 'en', bet parasti šis fix strādā.
-                    }
+                    alert("Kļūda: " + e.message);
                 }
             } else {
                 routingControl.getContainer().style.display = 'block';
@@ -3455,7 +3451,6 @@ map.whenReady(() => {
             }
         }
     });
-
     // --- 6. SOLIS: PARASTĀ MEKLĒŠANA ---
     const input = document.getElementById('smartSearchInput');
     const searchBtn = document.getElementById('smartSearchBtn');
