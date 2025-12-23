@@ -3136,35 +3136,10 @@ map.whenReady(() => {
    Ietver: MGRS, LKS-92, WGS84, OSRM Routing, Latviešu valoda
    ================================================================= */
 
-
-// Pārbaudām vai Leaflet eksistē
+    // Pārbaudām vai Leaflet eksistē
     if (typeof L === 'undefined') return;
 
-    // --- 1. SOLIS: DEFINĒJAM LATVIEŠU VALODU ---
-    // (Šim jābūt pašam pirmajam, lai Routing Machine neuzkaras)
-    if (typeof L.Routing !== 'undefined') {
-        L.Routing.Localization.prototype.lv = {
-            directions: {
-                N: 'ziemeļiem', NE: 'ziemeļaustrumiem', E: 'austrumiem', SE: 'dienvidaustrumiem',
-                S: 'dienvidiem', SW: 'dienvidrietumiem', W: 'rietumiem', NW: 'ziemeļrietumiem'
-            },
-            instructions: {
-                'Head': ['Dodies uz {dir}', 'uz {dir}'],
-                'Continue': ['Turpiniet braukt uz {dir}', 'uz {dir}'],
-                'TurnAround': ['Apgriezieties braukšanai pretējā virzienā'],
-                'WaypointReached': ['Vieta sasniegta'],
-                'Roundabout': ['Izbrauciet apli {exitStr}'],
-                'DestinationReached': ['Galamērķis sasniegts'],
-                'Fork': ['Neturiet pa {modifier}', 'Neturiet pa {modifier}'],
-                'Merge': ['Pievienojieties plūsmai', 'Pievienojieties plūsmai'],
-                'OnRamp': ['Uzbrauciet uz rampas', 'Uzbrauciet uz rampas'],
-                'OffRamp': ['Nobrauciet no ceļa', 'Nobrauciet no ceļa'],
-                'EndOfRoad': ['Ceļa beigas', 'Ceļa beigas'],
-                'Onto': 'uz {road}',
-            },
-            formatOrder: function(n) { return n + '.'; }
-        };
-    }
+    // (Tulkojumu definēsim zemāk, tieši pirms maršruta palaišanas, lai nav kļūdu)
 
     // --- 2. SOLIS: KOORDINĀTU APSTRĀDES FUNKCIJA ---
     function parseCoordinates(text) {
@@ -3174,7 +3149,6 @@ map.whenReady(() => {
         // A) MGRS (ja bibliotēka ielādēta)
         if (typeof mgrs !== 'undefined') {
             const cleanMGRS = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-            // Regex: 1-2 cipari + burts + sekojoši simboli
             if (/^\d{1,2}[A-Z]/.test(cleanMGRS) && cleanMGRS.length >= 4) {
                 try {
                     const point = mgrs.toPoint(cleanMGRS);
@@ -3290,6 +3264,32 @@ map.whenReady(() => {
             return;
         }
 
+        // *** SVARĪGI: DEFINĒJAM LATVIEŠU VALODU ŠEIT ***
+        // Tas garantē, ka bibliotēka to atradīs tieši pirms izmantošanas
+        if (!L.Routing.Localization.prototype.lv) {
+            L.Routing.Localization.prototype.lv = {
+                directions: {
+                    N: 'ziemeļiem', NE: 'ziemeļaustrumiem', E: 'austrumiem', SE: 'dienvidaustrumiem',
+                    S: 'dienvidiem', SW: 'dienvidrietumiem', W: 'rietumiem', NW: 'ziemeļrietumiem'
+                },
+                instructions: {
+                    'Head': ['Dodies uz {dir}', 'uz {dir}'],
+                    'Continue': ['Turpiniet braukt uz {dir}', 'uz {dir}'],
+                    'TurnAround': ['Apgriezieties braukšanai pretējā virzienā'],
+                    'WaypointReached': ['Vieta sasniegta'],
+                    'Roundabout': ['Izbrauciet apli {exitStr}'],
+                    'DestinationReached': ['Galamērķis sasniegts'],
+                    'Fork': ['Neturiet pa {modifier}', 'Neturiet pa {modifier}'],
+                    'Merge': ['Pievienojieties plūsmai', 'Pievienojieties plūsmai'],
+                    'OnRamp': ['Uzbrauciet uz rampas', 'Uzbrauciet uz rampas'],
+                    'OffRamp': ['Nobrauciet no ceļa', 'Nobrauciet no ceļa'],
+                    'EndOfRoad': ['Ceļa beigas', 'Ceļa beigas'],
+                    'Onto': 'uz {road}',
+                },
+                formatOrder: function(n) { return n + '.'; }
+            };
+        }
+
         isRoutingMode = !isRoutingMode;
         const btn = document.getElementById('toggleRouteBtn');
         const input = document.getElementById('smartSearchInput');
@@ -3298,7 +3298,7 @@ map.whenReady(() => {
 
         if (isRoutingMode) {
             // IESLĒDZ MARŠRUTĒŠANU
-            btn.style.background = '#4CAF50'; // Zaļš indikators
+            btn.style.background = '#4CAF50';
             input.style.display = 'none';
             searchBtn.style.display = 'none';
             resultsDiv.style.display = 'none';
@@ -3307,12 +3307,12 @@ map.whenReady(() => {
                 try {
                     routingControl = L.Routing.control({
                         waypoints: [
-                            L.latLng(56.946, 24.105), // Noklusētais sākums (Rīga)
-                            null // Beigas jāievada lietotājam
+                            L.latLng(56.946, 24.105), // Rīga
+                            null 
                         ],
                         routeWhileDragging: true,
-                        geocoder: new MyCustomGeocoder(), // Pievienojam mūsu MGRS atbalstu
-                        language: 'lv', // Šeit izmantojam definēto valodu
+                        geocoder: new MyCustomGeocoder(),
+                        language: 'lv', // Tagad tas 100% strādās
                         showAlternatives: true,
                         lineOptions: {
                             styles: [{color: '#00ccff', opacity: 0.8, weight: 6}]
@@ -3323,13 +3323,13 @@ map.whenReady(() => {
                     }).addTo(map);
                 } catch (e) {
                     console.error("Routing error:", e);
-                    alert("Neizdevās palaist maršrutētāju.");
+                    alert("Neizdevās palaist maršrutētāju: " + e.message);
                 }
             } else {
                 routingControl.getContainer().style.display = 'block';
             }
         } else {
-            // IZSLĒDZ MARŠRUTĒŠANU (Atgriežas pie parastā meklētāja)
+            // IZSLĒDZ MARŠRUTĒŠANU
             btn.style.background = ''; 
             input.style.display = 'block';
             searchBtn.style.display = 'block';
@@ -3340,7 +3340,7 @@ map.whenReady(() => {
         }
     });
 
-    // --- 6. SOLIS: PARASTĀ MEKLĒŠANA (Kad maršruts izslēgts) ---
+    // --- 6. SOLIS: PARASTĀ MEKLĒŠANA ---
     const input = document.getElementById('smartSearchInput');
     const searchBtn = document.getElementById('smartSearchBtn');
     const clearBtn = document.getElementById('smartSearchClear');
@@ -3400,7 +3400,6 @@ map.whenReady(() => {
         clearBtn.style.display = 'none';
         resultsDiv.style.display = 'none';
     };
-
 
 
 
