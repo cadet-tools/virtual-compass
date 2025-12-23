@@ -3131,13 +3131,17 @@ function createLKSGridLayers() {
 // režģi un slāņu kontroli veido tikai tad, kad karte tiešām “gatava”
 map.whenReady(() => {
 
+/* =================================================================
+   SMART ROUTING & SEARCH (GALA VERSIJA)
+   Ietver: MGRS, LKS-92, WGS84, OSRM Routing, Latviešu valoda
+   ================================================================= */
 
 
+// Pārbaudām vai Leaflet eksistē
+    if (typeof L === 'undefined') return;
 
-
-if (typeof L === 'undefined') return;
-
-    // --- 1. SOLIS: DEFINĒJAM LATVIEŠU VALODU (OBLIGĀTI PIRMS KONTROLES) ---
+    // --- 1. SOLIS: DEFINĒJAM LATVIEŠU VALODU ---
+    // (Šim jābūt pašam pirmajam, lai Routing Machine neuzkaras)
     if (typeof L.Routing !== 'undefined') {
         L.Routing.Localization.prototype.lv = {
             directions: {
@@ -3162,8 +3166,259 @@ if (typeof L === 'undefined') return;
         };
     }
 
+    // --- 2. SOLIS: KOORDINĀTU APSTRĀDES FUNKCIJA ---
+    function parseCoordinates(text) {
+        if (!text) return null;
+        text = text.trim();
+
+        // A) MGRS (ja bibliotēka ielādēta)
+        if (typeof mgrs !== 'undefined') {
+            const cleanMGRS = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+            // Regex: 1-2 cipari + burts + sekojoši simboli
+            if (/^\d{1,2}[A-Z]/.test(cleanMGRS) && cleanMGRS.length >= 4) {
+                try {
+                    const point = mgrs.toPoint(cleanMGRS);
+                    return { lat: point[1], lng: point[0], name: `MGRS: ${cleanMGRS}` };
+                } catch (e) {}
+            }
+        }
+
+        // B) Skaitļi (WGS vai LKS)
+        const normalized = text.replace(',', '.');
+        const numbers = normalized.match(/-?\d+(\.\d+)?/g);
+        
+        if (numbers && numbers.length >= 2) {
+            let n1 = parseFloat(numbers[0]);
+            let n2 = parseFloat(numbers[1]);
+
+            // WGS84 (Lat/Lon)
+            if (Math.abs(n1) <= 90 && Math.abs(n2) <= 180) {
+                // Auto-fix lat/lon secību priekš Latvijas
+                if (n1 > 20 && n1 < 30 && n2 > 55 && n2 < 60) { let t = n1; n1 = n2; n2 = t; }
+                return { lat: n1, lng: n2, name: `WGS: ${n1.toFixed(4)}, ${n2.toFixed(4)}` };
+            }
+
+            // LKS-92 (X/Y)
+            if (typeof proj4 !== 'undefined') {
+                let x = n1, y = n2;
+                if (n1 > 5000000) { y = n1; x = n2; } else if (n2 > 5000000) { x = n1; y = n2; }
+                else { x = n1; y = n2; }
+
+                try {
+                    const wgs = proj4('EPSG:3059', 'EPSG:4326', [x, y]);
+                    if (wgs[1] > 55 && wgs[1] < 59) {
+                        return { lat: wgs[1], lng: wgs[0], name: `LKS: ${Math.round(x)}, ${Math.round(y)}` };
+                    }
+                } catch(e) {}
+            }
+        }
+        return null;
+    }
+
+    // --- 3. SOLIS: PIELĀGOTS GEOCODER (Routing Machine) ---
+    const MyCustomGeocoder = L.Class.extend({
+        options: { serviceUrl: 'https://nominatim.openstreetmap.org/search' },
+        initialize: function(options) { L.Util.setOptions(this, options); },
+        geocode: function(query, cb, context) {
+            // 1. Mēģinam saprast kā koordinātas
+            const coords = parseCoordinates(query);
+            if (coords) {
+                cb.call(context, [{
+                    name: coords.name,
+                    center: L.latLng(coords.lat, coords.lng),
+                    bbox: L.latLngBounds([coords.lat, coords.lng], [coords.lat, coords.lng])
+                }]);
+            } else {
+                // 2. Ja nav koordinātas, meklējam kā adresi (Nominatim)
+                fetch(`${this.options.serviceUrl}?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=lv`)
+                .then(r => r.json())
+                .then(data => {
+                    const results = data.map(item => ({
+                        name: item.display_name,
+                        center: L.latLng(item.lat, item.lon),
+                        bbox: L.latLngBounds(
+                            [item.boundingbox[0], item.boundingbox[2]],
+                            [item.boundingbox[1], item.boundingbox[3]]
+                        )
+                    }));
+                    cb.call(context, results);
+                })
+                .catch(() => cb.call(context, []));
+            }
+        },
+        reverse: function(location, scale, cb, context) {
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.lat}&lon=${location.lng}`)
+            .then(r => r.json())
+            .then(data => {
+                cb.call(context, [{ name: data.display_name, center: location }]);
+            });
+        }
+    });
+
+    // --- 4. SOLIS: INTERFEISA IZVEIDE (HTML) ---
+    const container = L.DomUtil.create('div', 'smart-search-container');
+    L.DomEvent.disableClickPropagation(container);
+    L.DomEvent.disableScrollPropagation(container);
+
+    container.innerHTML = `
+        <div class="search-wrap">
+            <input type="text" id="smartSearchInput" placeholder="Meklēt (Adrese, MGRS, LKS)...">
+            <button id="smartSearchBtn" title="Meklēt">🔍</button>
+            <button id="toggleRouteBtn" title="Maršrutēšana">🔀</button>
+            <button id="smartSearchClear" title="Notīrīt" style="display:none;">✕</button>
+        </div>
+        <div id="smartSearchResults" class="search-results" style="display:none;"></div>
+    `;
+
+    const Control = L.Control.extend({
+        onAdd: () => container,
+        onRemove: () => {}
+    });
+    // Liekam kreisajā augšējā stūrī
+    const searchControl = new Control({ position: 'topleft' });
+    map.addControl(searchControl);
 
 
+    // --- 5. SOLIS: MARŠRUTĒŠANAS LOĢIKA ---
+    let routingControl = null;
+    let isRoutingMode = false;
+
+    document.getElementById('toggleRouteBtn').addEventListener('click', () => {
+        // Drošības pārbaude
+        if (typeof L.Routing === 'undefined') {
+            alert("⚠️ Kļūda: Nav ielādēta maršrutēšanas bibliotēka (leaflet-routing-machine).");
+            return;
+        }
+
+        isRoutingMode = !isRoutingMode;
+        const btn = document.getElementById('toggleRouteBtn');
+        const input = document.getElementById('smartSearchInput');
+        const searchBtn = document.getElementById('smartSearchBtn');
+        const resultsDiv = document.getElementById('smartSearchResults');
+
+        if (isRoutingMode) {
+            // IESLĒDZ MARŠRUTĒŠANU
+            btn.style.background = '#4CAF50'; // Zaļš indikators
+            input.style.display = 'none';
+            searchBtn.style.display = 'none';
+            resultsDiv.style.display = 'none';
+
+            if (!routingControl) {
+                try {
+                    routingControl = L.Routing.control({
+                        waypoints: [
+                            L.latLng(56.946, 24.105), // Noklusētais sākums (Rīga)
+                            null // Beigas jāievada lietotājam
+                        ],
+                        routeWhileDragging: true,
+                        geocoder: new MyCustomGeocoder(), // Pievienojam mūsu MGRS atbalstu
+                        language: 'lv', // Šeit izmantojam definēto valodu
+                        showAlternatives: true,
+                        lineOptions: {
+                            styles: [{color: '#00ccff', opacity: 0.8, weight: 6}]
+                        },
+                        createMarker: function(i, wp, nWps) {
+                            return L.marker(wp.latLng, { draggable: true });
+                        }
+                    }).addTo(map);
+                } catch (e) {
+                    console.error("Routing error:", e);
+                    alert("Neizdevās palaist maršrutētāju.");
+                }
+            } else {
+                routingControl.getContainer().style.display = 'block';
+            }
+        } else {
+            // IZSLĒDZ MARŠRUTĒŠANU (Atgriežas pie parastā meklētāja)
+            btn.style.background = ''; 
+            input.style.display = 'block';
+            searchBtn.style.display = 'block';
+            
+            if (routingControl) {
+                routingControl.getContainer().style.display = 'none';
+            }
+        }
+    });
+
+    // --- 6. SOLIS: PARASTĀ MEKLĒŠANA (Kad maršruts izslēgts) ---
+    const input = document.getElementById('smartSearchInput');
+    const searchBtn = document.getElementById('smartSearchBtn');
+    const clearBtn = document.getElementById('smartSearchClear');
+    const resultsDiv = document.getElementById('smartSearchResults');
+    let simpleMarker = null;
+
+    function doSimpleSearch() {
+        const val = input.value;
+        if (!val) return;
+        
+        // 1. Mēģinam koordinātas
+        const coords = parseCoordinates(val);
+        
+        if (coords) {
+            showMarker(coords.lat, coords.lng, coords.name);
+        } else {
+            // 2. Mēģinam adresi
+            searchBtn.innerHTML = '⏳';
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&limit=5&countrycodes=lv`)
+            .then(r => r.json())
+            .then(data => {
+                searchBtn.innerHTML = '🔍';
+                if (data.length > 0) {
+                   if (data.length === 1) showMarker(data[0].lat, data[0].lon, data[0].display_name);
+                   else {
+                       resultsDiv.innerHTML = '';
+                       resultsDiv.style.display = 'block';
+                       data.forEach(r => {
+                           const div = document.createElement('div');
+                           div.className = 'search-item';
+                           div.textContent = r.display_name;
+                           div.onclick = () => showMarker(r.lat, r.lon, r.display_name);
+                           resultsDiv.appendChild(div);
+                       });
+                   }
+                } else {
+                    alert("Nekas netika atrasts.");
+                }
+            })
+            .catch(() => { searchBtn.innerHTML = '🔍'; });
+        }
+    }
+
+    function showMarker(lat, lng, txt) {
+        if (simpleMarker) map.removeLayer(simpleMarker);
+        simpleMarker = L.marker([lat, lng]).addTo(map).bindPopup(txt).openPopup();
+        map.setView([lat, lng], 14);
+        resultsDiv.style.display = 'none';
+        clearBtn.style.display = 'block';
+    }
+
+    searchBtn.onclick = doSimpleSearch;
+    input.onkeypress = (e) => { if (e.key === 'Enter') doSimpleSearch(); };
+    clearBtn.onclick = () => {
+        input.value = '';
+        if (simpleMarker) map.removeLayer(simpleMarker);
+        clearBtn.style.display = 'none';
+        resultsDiv.style.display = 'none';
+    };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
 
 
 
@@ -3301,243 +3556,7 @@ applyLayerZoomLimits(osm);
 
 
 
-/* =================================================================
-   SMART ROUTING & SEARCH (MGRS + LKS-92 + WGS84 + OSRM)
-   Ievietot map.whenReady() blokā
-   ================================================================= */
 
-map.whenReady(() => {
-    if (typeof L === 'undefined') return;
-
-    // --- 1. Mūsu gudrais koordinātu atšifrētājs ---
-    // Šī funkcija mēģina saprast tekstu kā koordinātas. Ja nevar, atgriež null.
-    function parseCoordinates(text) {
-        if (!text) return null;
-        text = text.trim();
-
-        // A) MGRS
-        if (typeof mgrs !== 'undefined') {
-            const cleanMGRS = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-            if (/^\d{1,2}[A-Z]/.test(cleanMGRS) && cleanMGRS.length >= 4) {
-                try {
-                    const point = mgrs.toPoint(cleanMGRS);
-                    return { lat: point[1], lng: point[0], name: `MGRS: ${cleanMGRS}` };
-                } catch (e) {}
-            }
-        }
-
-        // B) Skaitļi (WGS vai LKS)
-        const normalized = text.replace(',', '.');
-        const numbers = normalized.match(/-?\d+(\.\d+)?/g);
-        
-        if (numbers && numbers.length >= 2) {
-            let n1 = parseFloat(numbers[0]);
-            let n2 = parseFloat(numbers[1]);
-
-            // WGS84
-            if (Math.abs(n1) <= 90 && Math.abs(n2) <= 180) {
-                // Auto-fix lat/lon secību priekš Latvijas
-                if (n1 > 20 && n1 < 30 && n2 > 55 && n2 < 60) { let t = n1; n1 = n2; n2 = t; }
-                return { lat: n1, lng: n2, name: `WGS: ${n1.toFixed(4)}, ${n2.toFixed(4)}` };
-            }
-
-            // LKS-92
-            if (typeof proj4 !== 'undefined') {
-                let x = n1, y = n2;
-                if (n1 > 5000000) { y = n1; x = n2; } else if (n2 > 5000000) { x = n1; y = n2; }
-                else { x = n1; y = n2; }
-
-                try {
-                    const wgs = proj4('EPSG:3059', 'EPSG:4326', [x, y]);
-                    if (wgs[1] > 55 && wgs[1] < 59) {
-                        return { lat: wgs[1], lng: wgs[0], name: `LKS: ${Math.round(x)}, ${Math.round(y)}` };
-                    }
-                } catch(e) {}
-            }
-        }
-        return null;
-    }
-
-    // --- 2. Custom Geocoder priekš Routing Machine ---
-    // Tas ļauj maršrutētājā ievadīt MGRS kodus
-    const MyCustomGeocoder = L.Class.extend({
-        options: { serviceUrl: 'https://nominatim.openstreetmap.org/search' },
-        initialize: function(options) { L.Util.setOptions(this, options); },
-        geocode: function(query, cb, context) {
-            // Vispirms pārbaudām vai tās ir koordinātas
-            const coords = parseCoordinates(query);
-            if (coords) {
-                cb.call(context, [{
-                    name: coords.name,
-                    center: L.latLng(coords.lat, coords.lng),
-                    bbox: L.latLngBounds([coords.lat, coords.lng], [coords.lat, coords.lng])
-                }]);
-            } else {
-                // Ja nav koordinātas, meklējam kā adresi caur Nominatim
-                fetch(`${this.options.serviceUrl}?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=lv`)
-                .then(r => r.json())
-                .then(data => {
-                    const results = data.map(item => ({
-                        name: item.display_name,
-                        center: L.latLng(item.lat, item.lon),
-                        bbox: L.latLngBounds(
-                            [item.boundingbox[0], item.boundingbox[2]],
-                            [item.boundingbox[1], item.boundingbox[3]]
-                        )
-                    }));
-                    cb.call(context, results);
-                })
-                .catch(() => cb.call(context, []));
-            }
-        },
-        reverse: function(location, scale, cb, context) {
-            // Reverse geocoding (no kartes uz adresi)
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.lat}&lon=${location.lng}`)
-            .then(r => r.json())
-            .then(data => {
-                cb.call(context, [{ name: data.display_name, center: location }]);
-            });
-        }
-    });
-
-    // --- 3. UI Kontroles izveide ---
-
-    // Konteiners pogām
-    const container = L.DomUtil.create('div', 'smart-search-container');
-    // Novēršam kartes klikšķus
-    L.DomEvent.disableClickPropagation(container);
-    L.DomEvent.disableScrollPropagation(container);
-
-    container.innerHTML = `
-        <div class="search-wrap">
-            <input type="text" id="smartSearchInput" placeholder="Meklēt (Adrese, MGRS, LKS)...">
-            <button id="smartSearchBtn" title="Meklēt">🔍</button>
-            <button id="toggleRouteBtn" title="Maršrutēšana">🔀</button>
-            <button id="smartSearchClear" title="Notīrīt" style="display:none;">✕</button>
-        </div>
-        <div id="smartSearchResults" class="search-results" style="display:none;"></div>
-    `;
-
-    // Pievienojam kartei (izmantojot jau nodefinēto vietu)
-    const Control = L.Control.extend({
-        onAdd: () => container,
-        onRemove: () => {}
-    });
-    const searchControl = new Control({ position: 'topleft' });
-    map.addControl(searchControl);
-
-
-    // --- 4. Maršrutēšanas Loģika ---
-    
-    let routingControl = null;
-    let isRoutingMode = false;
-
-    document.getElementById('toggleRouteBtn').addEventListener('click', () => {
-        isRoutingMode = !isRoutingMode;
-        const btn = document.getElementById('toggleRouteBtn');
-        const input = document.getElementById('smartSearchInput');
-        const searchBtn = document.getElementById('smartSearchBtn');
-        const resultsDiv = document.getElementById('smartSearchResults');
-
-        if (isRoutingMode) {
-            // IESLĒDZ MARŠRUTĒŠANU
-            btn.style.background = '#4CAF50'; // Zaļš
-            input.style.display = 'none'; // Paslēpjam parasto meklētāju
-            searchBtn.style.display = 'none';
-            resultsDiv.style.display = 'none';
-
-            if (!routingControl) {
-                routingControl = L.Routing.control({
-                    waypoints: [
-                        L.latLng(56.946, 24.105), // Sākums (var nomainīt uz atrašanās vietu)
-                        null // Beigas tukšas
-                    ],
-                    routeWhileDragging: true,
-                    geocoder: new MyCustomGeocoder(), // Mūsu MGRS atbalsts!
-                    language: 'lv',
-                    showAlternatives: true,
-                    lineOptions: {
-                        styles: [{color: '#00ccff', opacity: 0.8, weight: 6}]
-                    },
-                    altLineOptions: {
-                        styles: [{color: '#fff', opacity: 0.4, weight: 4}]
-                    }
-                }).addTo(map);
-            } else {
-                routingControl.getContainer().style.display = 'block';
-            }
-        } else {
-            // IZSLĒDZ MARŠRUTĒŠANU
-            btn.style.background = ''; // Atpakaļ uz parasto
-            input.style.display = 'block';
-            searchBtn.style.display = 'block';
-            
-            if (routingControl) {
-                routingControl.getContainer().style.display = 'none';
-                // Pēc izvēles: var notīrīt maršrutu pilnībā
-                // routingControl.setWaypoints([]); 
-            }
-        }
-    });
-
-    // --- 5. Parastā Meklēšana (saglabāta funkcionalitāte) ---
-    // (Šī daļa paliek, lai strādātu "parastais" meklētājs, kad nav maršruta režīms)
-    
-    const input = document.getElementById('smartSearchInput');
-    const searchBtn = document.getElementById('smartSearchBtn');
-    const clearBtn = document.getElementById('smartSearchClear');
-    const resultsDiv = document.getElementById('smartSearchResults');
-    let simpleMarker = null;
-
-    function doSimpleSearch() {
-        const val = input.value;
-        if (!val) return;
-        
-        // Izmantojam to pašu parseCoordinates
-        const coords = parseCoordinates(val);
-        
-        if (coords) {
-            showMarker(coords.lat, coords.lng, coords.name);
-        } else {
-            // Nominatim meklēšana
-            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&limit=5&countrycodes=lv`)
-            .then(r => r.json())
-            .then(data => {
-                if (data.length > 0) {
-                   if (data.length === 1) showMarker(data[0].lat, data[0].lon, data[0].display_name);
-                   else {
-                       resultsDiv.innerHTML = '';
-                       resultsDiv.style.display = 'block';
-                       data.forEach(r => {
-                           const div = document.createElement('div');
-                           div.className = 'search-item';
-                           div.textContent = r.display_name;
-                           div.onclick = () => showMarker(r.lat, r.lon, r.display_name);
-                           resultsDiv.appendChild(div);
-                       });
-                   }
-                }
-            });
-        }
-    }
-
-    function showMarker(lat, lng, txt) {
-        if (simpleMarker) map.removeLayer(simpleMarker);
-        simpleMarker = L.marker([lat, lng]).addTo(map).bindPopup(txt).openPopup();
-        map.setView([lat, lng], 14);
-        resultsDiv.style.display = 'none';
-        clearBtn.style.display = 'block';
-    }
-
-    searchBtn.onclick = doSimpleSearch;
-    input.onkeypress = (e) => { if (e.key === 'Enter') doSimpleSearch(); };
-    clearBtn.onclick = () => {
-        input.value = '';
-        if (simpleMarker) map.removeLayer(simpleMarker);
-        clearBtn.style.display = 'none';
-        resultsDiv.style.display = 'none';
-    };
-});
 	
 // Ja ieslēdz/izslēdz režģus – nosakām, ko rādīt popupā.
 // Noteikums: "pēdējais ieslēgtais režģis" nosaka režīmu.
