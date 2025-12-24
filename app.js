@@ -3252,488 +3252,532 @@ map.whenReady(() => {
     const searchControl = new Control({ position: 'topleft' });
     map.addControl(searchControl);
 
-// --- 5. SOLIS: MISSION PACKAGE (Taktiskā Maršrutēšana v2.1 FIX) ---
+// --- 5. SOLIS: MISSION PACKAGE (MILITARY EDITION v3.0) ---
 
-// Globālie mainīgie modulim
+// Globālie mainīgie
 let missionControl = null;
 let isMissionMode = false;
 let currentMissionProfile = 'driving'; // 'driving', 'walking', 'direct'
-let missionWaypointsData = {}; // Glabā piezīmes: { 0: "Teksts...", 1: "..." }
+let missionWaypointsData = {}; // Piezīmes: { 0: "Teksts...", 1: "..." }
 
-// --- A. STILI (KP Aplīši, Paneļi, Druka) ---
-(function injectMissionStyles() {
-    if (document.getElementById('mission-css')) return;
+// --- A. TACTICAL CSS (Pilnīga dizaina pārrakstīšana) ---
+(function injectTacticalStyles() {
+    if (document.getElementById('mission-tactical-css')) return;
     const style = document.createElement('style');
-    style.id = 'mission-css';
+    style.id = 'mission-tactical-css';
     style.textContent = `
-        /* Paneļa dizains */
+        /* 1. PANEĻA KONTEINERS */
         .mission-panel-container {
-            background-color: rgba(20, 24, 30, 0.95) !important;
+            background-color: #1b1f25 !important; /* Tumšs fons */
             color: #eef2f7 !important;
             border: 1px solid rgba(255,255,255,0.15);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-            border-radius: 8px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.8);
+            border-radius: 6px;
             margin-top: 10px !important;
-            overflow: hidden;
+            margin-left: 10px !important;
+            width: 320px; /* Fiksēts platums */
+            max-height: 85vh; /* Lai neiet ārpus ekrāna */
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Iekšējais skrollis */
+            z-index: 2000;
         }
-        
-        /* Maršruta instrukciju saraksts - FONS UN TEKSTS */
+
+        /* 2. LEAFLET ROUTING MACHINE OVERRIDE (Svarīgi!) */
         .leaflet-routing-container {
             margin: 0 !important; padding: 0 !important;
-            background: transparent !important; 
-            border: none !important; box-shadow: none !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            width: 100% !important;
+            color: #ccc !important;
+        }
+        
+        /* Adrešu ievades lauki */
+        .leaflet-routing-geocoders {
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding: 10px !important;
+            background: #232830 !important;
+        }
+        .leaflet-routing-geocoders input {
+            background: #0f1318 !important;
+            border: 1px solid #444 !important;
             color: #fff !important;
+            border-radius: 4px;
+            padding: 6px;
+            width: 230px !important; /* Pielāgots platums */
+            margin-bottom: 4px;
         }
-        .leaflet-routing-alt { 
-            background: rgba(0, 0, 0, 0.6) !important; /* Tumšs fons tekstam */
-            max-height: 50vh; 
-            overflow-y: auto; 
-            padding: 10px; 
+        .leaflet-routing-geocoders input:focus {
+            border-color: #4caf50 !important;
+            outline: none;
         }
-        .leaflet-routing-alt tr:hover { 
-            background: rgba(255,255,255,0.1) !important; 
+
+        /* +/- Pogas (Add/Remove Waypoint) */
+        .leaflet-routing-add-waypoint, .leaflet-routing-remove-waypoint {
+            background-color: transparent !important;
+            border: none !important;
+            color: #aaa !important;
+            font-size: 18px;
+            font-weight: bold;
+            opacity: 0.7;
+        }
+        .leaflet-routing-add-waypoint:after { content: '+'; color: #4caf50; }
+        .leaflet-routing-remove-waypoint:after { content: '×'; color: #d32f2f; }
+        .leaflet-routing-add-waypoint:hover, .leaflet-routing-remove-waypoint:hover { opacity: 1; transform: scale(1.1); }
+
+        /* Maršruta instrukciju saraksts (Skrollējams) */
+        .leaflet-routing-alt {
+            max-height: 40vh; /* Ierobežots augstums */
+            overflow-y: auto; /* Skrollis */
+            padding: 0 !important;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.2) !important;
+        }
+        .leaflet-routing-alt table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .leaflet-routing-alt tr {
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            transition: background 0.2s;
+        }
+        .leaflet-routing-alt tr:hover {
+            background: rgba(46, 125, 50, 0.2) !important; /* Zaļgans hover */
             cursor: pointer;
         }
-        .leaflet-routing-alt h2, .leaflet-routing-alt h3 {
-            color: #4caf50 !important; /* Zaļš virsraksts */
-            font-size: 14px;
-            margin-top: 5px;
+        .leaflet-routing-alt td {
+            padding: 8px !important;
+            font-size: 12px;
+            color: #ddd;
         }
-        .leaflet-routing-alt-time {
-            background: #2e7d32; padding: 2px 5px; border-radius: 4px;
-        }
-
-        /* KP Marķieri (Orientēšanās stils) */
-        .kp-marker-icon {
-            background: transparent;
-        }
-        .kp-circle {
-            width: 16px; height: 16px;
-            border: 3px solid #ff0000; /* Sarkans aplis */
-            border-radius: 50%;
-            position: absolute; left: -8px; top: -8px;
-            background: rgba(255,0,0,0.1);
-            box-shadow: 0 0 2px rgba(0,0,0,0.5);
-            pointer-events: auto;
-        }
-        .kp-center-dot {
-            width: 2px; height: 2px;
-            background: #ff0000;
-            position: absolute; left: -1px; top: -1px;
-            border-radius: 50%;
-        }
-        .kp-label {
-            position: absolute; left: 12px; top: -12px;
-            color: #ff0000; font-weight: bold; font-size: 14px;
-            text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
-            white-space: nowrap;
-        }
-
-        /* Toolbar Pogas */
+        
+        /* Slēpjam liekos OSRM elementus */
+        .leaflet-routing-collapse-btn { display: none !important; }
+        
+        /* 3. MŪSU TOOLBAR (Pogas augšā) */
         .mission-toolbar {
             display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
-            padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);
-            background: rgba(20, 24, 30, 0.95);
+            padding: 8px; 
+            background: #15191e;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
         }
         .mission-btn {
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-            color: #ccc; padding: 6px; border-radius: 4px; cursor: pointer;
-            font-size: 11px; font-weight: 700; text-transform: uppercase;
-            text-align: center; transition: all 0.2s;
+            background: rgba(255,255,255,0.08); 
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #aaa; padding: 8px; border-radius: 4px; cursor: pointer;
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            text-align: center; letter-spacing: 0.5px;
+            transition: all 0.2s;
         }
-        .mission-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
-        .mission-btn.active { background: #2e7d32; border-color: #4caf50; color: #fff; }
-        
-        .mission-tools-row {
-            display: flex; gap: 5px; padding: 8px; justify-content: space-between;
-            border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3);
-        }
-        .mission-action { flex: 1; padding: 6px; font-size: 11px; }
-        .btn-print { background: #1565c0; border-color: #42a5f5; color:#fff; }
-        .btn-clear { background: #c62828; border-color: #ef5350; color:#fff; }
-
-        /* Checkbox stils */
-        .mission-toggle-row {
-            padding: 6px 8px; font-size: 12px; display: flex; align-items: center; gap: 8px;
-            color: #ccc; background: rgba(0,0,0,0.3);
+        .mission-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+        .mission-btn.active { 
+            background: #1b5e20; /* Taktiski zaļš */
+            border-color: #2e7d32; 
+            color: #fff; 
+            box-shadow: 0 0 5px rgba(46,125,50,0.5);
         }
 
-        /* Slēpt līnijas (tikai punkti) */
-        .hide-route-lines path.leaflet-interactive {
-            stroke-opacity: 0 !important;
-            pointer-events: none;
+        /* 4. APAKŠĒJĀ RĪKU JOSLA */
+        .mission-footer {
+            padding: 8px;
+            background: #15191e;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex; gap: 6px;
         }
-        .hide-route-lines .leaflet-routing-container path { /* OSRM fallback */
-            display: none !important;
+        .btn-action { flex: 1; padding: 8px; font-size: 11px; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-print { background: #1565c0; }
+        .btn-print:hover { background: #0d47a1; }
+        .btn-clear { background: #c62828; }
+        .btn-clear:hover { background: #b71c1c; }
+
+        /* 5. KP MARKERI (Sarkanie aplīši) */
+        .kp-marker-icon { background: transparent; pointer-events: none; }
+        .kp-viz {
+            position: absolute; left: -10px; top: -10px;
+            width: 20px; height: 20px;
+            border: 3px solid #ff3333;
+            border-radius: 50%;
+            background: rgba(255, 0, 0, 0.1);
+            box-shadow: 0 0 4px rgba(0,0,0,0.8);
+            pointer-events: auto; /* Lai var uzklikšķināt */
         }
-        
-        /* Popup */
+        .kp-viz::after {
+            content: ''; position: absolute; left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            width: 2px; height: 2px; background: #ff3333;
+        }
+        .kp-label {
+            position: absolute; left: 14px; top: -14px;
+            color: #ff3333; font-weight: 800; font-size: 14px;
+            text-shadow: 2px 2px 0 #000, -1px -1px 0 #000;
+        }
+
+        /* 6. POPUP DIZAINS */
+        .mission-popup { width: 220px; }
+        .mission-popup h4 { margin: 0 0 8px 0; color: #4caf50; border-bottom: 1px solid #444; padding-bottom: 4px; }
         .mission-popup textarea {
-            width: 100%; height: 60px; background: #222; color: #fff; border: 1px solid #555;
+            width: 100%; height: 70px; 
+            background: #111; border: 1px solid #444; color: #eee; 
+            padding: 5px; font-family: sans-serif; font-size: 12px; resize: vertical;
         }
 
-        /* DRUKAS MODĀLIS */
+        /* 7. DRUKAS LAPA */
         #missionPrintModal {
-            position: fixed; inset: 0; z-index: 99999;
-            background: rgba(0,0,0,0.85); display: none;
-            align-items: center; justify-content: center; backdrop-filter: blur(4px);
+            position: fixed; inset: 0; z-index: 10000;
+            background: rgba(0,0,0,0.9); display: none;
+            overflow-y: auto; padding: 20px;
         }
-        .print-paper {
-            width: 210mm; height: 90vh; background: #fff; color: #000;
-            padding: 15mm; overflow-y: auto; font-family: 'Times New Roman', serif;
-            box-shadow: 0 0 40px #000;
+        .print-sheet {
+            width: 210mm; min-height: 297mm; 
+            background: #fff; color: #000;
+            margin: 0 auto; padding: 15mm;
+            font-family: 'Times New Roman', serif;
+            box-shadow: 0 0 50px #000;
         }
-        .mission-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        .mission-table th, .mission-table td { border: 1px solid #000; padding: 6px; font-size: 12px; vertical-align: top; }
-        .mission-table th { background: #eee; text-align: left; }
-        
         @media print {
-            body.printing-mission > * { display: none !important; }
-            body.printing-mission #missionPrintModal { 
-                display: block !important; position: absolute; inset: 0; background: #fff; 
-            }
-            body.printing-mission .print-paper {
-                width: 100%; height: auto; box-shadow: none; padding: 0; overflow: visible;
-            }
-            body.printing-mission .no-print { display: none !important; }
+            body > * { display: none !important; }
+            #missionPrintModal { display: block !important; position: absolute; inset: 0; padding: 0; background: #fff; }
+            .print-sheet { box-shadow: none; width: 100%; height: auto; margin: 0; }
+            .no-print { display: none !important; }
         }
     `;
     document.head.appendChild(style);
 })();
 
-// --- B. IESLĒGT / IZSLĒGT (MAIN LOGIC) ---
+// --- B. IESLĒGT / IZSLĒGT MODULI ---
 document.getElementById('toggleRouteBtn').addEventListener('click', () => {
-    // Pārbaude
+    // 1. Bibliotēku pārbaude
     if (typeof L === 'undefined' || typeof L.Routing === 'undefined') {
-        alert("⚠️ Kļūda: Routing spraudnis nav ielādēts.");
+        alert("⚠️ Kļūda: Nav ielādēts Routing modulis. Pārbaudiet interneta savienojumu vai bibliotēkas.");
         return;
     }
 
-    // Pārslēdzam režīmu
     isMissionMode = !isMissionMode;
     const btn = document.getElementById('toggleRouteBtn');
     
-    // UI Elementi, kurus slēpt
+    // UI slēpšana/rādīšana
     const searchUI = [
         'smartSearchInput', 'smartSearchBtn', 
         'smartSearchResults', 'smartSearchClear'
     ].map(id => document.getElementById(id)).filter(e => e);
 
     if (isMissionMode) {
-        // == IESLĒDZAM ==
-        btn.style.background = '#d32f2f'; // Sarkans (lai redz, ka jāizslēdz)
-        btn.title = "Aizvērt plānotāju";
-        searchUI.forEach(el => el.style.display = 'none');
+        // --> AKTIVIZĒT
+        btn.style.background = '#c62828'; // Sarkans (Aizvērt)
+        btn.innerHTML = '✕'; // Ikona mainās
+        btn.title = "Aizvērt maršruta plānotāju";
+        
+        searchUI.forEach(el => el.style.display = 'none'); // Paslēpj meklētāju
 
         if (!missionControl) {
-            initMissionControl();
+            initMissionLogic(); // Iniciējam
         } else {
-            missionControl.getContainer().style.display = 'block';
+            missionControl.getContainer().style.display = 'flex';
         }
 
     } else {
-        // == IZSLĒDZAM (UN TĪRAM) ==
+        // --> DEAKTIVIZĒT
         btn.style.background = ''; // Reset
+        btn.innerHTML = '🔀';
         btn.title = "Maršrutēšana";
-        searchUI.forEach(el => el.style.display = 'block');
         
-        // PILNĪGA DZĒŠANA
+        searchUI.forEach(el => el.style.display = 'block'); // Atjauno meklētāju
+        
+        // Pilnīga tīrīšana
         if (missionControl) {
-            // Noņemam maršrutu no kartes
-            missionControl.setWaypoints([]); // Notīra punktus
-            map.removeControl(missionControl); // Noņem kontroli
-            missionControl = null; // Reset mainīgo
+            missionControl.setWaypoints([]); // Notīra karti
+            map.removeControl(missionControl); // Noņem paneli
+            missionControl = null;
         }
-        // Noņemam klasi, ja palikusi
-        document.querySelector('.leaflet-pane.leaflet-overlay-pane').classList.remove('hide-route-lines');
-        missionWaypointsData = {}; // Reset dati
+        missionWaypointsData = {}; 
     }
 });
 
-// --- C. INICIALIZĀCIJA ---
-function initMissionControl() {
+// --- C. GALVENĀ LOĢIKA ---
+function initMissionLogic() {
     try {
-        // Definējam "Dummy" maršrutētāju priekš TAISNĀS LĪNIJAS (Direct/Azimuth)
+        // 1. "Taisnās Līnijas" Rūteris (Azimuts)
         const DirectRouter = L.Class.extend({
             route: function(waypoints, callback, context, options) {
                 const routes = [];
-                // Vienkārši savieno punktus ar taisni
                 const latLngs = waypoints.map(wp => wp.latLng).filter(ll => ll != null);
+                
                 if (latLngs.length >= 2) {
                     let totalDist = 0;
+                    const instructions = [];
+                    
                     for(let i=0; i<latLngs.length-1; i++) {
-                        totalDist += latLngs[i].distanceTo(latLngs[i+1]);
+                        const dist = latLngs[i].distanceTo(latLngs[i+1]);
+                        totalDist += dist;
+                        
+                        // Aprēķinam azimutu
+                        const y = Math.sin(latLngs[i+1].lng * Math.PI/180 - latLngs[i].lng * Math.PI/180) * Math.cos(latLngs[i+1].lat * Math.PI/180);
+                        const x = Math.cos(latLngs[i].lat * Math.PI/180) * Math.sin(latLngs[i+1].lat * Math.PI/180) -
+                                  Math.sin(latLngs[i].lat * Math.PI/180) * Math.cos(latLngs[i+1].lat * Math.PI/180) * Math.cos(latLngs[i+1].lng * Math.PI/180 - latLngs[i].lng * Math.PI/180);
+                        let brng = Math.atan2(y, x) * 180 / Math.PI;
+                        brng = (brng + 360) % 360;
+
+                        instructions.push({
+                            type: 'Straight',
+                            distance: dist,
+                            time: dist / 1.1, // ~4km/h
+                            text: `Uz KP-${i+1}: ${Math.round(dist)}m @ ${Math.round(brng)}°`
+                        });
                     }
+
                     routes.push({
-                        name: "Azimuts (Taisne)",
-                        summary: { totalDistance: totalDist, totalTime: totalDist / 1.1 }, // ~4km/h
+                        name: "Azimuta Gājiens",
+                        summary: { totalDistance: totalDist, totalTime: totalDist / 1.1 },
                         coordinates: latLngs,
+                        inputWaypoints: waypoints,
                         waypoints: waypoints,
-                        instructions: [] // Nav pagriezienu instrukciju taisnei
+                        instructions: instructions 
                     });
                 }
                 callback.call(context, null, routes);
             }
         });
 
-        // OSRM Router (Auto/Kājām)
-        const osrmRouter = L.Routing.osrmv1({
-            serviceUrl: 'https://router.project-osrm.org/route/v1',
-            profile: 'driving', // Sākumā
-            language: 'en'
-        });
-
-        // Izveidojam Kontroli
+        // 2. Izveidojam Kontroli
         missionControl = L.Routing.control({
-            position: 'topleft',
-            waypoints: [ null, null ], // Sākumā tukšs, lietotājs klikšķina
-            geocoder: new MyCustomGeocoder(), // Izmanto Tavu esošo
+            position: 'topleft', // Novietojums
+            waypoints: [ null, null ], 
+            geocoder: new MyCustomGeocoder(), 
             routeWhileDragging: true,
             showAlternatives: false,
-            containerClassName: 'mission-panel-container',
+            fitSelectedRoutes: false, // Lai nelēkā
+            containerClassName: 'mission-panel-container', // Mūsu klase
             
-            // Maršrutētāja loģika (Mainās dinamiski)
-            router: osrmRouter,
+            // Sākumā OSRM Auto
+            router: L.Routing.osrmv1({
+                serviceUrl: 'https://router.project-osrm.org/route/v1',
+                profile: 'driving'
+            }),
 
             lineOptions: {
-                styles: [{color: '#d32f2f', opacity: 0.8, weight: 4, dashArray: '5, 10'}]
+                styles: [{color: '#ff3333', opacity: 0.8, weight: 4, dashArray: '10, 10'}]
             },
 
-            // --- KP APLĪŠI ---
+            // 3. Pielāgoti KP Marķieri
             createMarker: function(i, wp, nWps) {
-                // Orientēšanās stils: Aplis, kur centrs ir punkts
-                const type = (i === 0) ? "S" : (i === nWps - 1 ? "F" : i);
+                const label = (i === 0) ? "START" : (i === nWps - 1 ? "FINISH" : `KP-${i}`);
+                
                 const html = `
-                    <div class="kp-circle"></div>
-                    <div class="kp-center-dot"></div>
-                    <div class="kp-label">${type}</div>
+                    <div class="kp-viz"></div>
+                    <div class="kp-label">${label}</div>
                 `;
                 
                 const icon = L.divIcon({
                     className: 'kp-marker-icon',
                     html: html,
-                    iconSize: [0, 0], // CSS handles positioning relative to 0,0
-                    iconAnchor: [0, 0] // Centrs ir tieši koordinātē
+                    iconSize: [20, 20],
+                    iconAnchor: [0, 0] // Centrs
                 });
 
                 const marker = L.marker(wp.latLng, { draggable: true, icon: icon });
 
-                // Popup loģika
-                let mgrsStr = (typeof toMGRS8 === 'function') ? toMGRS8(wp.latLng.lat, wp.latLng.lng, true) : "";
-                let note = missionWaypointsData[i] || "";
+                // Datu popup
+                let savedNote = missionWaypointsData[i] || "";
+                let lat = wp.latLng.lat.toFixed(5);
+                let lng = wp.latLng.lng.toFixed(5);
+                let mgrs = (typeof toMGRS8 === 'function') ? toMGRS8(wp.latLng.lat, wp.latLng.lng, true) : "-";
 
                 const content = document.createElement('div');
                 content.className = 'mission-popup';
                 content.innerHTML = `
-                    <h4 style="margin:0 0 5px 0; color:#d32f2f;">KP-${type}</h4>
-                    <div style="font-family:monospace; font-size:11px; color:#aaa; margin-bottom:5px;">${mgrsStr}</div>
-                    <textarea placeholder="Uzdevums / Piezīme...">${note}</textarea>
+                    <h4>${label}</h4>
+                    <div style="font-size:11px; color:#aaa; margin-bottom:5px;">
+                        MGRS: <span style="color:#fff; font-family:monospace;">${mgrs}</span><br>
+                        WGS: ${lat}, ${lng}
+                    </div>
+                    <textarea placeholder="Ievadi uzdevumu...">${savedNote}</textarea>
                 `;
-                content.querySelector('textarea').addEventListener('input', function() {
-                    missionWaypointsData[i] = this.value;
-                });
                 
+                content.querySelector('textarea').addEventListener('input', (e) => {
+                    missionWaypointsData[i] = e.target.value;
+                });
+
                 marker.bindPopup(content);
                 return marker;
             }
         }).addTo(map);
 
-        // --- INJECT CUSTOM UI ---
-        // Mēs ieliekam savu paneli PIRMS maršruta instrukcijām
+        // 4. Ievietojam "Tactical Toolbar" tieši panelī
+        // Mēs to darām asinhroni, lai sagaidītu, kad LRM izveido savu konteineru
         setTimeout(() => {
-            const container = missionControl.getContainer();
-            if (!container) return;
+            const lrmContainer = missionControl.getContainer(); // .mission-panel-container
+            if (!lrmContainer) return;
 
+            // Izveidojam mūsu rīkjoslu
             const toolbar = document.createElement('div');
             toolbar.innerHTML = `
                 <div class="mission-toolbar">
-                    <div class="mission-btn active" id="modeAuto" title="Ceļi (Auto)">🚙 AUTO</div>
-                    <div class="mission-btn" id="modeWalk" title="Takas (Kājām)">🚶 KĀJĀM</div>
-                    <div class="mission-btn" id="modeDirect" title="Taisne (Azimuts)">📏 TAISNE</div>
+                    <div class="mission-btn active" id="btnModeCar" title="Pa ceļiem">🚙 AUTO</div>
+                    <div class="mission-btn" id="btnModeFoot" title="Pa takām">🚶 KĀJĀM</div>
+                    <div class="mission-btn" id="btnModeLine" title="Taisni (Azimuts)">📏 TAISNE</div>
                 </div>
-                <div class="mission-toggle-row">
-                    <input type="checkbox" id="hideLinesCheck">
-                    <label for="hideLinesCheck">Slēpt līnijas (Tikai punkti)</label>
-                </div>
-                <div class="mission-tools-row">
-                    <button class="mission-btn mission-action btn-print" id="missionPrint">📄 DRUKĀT LAPU</button>
-                    <button class="mission-btn mission-action btn-clear" id="missionClear">✕ DZĒST VISU</button>
+                <div style="flex:1;"></div> <div class="mission-footer">
+                    <button class="btn-action btn-print" id="btnPrintMission">📄 DRUKĀT</button>
+                    <button class="btn-action btn-clear" id="btnClearMission">✕ DZĒST</button>
                 </div>
             `;
-            container.insertBefore(toolbar, container.firstChild);
-
-            // --- EVENT LISTENERS ---
             
-            // 1. PROFILI (LABOTS: Izmanto options.router, nevis setRouter)
-            const bAuto = toolbar.querySelector('#modeAuto');
-            const bWalk = toolbar.querySelector('#modeWalk');
-            const bDir  = toolbar.querySelector('#modeDirect');
+            // Ievietojam PAŠĀ AUGŠĀ (pirms inputiem)
+            lrmContainer.insertBefore(toolbar, lrmContainer.firstChild);
 
-            function setProfile(mode) {
+            // --- POGU LOĢIKA ---
+            
+            // Profilu maiņa
+            const setMode = (mode) => {
                 currentMissionProfile = mode;
-                // UI update
-                [bAuto, bWalk, bDir].forEach(b => b.classList.remove('active'));
-                if(mode==='driving') bAuto.classList.add('active');
-                if(mode==='walking') bWalk.classList.add('active');
-                if(mode==='direct')  bDir.classList.add('active');
+                // UI
+                ['btnModeCar', 'btnModeFoot', 'btnModeLine'].forEach(id => {
+                    document.getElementById(id).classList.remove('active');
+                });
+                if(mode === 'driving') document.getElementById('btnModeCar').classList.add('active');
+                if(mode === 'walking') document.getElementById('btnModeFoot').classList.add('active');
+                if(mode === 'direct')  document.getElementById('btnModeLine').classList.add('active');
 
-                // Router update
+                // Router Logic
                 if (mode === 'direct') {
-                    // Iestata mūsu Dummy router
+                    // Iestatām mūsu Dummy router
                     missionControl.options.router = new DirectRouter();
                 } else {
                     // OSRM
-                    const profileStr = (mode === 'walking') ? 'foot' : 'driving'; 
-                    
-                    // Re-init OSRM router to force update
+                    const profile = (mode === 'walking') ? 'foot' : 'driving';
                     missionControl.options.router = L.Routing.osrmv1({
                         serviceUrl: 'https://router.project-osrm.org/route/v1',
-                        profile: profileStr,
-                        language: 'en'
+                        profile: profile
                     });
                 }
-                missionControl.route(); // Pārrēķina
-            }
-
-            bAuto.onclick = () => setProfile('driving');
-            bWalk.onclick = () => setProfile('walking');
-            bDir.onclick  = () => setProfile('direct');
-
-            // 2. SLĒPT LĪNIJAS
-            const checkHide = toolbar.querySelector('#hideLinesCheck');
-            checkHide.onchange = (e) => {
-                const pane = document.querySelector('.leaflet-pane.leaflet-overlay-pane');
-                if (e.target.checked) {
-                    pane.classList.add('hide-route-lines');
-                } else {
-                    pane.classList.remove('hide-route-lines');
-                }
+                missionControl.route(); // Pārrēķināt
             };
 
-            // 3. DZĒST
-            toolbar.querySelector('#missionClear').onclick = () => {
-                if(confirm("Dzēst visu maršrutu?")) {
+            document.getElementById('btnModeCar').onclick = () => setMode('driving');
+            document.getElementById('btnModeFoot').onclick = () => setMode('walking');
+            document.getElementById('btnModeLine').onclick = () => setMode('direct');
+
+            // Dzēšana
+            document.getElementById('btnClearMission').onclick = () => {
+                if(confirm('Vai tiešām dzēst visu maršrutu?')) {
                     missionControl.setWaypoints([null, null]);
                     missionWaypointsData = {};
                 }
             };
 
-            // 4. DRUKĀT
-            toolbar.querySelector('#missionPrint').onclick = generateMissionSheet;
+            // Druka
+            document.getElementById('btnPrintMission').onclick = openMissionPrint;
 
-        }, 100);
+        }, 150);
 
     } catch (e) {
-        console.error(e);
-        alert("Kļūda iniciējot Mission Package: " + e.message);
+        console.error("Mission init error:", e);
+        alert("Kļūda inicializējot plānotāju.");
     }
 }
 
-// --- D. MARŠRUTA LAPAS ĢENERĒŠANA ---
-function generateMissionSheet() {
+// --- D. DRUKAS FUNKCIJA (Profesionāla lapa) ---
+function openMissionPrint() {
     if (!missionControl || !missionControl._routes || missionControl._routes.length === 0) {
-        alert("Nav maršruta! Lūdzu izveidojiet vismaz sākumu un beigas.");
+        alert("Nav maršruta ko drukāt.");
         return;
     }
 
     const route = missionControl._routes[0];
     const wps = missionControl.getWaypoints();
-    const totalDist = (route.summary.totalDistance / 1000).toFixed(2);
-    // Aptuvens laiks: Auto (pēc OSRM), Kājām (4km/h), Direct (3km/h)
-    let timeMin = Math.round(route.summary.totalTime / 60); 
-    if (currentMissionProfile === 'direct') timeMin = Math.round((route.summary.totalDistance / 1000) / 3 * 60); 
+    const distKm = (route.summary.totalDistance / 1000).toFixed(2);
+    
+    // Aprēķinam laiku (ja Direct, tad pieņemam 4km/h)
+    let timeMin = Math.round(route.summary.totalTime / 60);
+    if (currentMissionProfile === 'direct') {
+        timeMin = Math.round((route.summary.totalDistance / 1000) / 4 * 60);
+    }
+    const h = Math.floor(timeMin / 60);
+    const m = timeMin % 60;
+    const timeStr = `${h}h ${m}min`;
 
-    let rows = '';
-    // Aprēķina segmentus (azimutu un distanci starp punktiem)
+    let rowsHTML = '';
+    
+    // Ģenerējam tabulu
     for (let i = 0; i < wps.length; i++) {
-        const wp = wps[i];
-        if (!wp.latLng) continue;
+        if (!wps[i].latLng) continue;
+        
+        const ll = wps[i].latLng;
+        const mgrs = (typeof toMGRS8 === 'function') ? toMGRS8(ll.lat, ll.lng, true) : "-";
+        const note = missionWaypointsData[i] || "";
+        const name = (i === 0) ? "START" : (i === wps.length - 1 ? "FINISH" : `KP-${i}`);
 
-        let mgrs = (typeof toMGRS8 === 'function') ? toMGRS8(wp.latLng.lat, wp.latLng.lng, true) : "-";
-        let note = missionWaypointsData[i] || "";
-        let name = (i === 0) ? "START" : (i === wps.length - 1 ? "FINISH" : `KP-${i}`);
-
-        // Segmenta info uz nākamo punktu
-        let segInfo = "";
+        // Info uz nākamo punktu
+        let nextInfo = "";
         if (i < wps.length - 1 && wps[i+1].latLng) {
             const next = wps[i+1].latLng;
-            const dist = wp.latLng.distanceTo(next); // metros
+            const dist = ll.distanceTo(next);
+            // Azimuts
+            const y = Math.sin(next.lng * Math.PI/180 - ll.lng * Math.PI/180) * Math.cos(next.lat * Math.PI/180);
+            const x = Math.cos(ll.lat * Math.PI/180) * Math.sin(next.lat * Math.PI/180) -
+                      Math.sin(ll.lat * Math.PI/180) * Math.cos(next.lat * Math.PI/180) * Math.cos(next.lng * Math.PI/180 - ll.lng * Math.PI/180);
+            let brng = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
             
-            // Azimuts (Bearing)
-            const y = Math.sin(next.lng * Math.PI/180 - wp.latLng.lng * Math.PI/180) * Math.cos(next.lat * Math.PI/180);
-            const x = Math.cos(wp.latLng.lat * Math.PI/180) * Math.sin(next.lat * Math.PI/180) -
-                      Math.sin(wp.latLng.lat * Math.PI/180) * Math.cos(next.lat * Math.PI/180) * Math.cos(next.lng * Math.PI/180 - wp.latLng.lng * Math.PI/180);
-            let brng = Math.atan2(y, x) * 180 / Math.PI;
-            brng = (brng + 360) % 360; // 0-360
-            
-            segInfo = `→ ${Math.round(dist)}m @ ${Math.round(brng)}°`;
-        } else {
-            segInfo = "END";
+            nextInfo = `<b>${Math.round(dist)}m</b> @ <b>${Math.round(brng)}°</b>`;
         }
 
-        rows += `
-            <tr>
-                <td><strong>${name}</strong></td>
-                <td style="font-family:monospace; font-weight:bold;">${mgrs}</td>
-                <td>${segInfo}</td>
-                <td>${note}</td>
-                <td></td> 
-            </tr>
+        rowsHTML += `
+            <tr style="border-bottom:1px solid #ccc;">
+                <td style="padding:8px;"><b>${name}</b></td>
+                <td style="padding:8px; font-family:monospace;">${mgrs}</td>
+                <td style="padding:8px;">${nextInfo}</td>
+                <td style="padding:8px;">${note}</td>
+                <td style="border:1px solid #000;"></td> </tr>
         `;
     }
 
-    const html = `
+    // Modāļa saturs
+    const modalHTML = `
         <div id="missionPrintModal">
-            <div class="print-paper">
-                <div class="no-print" style="text-align:right; margin-bottom:10px;">
-                    <button onclick="window.printMission()" style="background:#2e7d32; color:#fff; padding:10px 20px; border:none; cursor:pointer;">DRUKĀT</button>
-                    <button onclick="document.getElementById('missionPrintModal').remove()" style="background:#c62828; color:#fff; padding:10px 20px; border:none; cursor:pointer;">AIZVĒRT</button>
-                </div>
-                
-                <h2 style="text-align:center; border-bottom:2px solid black;">MARŠRUTA KARTE (Route Card)</h2>
-                <div style="display:flex; justify-content:space-between; margin-top:10px;">
-                    <div><strong>Profils:</strong> ${currentMissionProfile.toUpperCase()}</div>
-                    <div><strong>Distance:</strong> ${totalDist} km</div>
-                    <div><strong>Laiks:</strong> ~${timeMin} min</div>
-                    <div><strong>Datums:</strong> ${new Date().toLocaleDateString('lv-LV')}</div>
+            <div class="print-sheet">
+                <div class="no-print" style="text-align:right; margin-bottom:20px;">
+                    <button onclick="window.print()" style="padding:10px 20px; background:#1b5e20; color:#fff; border:none; cursor:pointer; font-weight:bold;">DRUKĀT</button>
+                    <button onclick="document.getElementById('missionPrintModal').remove()" style="padding:10px 20px; background:#b71c1c; color:#fff; border:none; cursor:pointer;">AIZVĒRT</button>
                 </div>
 
-                <table class="mission-table">
+                <div style="text-align:center; border-bottom:3px solid #000; padding-bottom:10px; margin-bottom:20px;">
+                    <h1 style="margin:0; font-size:24pt;">MARŠRUTA KARTE</h1>
+                    <p style="margin:5px 0;">Operācija: ____________________ | Datums: ${new Date().toLocaleDateString('lv-LV')}</p>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; margin-bottom:20px; font-size:14px; background:#eee; padding:10px;">
+                    <div>Profils: <strong>${currentMissionProfile.toUpperCase()}</strong></div>
+                    <div>Kopējā distance: <strong>${distKm} km</strong></div>
+                    <div>Aprēķinātais laiks: <strong>${timeStr}</strong></div>
+                </div>
+
+                <table style="width:100%; border-collapse:collapse; font-size:12pt;">
                     <thead>
-                        <tr>
-                            <th width="15%">Punkts</th>
-                            <th width="20%">MGRS Koordinātes</th>
-                            <th width="25%">Nākamais posms (Dist / Azimuts)</th>
-                            <th width="30%">Uzdevums / Piezīmes</th>
-                            <th width="10%">Laiks</th>
+                        <tr style="background:#ddd; border-bottom:2px solid #000;">
+                            <th style="text-align:left; padding:8px;">Punkts</th>
+                            <th style="text-align:left; padding:8px;">MGRS</th>
+                            <th style="text-align:left; padding:8px;">Uz nākamo</th>
+                            <th style="text-align:left; padding:8px; width:35%;">Uzdevums</th>
+                            <th style="text-align:left; padding:8px; width:10%;">Izpilde</th>
                         </tr>
                     </thead>
-                    <tbody>${rows}</tbody>
+                    <tbody>${rowsHTML}</tbody>
                 </table>
 
-                <div style="margin-top:50px; border-top:1px solid #ccc; padding-top:10px;">
-                    <p>Sastādīja: __________________________</p>
-                    <p>Apstiprināja: __________________________</p>
+                <div style="margin-top:60px; display:flex; justify-content:space-between; font-size:12pt;">
+                    <div style="border-top:1px solid #000; width:40%; padding-top:5px;">Sastādīja:</div>
+                    <div style="border-top:1px solid #000; width:40%; padding-top:5px;">Apstiprināja:</div>
                 </div>
             </div>
         </div>
     `;
 
-    // Clean old
-    const old = document.getElementById('missionPrintModal');
-    if(old) old.remove();
-    
-    document.body.insertAdjacentHTML('beforeend', html);
+    // Notīram veco un ieliekam jauno
+    const existing = document.getElementById('missionPrintModal');
+    if(existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
 }
-
-// Druka Helper
-window.printMission = function() {
-    document.body.classList.add('printing-mission');
-    window.print();
-    setTimeout(() => {
-        document.body.classList.remove('printing-mission');
-    }, 500);
-};
     // --- 6. SOLIS: PARASTĀ MEKLĒŠANA ---
     const input = document.getElementById('smartSearchInput');
     const searchBtn = document.getElementById('smartSearchBtn');
