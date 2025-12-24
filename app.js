@@ -3314,7 +3314,7 @@ map.whenReady(() => {
         width:420px;
         min-width:380px;
         max-width:92vw;
-        height:560px;
+        height:660px;
         min-height:420px;
         max-height:calc(100vh - 120px);
         resize:both;                         /* lietotājs var koriģēt izmēru */
@@ -3322,7 +3322,7 @@ map.whenReady(() => {
         display:flex;
         flex-direction:column;
         overflow:hidden;
-        z-index:200000;                      /* virs Leaflet */
+        z-index:2;                      /* virs Leaflet */
       }
 
       /* lai drukājot parasto lapu panelis netraucē */
@@ -3417,7 +3417,7 @@ map.whenReady(() => {
       .mp4-qbtn.active{ background:#c77712; border-color:#f0a43a; color:#111; }
       .mp4-qrow{ grid-column:1 / -1; display:grid; grid-template-columns: 1fr 44px 44px; gap:6px; align-items:center; }
       .mp4-qrow input{
-        width:100%;
+        width:90%;
         background:#0c1015;
         border:1px solid rgba(255,255,255,.18);
         color:#fff;
