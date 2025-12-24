@@ -3251,9 +3251,6 @@ map.whenReady(() => {
     // Liekam kreisajā augšējā stūrī
     const searchControl = new Control({ position: 'topleft' });
     map.addControl(searchControl);
-// ==============================================================
-// 5. SOLIS ...
-//===============================================================	
 (function MissionPlannerV4(){
   if (window.__MP4_INSTALLED__) return;
   window.__MP4_INSTALLED__ = true;
@@ -3273,10 +3270,10 @@ map.whenReady(() => {
   const S = {
     control: null,
     enabled: false,
-    profile: localStorage.getItem('mp4.profile') || 'driving',         // driving | walking | direct
-    distanceMode: localStorage.getItem('mp4.distanceMode') || 'route', // route | air
-    coordMode: localStorage.getItem('mp4.coordMode') || 'MGRS',        // MGRS | WGS | LKS
-    bearingUnit: localStorage.getItem('mp4.bearingUnit') || 'deg',     // deg | mil
+    profile: localStorage.getItem('mp4.profile') || 'driving',
+    distanceMode: localStorage.getItem('mp4.distanceMode') || 'route',
+    coordMode: localStorage.getItem('mp4.coordMode') || 'MGRS',
+    bearingUnit: localStorage.getItem('mp4.bearingUnit') || 'deg',
     wpData: new Map(),
     wpSeq: 0,
     legs: null,
@@ -3286,7 +3283,8 @@ map.whenReady(() => {
     dockResizeBound: false,
     mapClickAdd: false,
     lastDistNonDirect: localStorage.getItem('mp4.lastDistNonDirect') || (localStorage.getItem('mp4.distanceMode') || 'route'),
-    dragFromIdx: null
+    dragFromIdx: null,
+    settingsOpen: false // Vai sānu panelis ir vaļā
   };
 
   const SYMBOLS = [
@@ -3298,7 +3296,7 @@ map.whenReady(() => {
   ];
   const DEFAULT_SYMBOL = localStorage.getItem('mp4.defaultSymbol') || 'circle';
 
-  // --- CSS (tikai mp4) ---
+  // --- CSS ---
   (function injectCss(){
     if (document.getElementById('mp4-css')) return;
     const style = document.createElement('style');
@@ -3321,12 +3319,25 @@ map.whenReady(() => {
         box-sizing:border-box;
         display:flex;
         flex-direction:column;
-        overflow:hidden;
+        /* SVARĪGI: Lai redzētu sānu paneli un dropdown */
+        overflow:visible !important; 
         z-index:200000;
+        position: relative;
       }
 
       @media print { .mp4-panel{ display:none !important; } }
       body.print-mode .mp4-panel{ display:none !important; }
+
+      /* Iekšējais konteiners saturam, kam vajag scroll */
+      .mp4-inner-scroll {
+         flex: 1;
+         overflow: auto;
+         display: flex;
+         flex-direction: column;
+         position: relative;
+         background: #14181e; /* Lai nosegtu fonu */
+         border-radius: 0 0 10px 10px;
+      }
 
       .mp4-panel .leaflet-routing-container{
         margin:0 !important; padding:0 !important;
@@ -3337,16 +3348,12 @@ map.whenReady(() => {
         color:#cfd6df !important;
       }
 
-      /* ROUTING INPUTI (daudz KP → iekšējais scroll) */
       .mp4-panel .leaflet-routing-geocoders{
         padding:10px !important;
         background:#1c222a !important;
         border-bottom:1px solid rgba(255,255,255,.08);
-        max-height:28vh;
-        overflow:auto;
       }
 
-      /* katra rindas vizuālais noformējums + vieta drag handle */
       .mp4-panel .leaflet-routing-geocoder{
         position:relative;
         padding-left:26px !important;
@@ -3357,348 +3364,214 @@ map.whenReady(() => {
         border:1px solid rgba(255,255,255,.18) !important;
         color:#fff !important;
         border-radius:10px !important;
-        padding:8px 10px !important;
-        width:100% !important; /* lai nav šaurs, kad ir drag handle */
+        padding:6px 10px !important;
+        width:100% !important;
         margin-bottom:6px !important;
         box-sizing:border-box !important;
       }
 
       .mp4-panel .leaflet-routing-add-waypoint,
       .mp4-panel .leaflet-routing-remove-waypoint{
-        background:transparent !important;
-        border:none !important;
-        opacity:.9;
+        background:transparent !important; border:none !important; opacity:.9;
       }
       .mp4-panel .leaflet-routing-add-waypoint:after{ content:'+'; color:#3ddc84; font-weight:900; font-size:18px; }
       .mp4-panel .leaflet-routing-remove-waypoint:after{ content:'×'; color:#ff5b5b; font-weight:900; font-size:18px; }
 
       .mp4-panel .leaflet-routing-alt{
-        max-height:18vh;
-        overflow:auto;
         border-top:1px solid rgba(255,255,255,.08);
         background:rgba(0,0,0,.18) !important;
       }
       .mp4-panel .leaflet-routing-collapse-btn{ display:none !important; }
 
-      /* Drag handle */
       .mp4-drag-handle{
-        position:absolute;
-        left:8px;
-        top:10px;
-        width:14px;
-        height:20px;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        cursor:grab;
-        user-select:none;
-        opacity:.85;
-        font-weight:1000;
-        color:#aeb8c7;
+        position:absolute; left:8px; top:8px;
+        width:14px; height:20px;
+        display:flex; align-items:center; justify-content:center;
+        cursor:grab; user-select:none; opacity:.85;
+        font-weight:1000; color:#aeb8c7;
       }
       .mp4-drag-handle:active{ cursor:grabbing; opacity:1; }
       .mp4-wprow.mp4-drop{
-        outline:2px solid rgba(67,126,18,.55);
-        outline-offset:4px;
-        border-radius:10px;
+        outline:2px solid rgba(67,126,18,.55); outline-offset:4px; border-radius:10px;
       }
 
       .mp4-top{
-        padding:10px;
-        display:grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap:6px;
+        padding:8px 10px;
+        display:flex; gap:6px;
         background:#10141a;
         border-bottom:1px solid rgba(255,255,255,.08);
+        border-radius: 10px 10px 0 0;
       }
       .mp4-btn{
+        flex: 1;
         background:rgba(255,255,255,.08);
         border:1px solid rgba(255,255,255,.14);
-        color:#dbe3ee;
-        border-radius:10px;
-        padding:9px 8px;
-        font-weight:900;
-        font-size:11px;
-        letter-spacing:.3px;
-        text-align:center;
-        cursor:pointer;
-        user-select:none;
+        color:#dbe3ee; border-radius:8px;
+        padding:7px 8px;
+        font-weight:900; font-size:11px;
+        text-align:center; cursor:pointer; user-select:none;
       }
       .mp4-btn:hover{ background:rgba(255,255,255,.12); }
       .mp4-btn.active{
-        background:#1b5e20;
-        border-color:#2e7d32;
+        background:#1b5e20; border-color:#2e7d32;
         box-shadow:0 0 0 2px rgba(46,125,50,.18) inset;
       }
+      .mp4-btn-settings {
+         flex: 0 0 32px; font-size: 14px; padding: 0; display: flex; align-items: center; justify-content: center;
+      }
+      .mp4-btn-settings.active { background: #c77712; border-color:#f0a43a; color:#000; }
 
       .mp4-quick{
         padding:10px;
         background:#14181e;
         border-bottom:1px solid rgba(255,255,255,.08);
-        display:grid;
-        grid-template-columns: 1fr 1fr;
-        gap:8px;
-        position:relative; /* priekš ieteikumu dropdown */
+        display:grid; grid-template-columns: 1fr 1fr; gap:6px;
+        position:relative; z-index: 10;
       }
       .mp4-qbtn{
         background:rgba(255,255,255,.08);
         border:1px solid rgba(255,255,255,.14);
-        color:#fff;
-        border-radius:10px;
-        padding:9px 10px;
-        font-weight:1000;
-        cursor:pointer;
-        text-align:center;
-        font-size:11px;
+        color:#fff; border-radius:8px;
+        padding:7px 10px; font-weight:1000;
+        cursor:pointer; text-align:center; font-size:11px;
       }
       .mp4-qbtn.active{ background:#c77712; border-color:#f0a43a; color:#111; }
-      .mp4-qrow{ grid-column:1 / -1; display:grid; grid-template-columns: 1fr 44px 44px; gap:6px; align-items:center; }
+      
+      .mp4-qrow{ grid-column:1 / -1; display:grid; grid-template-columns: 1fr 32px 32px; gap:6px; align-items:center; position: relative; }
       .mp4-qrow input{
-        width:100%;
-        background:#0c1015;
+        width:100%; background:#0c1015;
         border:1px solid rgba(255,255,255,.18);
-        color:#fff;
-        border-radius:10px;
-        padding:9px 10px;
-        font-weight:900;
-        font-size:12px;
-        outline:none;
-        box-sizing:border-box;
+        color:#fff; border-radius:8px;
+        padding:7px 10px; font-weight:900; font-size:12px;
+        outline:none; box-sizing:border-box;
       }
-      .mp4-qrow input:focus{ border-color: rgba(67,126,18,.85); box-shadow: 0 0 0 2px rgba(67,126,18,.18); }
+      .mp4-qrow input:focus{ border-color: rgba(67,126,18,.85); }
       .mp4-qicon{
-        background:rgba(255,255,255,.08);
-        border:1px solid rgba(255,255,255,.14);
-        color:#fff;
-        border-radius:10px;
-        width:44px; height:38px; padding:0;
-        display:inline-flex; align-items:center; justify-content:center;
-        font-weight:1000;
-        cursor:pointer;
-        font-size:12px;
-        line-height:1;
+        background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
+        color:#fff; border-radius:8px;
+        height:32px; padding:0; display:flex; align-items:center; justify-content:center;
+        font-weight:1000; cursor:pointer; font-size:12px;
       }
       .mp4-qicon:hover{ background:rgba(255,255,255,.12); }
-      .mp4-qicon:disabled{ opacity:.55; cursor:not-allowed; }
-      .mp4-qhint{ grid-column:1 / -1; font-size:11px; color:#aeb8c7; line-height:1.2; margin-top:-2px; }
+      .mp4-qhint{ grid-column:1 / -1; font-size:10px; color:#aeb8c7; margin-top:-2px; }
 
-      /* Ieteikumi — OVERLAY (nevis stumj paneli uz leju) */
+      /* JAUNS: Ieteikumi (Dropdown) - peldošs virs satura */
       .mp4-suggest{
         position:absolute;
-        left:10px;
-        right:10px;
+        top: 100%; left:0; right:0;
+        margin-top: 4px;
         background:#0c1015;
-        border:1px solid rgba(255,255,255,.18);
-        border-radius:10px;
-        overflow:auto;
-        max-height:220px;
+        border:1px solid rgba(255,255,255,.25);
+        border-radius:8px;
+        overflow:auto; max-height:220px;
         display:none;
-        z-index:5;
-        box-shadow:0 10px 26px rgba(0,0,0,.6);
+        z-index:9999;
+        box-shadow:0 10px 30px rgba(0,0,0,.9);
       }
       .mp4-suggest .item{
-        padding:8px 10px;
-        cursor:pointer;
-        font-weight:900;
-        font-size:12px;
+        padding:8px 10px; cursor:pointer; font-weight:900; font-size:12px;
         border-bottom:1px solid rgba(255,255,255,.08);
       }
       .mp4-suggest .item:last-child{ border-bottom:none; }
       .mp4-suggest .item:hover{ background:rgba(255,255,255,.10); }
-      .mp4-suggest .sub{
-        display:block;
-        margin-top:2px;
-        font-size:11px;
-        font-weight:600;
-        opacity:.9;
-        color:#aeb8c7;
-      }
+      .mp4-suggest .sub{ display:block; margin-top:2px; font-size:10px; font-weight:600; opacity:.7; }
 
-      .mp4-mid{
-        padding:10px;
-        background:#14181e;
-        border-bottom:1px solid rgba(255,255,255,.08);
-        display:grid;
-        grid-template-columns: 1fr 1fr;
-        gap:8px;
-        align-items:end;
+      /* JAUNS: Sānu panelis (Iestatījumi) */
+      .mp4-side-panel {
+        position: absolute;
+        top: 10px;
+        left: 100%; /* Pa labi no galvenā paneļa */
+        margin-left: 8px;
+        width: 200px;
+        background: #14181e;
+        border: 1px solid rgba(255,255,255,.14);
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0,0,0,.6);
+        padding: 10px;
+        display: none; /* Slēpts pēc noklusējuma */
+        z-index: 199999;
       }
-      .mp4-field label{
-        display:block;
-        font-size:11px;
-        color:#aeb8c7;
-        margin-bottom:4px;
-        font-weight:800;
-        letter-spacing:.2px;
-      }
+      .mp4-side-panel.open { display: block; }
+
+      .mp4-field { margin-bottom: 10px; }
+      .mp4-field label{ display:block; font-size:10px; color:#aeb8c7; margin-bottom:3px; font-weight:800; text-transform:uppercase; }
       .mp4-field select{
-        width:100%;
-        background:#0c1015;
-        color:#fff;
+        width:100%; background:#0c1015; color:#fff;
         border:1px solid rgba(255,255,255,.18);
-        border-radius:10px;
-        padding:8px 10px;
-        font-weight:800;
-        font-size:12px;
+        border-radius:8px; padding:6px 8px;
+        font-weight:800; font-size:11px;
       }
 
-      .mp4-legs{
-        padding:10px;
-        overflow:auto;
-        flex:1;
-      }
-      .mp4-legs h4{
-        margin:0 0 8px 0;
-        font-size:12px;
-        color:#aeb8c7;
-        letter-spacing:.25px;
-      }
+      .mp4-legs{ padding:10px; flex:1; }
+      .mp4-legs h4{ margin:0 0 6px 0; font-size:11px; color:#aeb8c7; text-transform:uppercase; letter-spacing:0.5px; }
       .mp4-leg{
         border:1px solid rgba(255,255,255,.10);
         background:rgba(255,255,255,.05);
-        border-radius:12px;
-        padding:10px;
-        margin-bottom:8px;
+        border-radius:8px; padding:8px; margin-bottom:6px;
       }
-      .mp4-leg .t1{ font-weight:900; }
-      .mp4-leg .t2{ font-size:12px; color:#cfd6df; margin-top:3px; line-height:1.25; }
+      .mp4-leg .t1{ font-weight:900; font-size:12px; }
+      .mp4-leg .t2{ font-size:11px; color:#cfd6df; margin-top:2px; }
       .mp4-pill{
-        display:inline-block;
-        padding:2px 8px;
-        border:1px solid rgba(255,255,255,.14);
-        border-radius:999px;
-        font-size:11px;
-        font-weight:900;
-        margin-left:6px;
-        color:#e9eef5;
+        display:inline-block; padding:1px 6px;
+        border:1px solid rgba(255,255,255,.14); border-radius:10px;
+        font-size:10px; font-weight:900; margin-left:6px;
         background:rgba(0,0,0,.18);
       }
 
       .mp4-foot{
-        padding:10px;
+        padding:8px 10px;
         background:#10141a;
         border-top:1px solid rgba(255,255,255,.08);
-        display:flex;
-        gap:8px;
+        border-radius: 0 0 10px 10px;
+        display:flex; gap:6px;
       }
       .mp4-action{
-        flex:1;
-        border:none;
-        border-radius:12px;
-        padding:7px 8px; /* samazināts augstums */
-        font-weight:1000;
-        cursor:pointer;
-        color:#fff;
+        flex:1; border:none; border-radius:8px;
+        padding:4px 8px; /* SAMAZINĀTS AUGSTUMS */
+        font-weight:900; cursor:pointer; color:#fff; font-size:11px;
       }
-      .mp4-print{ background:#1565c0; }
-      .mp4-print:hover{ background:#0d47a1; }
-      .mp4-export{ background:#455a64; }
-      .mp4-export:hover{ background:#37474f; }
-      .mp4-clear{ background:#c62828; }
-      .mp4-clear:hover{ background:#b71c1c; }
+      .mp4-print{ background:#1565c0; } .mp4-print:hover{ background:#0d47a1; }
+      .mp4-export{ background:#455a64; } .mp4-export:hover{ background:#37474f; }
+      .mp4-clear{ background:#c62828; }  .mp4-clear:hover{ background:#b71c1c; }
 
       .mp4-marker-icon{ background:transparent; }
       .mp4-kp{
-        width:34px; height:34px;
-        display:flex; align-items:center; justify-content:center;
-        position:relative;
-        filter: drop-shadow(0 2px 3px rgba(0,0,0,.7));
+        width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+        position:relative; filter: drop-shadow(0 2px 3px rgba(0,0,0,.7));
       }
       .mp4-kp svg{ width:34px; height:34px; }
       .mp4-kp .mp4-lbl{
-        position:absolute;
-        top:-18px; left:50%;
-        transform:translateX(-50%);
-        padding:1px 6px;
-        border-radius:999px;
-        font-size:12px;
-        font-weight:1000;
-        color:#ff3b3b;
-        text-shadow: 0 2px 0 #000;
-        background:rgba(0,0,0,.35);
-        border:1px solid rgba(255,255,255,.12);
+        position:absolute; top:-18px; left:50%; transform:translateX(-50%);
+        padding:1px 6px; border-radius:999px; font-size:12px; font-weight:1000;
+        color:#ff3b3b; text-shadow: 0 2px 0 #000;
+        background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.12);
         white-space:nowrap;
       }
 
       .mp4-popup{ width:260px; }
       .mp4-popup h4{ margin:0 0 8px 0; color:#3ddc84; border-bottom:1px solid rgba(255,255,255,.12); padding-bottom:6px; }
       .mp4-coords{ font-size:11px; color:#aeb8c7; line-height:1.3; margin-bottom:8px; }
-      .mp4-coords code{ color:#fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .mp4-coords code{ color:#fff; font-family: ui-monospace, monospace; }
       .mp4-row{ display:flex; gap:6px; margin:6px 0; }
       .mp4-row button{
-        flex:1;
-        background:rgba(255,255,255,.08);
-        border:1px solid rgba(255,255,255,.14);
-        color:#fff;
-        border-radius:10px;
-        padding:7px 8px;
-        font-weight:900;
-        cursor:pointer;
-        font-size:11px;
+        flex:1; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
+        color:#fff; border-radius:8px; padding:6px; font-weight:900; cursor:pointer; font-size:10px;
       }
-      .mp4-row button:hover{ background:rgba(255,255,255,.12); }
       .mp4-popup textarea{
-        width:100%;
-        height:80px;
-        background:#0c1015;
-        border:1px solid rgba(255,255,255,.18);
-        color:#fff;
-        border-radius:12px;
-        padding:10px;
-        resize:vertical;
-        font-size:12px;
+        width:100%; height:60px; background:#0c1015; border:1px solid rgba(255,255,255,.18);
+        color:#fff; border-radius:8px; padding:8px; resize:vertical; font-size:11px;
       }
       .mp4-popup select{
-        width:100%;
-        background:#0c1015;
-        border:1px solid rgba(255,255,255,.18);
-        color:#fff;
-        border-radius:12px;
-        padding:9px 10px;
-        font-weight:900;
-        margin-bottom:8px;
+        width:100%; background:#0c1015; border:1px solid rgba(255,255,255,.18);
+        color:#fff; border-radius:8px; padding:6px; font-weight:900; margin-bottom:8px;
       }
-
-	  /* JAUNS: Nolaižamā paneļa stils (settings) */
-.mp4-details {
-  background: #14181e;
-  border-bottom: 1px solid rgba(255,255,255,.08);
-}
-.mp4-details summary {
-  padding: 8px 10px;
-  cursor: pointer;
-  font-weight: 800;
-  color: #aeb8c7;
-  font-size: 11px;
-  user-select: none;
-  list-style: none;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: rgba(255,255,255,.03);
-}
-.mp4-details summary::-webkit-details-marker { display: none; }
-.mp4-details summary:hover { background: rgba(255,255,255,.07); }
-.mp4-details summary::after { content: '+'; font-size: 14px; font-weight: 900; color: #666; }
-.mp4-details[open] summary::after { content: '−'; color: #ccc; }
-
-/* Pārveidojam mp4-mid, lai tas derētu iekšā */
-.mp4-mid {
-  padding: 10px;
-  background: #10141a; /* Mazliet tumšāks fons iekšpusē */
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  align-items: end;
-  border-top: 1px solid rgba(255,255,255,.05);
-}
     `;
     document.head.appendChild(style);
   })();
 
   function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
 
-  // --- Paneļa izmērs (lietotājs var koriģēt) + saglabāšana ---
+  // --- Paneļa izmērs ---
   const _MP4_PANEL_W_KEY = 'mp4.panel.w';
   const _MP4_PANEL_H_KEY = 'mp4.panel.h';
 
@@ -3712,54 +3585,25 @@ map.whenReady(() => {
     }catch(_){}
   }
 
-function _mp4BindPanelResizePersist(panel){
-  if (!panel || panel.__mp4ResizeBound) return;
-  panel.__mp4ResizeBound = true;
-
-  const rafFn = window.requestAnimationFrame || function(cb){ return setTimeout(cb, 16); };
-  const cafFn = window.cancelAnimationFrame || function(id){ clearTimeout(id); };
-
-  const save = ()=>{
-    try{
-      const r = panel.getBoundingClientRect();
-      if (r && r.width)  localStorage.setItem(_MP4_PANEL_W_KEY, String(Math.round(r.width)));
-      if (r && r.height) localStorage.setItem(_MP4_PANEL_H_KEY, String(Math.round(r.height)));
-    }catch(_){}
-  };
-
-  // RO callback = tikai saglabā izmēru (NEKĀDU dockPanel te!)
-  let raf = 0;
-  const saveRaf = ()=>{
-    if (raf) cafFn(raf);
-    raf = rafFn(()=>{ raf = 0; save(); });
-  };
-
-  if (window.ResizeObserver){
-    const ro = new ResizeObserver(()=>{ saveRaf(); });
-    ro.observe(panel);
-    panel.__mp4RO = ro;
-  } else {
-    // veciem pārlūkiem: saglabā uz "atlaists"
-    panel.addEventListener('mouseup', save, { passive:true });
-    panel.addEventListener('touchend', save, { passive:true });
+  function _mp4BindPanelResizePersist(panel){
+    if (!panel || panel.__mp4ResizeBound) return;
+    panel.__mp4ResizeBound = true;
+    const save = ()=>{
+      try{
+        const r = panel.getBoundingClientRect();
+        if (r && r.width)  localStorage.setItem(_MP4_PANEL_W_KEY, String(Math.round(r.width)));
+        if (r && r.height) localStorage.setItem(_MP4_PANEL_H_KEY, String(Math.round(r.height)));
+      }catch(_){}
+    };
+    if (window.ResizeObserver){
+      new ResizeObserver(()=>{ setTimeout(save, 100); }).observe(panel);
+    } else {
+      panel.addEventListener('mouseup', save, { passive:true });
+    }
+    const dockOnce = ()=>{ setTimeout(()=>{ save(); try{dockPanel();}catch(_){} }, 20); };
+    panel.addEventListener('pointerup', dockOnce);
+    panel.addEventListener('mouseup', dockOnce);
   }
-
-  // Kad lietotājs pabeidz resize → 1x saglabā + 1x dock (bez RO loop)
-  let dockRaf = 0;
-  const dockOnce = ()=>{
-    if (dockRaf) cafFn(dockRaf);
-    dockRaf = rafFn(()=>{
-      dockRaf = 0;
-      save();
-      try{ dockPanel(); }catch(_){}
-    });
-  };
-
-  panel.addEventListener('pointerup', dockOnce, { passive:true });
-  panel.addEventListener('mouseup', dockOnce, { passive:true });
-  panel.addEventListener('touchend', dockOnce, { passive:true });
-}
-
 
   function bearingDeg(a, b){
     const toRad = (x)=>x*Math.PI/180;
@@ -3770,7 +3614,6 @@ function _mp4BindPanelResizePersist(panel){
     return (brng + 360) % 360;
   }
   function degToMil(deg){ return (deg * 6400) / 360; }
-
   function fmtDist(m){
     if (!Number.isFinite(m)) return '-';
     if (m >= 1000) return (m/1000).toFixed(2) + ' km';
@@ -3786,15 +3629,12 @@ function _mp4BindPanelResizePersist(panel){
 
   function getCoordStrings(latlng){
     const lat = latlng.lat, lng = latlng.lng;
-
     let mgrsTxt = '-';
     try{
       if (typeof toMGRS8 === 'function') mgrsTxt = toMGRS8(lat, lng, false);
       else if (typeof mgrs !== 'undefined' && mgrs.forward) mgrsTxt = mgrs.forward([lng, lat]);
     }catch(_){}
-
     const wgsTxt = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-
     let lksTxt = '-';
     try{
       if (typeof wgsToLKS === 'function'){
@@ -3805,7 +3645,6 @@ function _mp4BindPanelResizePersist(panel){
         lksTxt = `${Math.round(p[0])}, ${Math.round(p[1])}`;
       }
     }catch(_){}
-
     return { mgrsTxt, wgsTxt, lksTxt };
   }
 
@@ -3827,247 +3666,96 @@ function _mp4BindPanelResizePersist(panel){
   function symbolSvg(symbolId){
     const stroke = '#ff3b3b';
     const fill   = 'rgba(255, 59, 59, 0.12)';
-    if (symbolId === 'square'){
-      return `<svg viewBox="0 0 36 36"><rect x="5" y="5" width="26" height="26" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="3"/></svg>`;
-    }
-    if (symbolId === 'diamond'){
-      return `<svg viewBox="0 0 36 36"><path d="M18 4 L32 18 L18 32 L4 18 Z" fill="${fill}" stroke="${stroke}" stroke-width="3"/></svg>`;
-    }
-    if (symbolId === 'triangle'){
-      return `<svg viewBox="0 0 36 36"><path d="M18 5 L32 30 L4 30 Z" fill="${fill}" stroke="${stroke}" stroke-width="3" /></svg>`;
-    }
-    if (symbolId === 'cross'){
-      return `<svg viewBox="0 0 36 36">
-        <path d="M16 6h4v10h10v4H20v10h-4V20H6v-4h10z" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
-        <rect x="5" y="5" width="26" height="26" rx="6" fill="none" stroke="${stroke}" stroke-width="2" opacity=".55"/>
-      </svg>`;
-    }
-    return `<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="12" fill="${fill}" stroke="${stroke}" stroke-width="3"/><circle cx="18" cy="18" r="1.5" fill="${stroke}"/></svg>`;
+    let p = '';
+    if (symbolId === 'square') p = `<rect x="5" y="5" width="26" height="26" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="3"/>`;
+    else if (symbolId === 'diamond') p = `<path d="M18 4 L32 18 L18 32 L4 18 Z" fill="${fill}" stroke="${stroke}" stroke-width="3"/>`;
+    else if (symbolId === 'triangle') p = `<path d="M18 5 L32 30 L4 30 Z" fill="${fill}" stroke="${stroke}" stroke-width="3" />`;
+    else if (symbolId === 'cross') p = `<path d="M16 6h4v10h10v4H20v10h-4V20H6v-4h10z" fill="${fill}" stroke="${stroke}" stroke-width="2"/><rect x="5" y="5" width="26" height="26" rx="6" fill="none" stroke="${stroke}" stroke-width="2" opacity=".55"/>`;
+    else p = `<circle cx="18" cy="18" r="12" fill="${fill}" stroke="${stroke}" stroke-width="3"/><circle cx="18" cy="18" r="1.5" fill="${stroke}"/>`;
+    return `<svg viewBox="0 0 36 36">${p}</svg>`;
   }
 
   function copyText(txt){
-    try{
-      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt);
-    }catch(_){}
-    window.prompt('Kopē tekstu:', txt);
-    return Promise.resolve();
+    try{ if (navigator.clipboard) return navigator.clipboard.writeText(txt); }catch(_){}
+    window.prompt('Kopē:', txt);
   }
 
-  // --- Ievade → LatLng (adrese / WGS84 / LKS-92 / MGRS)
   function _mp4ParseAnyCoords(q){
     q = String(q||'').trim();
     if (!q) return null;
-
     let m = q.match(/^\s*(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)\s*$/);
     if (m){
       const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
-      if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180){
-        return L.latLng(lat, lng);
-      }
+      if (Math.abs(lat) <= 90) return L.latLng(lat, lng);
     }
-
     m = q.match(/^\s*(\d{5,7})\s*[, ]\s*(\d{5,7})\s*$/);
     if (m){
       const E = parseFloat(m[1]), N = parseFloat(m[2]);
       try{
-        if (typeof lksToWGS === 'function'){
-          const p = lksToWGS(E, N);
-          if (p && isFinite(p.lat) && isFinite(p.lng)) return L.latLng(p.lat, p.lng);
-        } else if (typeof proj4 !== 'undefined'){
-          const out = proj4('EPSG:3059','EPSG:4326',[E,N]);
-          if (out && out.length >= 2) return L.latLng(out[1], out[0]);
-        }
+        if (typeof lksToWGS === 'function'){ const p = lksToWGS(E, N); return L.latLng(p.lat, p.lng); }
       }catch(_){}
     }
-
     const mgrsLike = q.replace(/\s+/g,'').toUpperCase();
     if (/^\d{1,2}[C-X][A-Z]{2}\d{2,10}$/i.test(mgrsLike)){
       try{
         const lib = (typeof mgrs !== 'undefined') ? mgrs : (window.mgrs || null);
-        if (lib && typeof lib.toPoint === 'function'){
-          const pt = lib.toPoint(mgrsLike);
-          if (pt && pt.length >= 2) return L.latLng(pt[1], pt[0]);
-        }
+        if (lib) { const pt = lib.toPoint(mgrsLike); return L.latLng(pt[1], pt[0]); }
       }catch(_){}
     }
-
-    try{
-      if (typeof parseCoordinates === 'function'){
-        const r = parseCoordinates(q);
-        if (r && isFinite(r.lat) && isFinite(r.lng)) return L.latLng(r.lat, r.lng);
-      }
-    }catch(_){}
-
     return null;
   }
 
-  // --- Nominatim (vairāki rezultāti) ar kešu ---
+  // --- Nominatim ---
   const _mp4GeoCache = new Map();
-  const _mp4GeoTTL = 30000;
-
-  function _mp4GeoCacheGet(key){
-    try{
-      const e = _mp4GeoCache.get(key);
-      if (e && (Date.now() - e.t) < _mp4GeoTTL) return e.v;
-      if (e) _mp4GeoCache.delete(key);
-    }catch(_){}
-    return null;
-  }
-  function _mp4GeoCacheSet(key, v){
-    try{ _mp4GeoCache.set(key, { t: Date.now(), v: v || [] }); }catch(_){}
-  }
-
-  async function _mp4NominatimSearchMany(q, limit){
-    const lim = Math.max(1, Math.min(10, parseInt(limit || 7, 10) || 7));
-    const url =
-      'https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&dedupe=1'
-      + '&limit=' + lim
-      + '&countrycodes=lv'
-      + '&q=' + encodeURIComponent(q);
-
-    const resp = await fetch(url, {
-      headers: { 'Accept': 'application/json', 'Accept-Language': 'lv' }
-    });
-    if (!resp.ok) throw new Error('nominatim ' + resp.status);
-    const data = await resp.json();
-
-    const out = [];
-    (data || []).forEach(r=>{
-      if (!r || r.lat == null || r.lon == null) return;
-      const lat = parseFloat(r.lat), lon = parseFloat(r.lon);
-      if (!isFinite(lat) || !isFinite(lon)) return;
-      out.push({ name: r.display_name || q, center: L.latLng(lat, lon), raw: r });
-    });
-    return out;
-  }
-
   async function resolveQueryToCandidates(q, limit){
-    q = String(q || '').trim();
+    q = String(q||'').trim();
     if (!q) return [];
-
     const ll = _mp4ParseAnyCoords(q);
     if (ll) return [{ name: q, center: ll, raw: null }];
 
-    const key = 'nom:' + q.toLowerCase();
-    const cached = _mp4GeoCacheGet(key);
-    if (cached) return cached;
+    const key = 'nom:'+q.toLowerCase();
+    if (_mp4GeoCache.has(key)) return _mp4GeoCache.get(key);
 
-    const res = await _mp4NominatimSearchMany(q, limit || 7);
-    _mp4GeoCacheSet(key, res);
-    return res;
-  }
-
-  async function resolveQueryToLatLng(q){
-    const arr = await resolveQueryToCandidates(q, 1);
-    return (arr && arr[0]) ? arr[0].center : null;
-  }
-
-  function createFallbackGeocoder(){
-    return {
-      geocode: function(query, cb, context){
-        resolveQueryToCandidates(query, 7).then((arr)=>{
-          const res = (arr || []).map(it => ({ name: it.name, center: it.center }));
-          cb.call(context || this, res);
-        }).catch(()=>cb.call(context || this, []));
-      },
-      reverse: function(latlng, scale, cb, context){
-        const name = (latlng && isFinite(latlng.lat) && isFinite(latlng.lng))
-          ? (latlng.lat.toFixed(6) + ', ' + latlng.lng.toFixed(6))
-          : '';
-        cb.call(context || this, name ? [{ name, center: latlng }] : []);
-      }
-    };
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&dedupe=1&limit='+limit+'&countrycodes=lv&q='+encodeURIComponent(q);
+    const resp = await fetch(url);
+    const data = await resp.json();
+    const out = [];
+    (data||[]).forEach(r=>{
+       out.push({ name: r.display_name, center: L.latLng(r.lat, r.lon), raw: r });
+    });
+    _mp4GeoCache.set(key, out);
+    return out;
   }
 
   function createHybridGeocoder(){
-    const custom = (window.MyCustomGeocoder) ? new MyCustomGeocoder() : null;
-    const fallback = createFallbackGeocoder();
-
     return {
       geocode: function(query, cb, context){
-        let done = false;
-        const finish = (res)=>{
-          if (done) return;
-          done = true;
-          cb.call(context || this, (res || []).slice(0, 7));
-        };
-
-        const mergeWithFallback = async (firstRes)=>{
-          try{
-            const arr = await resolveQueryToCandidates(query, 7);
-            const res = Array.isArray(firstRes) ? firstRes.slice() : [];
-            const seen = new Set();
-
-            res.forEach(r=>{
-              try{
-                if (r && r.center && isFinite(r.center.lat) && isFinite(r.center.lng)){
-                  seen.add(r.center.lat.toFixed(6)+','+r.center.lng.toFixed(6));
-                }
-              }catch(_){}
-            });
-
-            for (const it of (arr || [])){
-              const c = it && it.center;
-              if (!c) continue;
-              const k = c.lat.toFixed(6)+','+c.lng.toFixed(6);
-              if (seen.has(k)) continue;
-              seen.add(k);
-              res.push({ name: it.name, center: c });
-              if (res.length >= 7) break;
-            }
-            finish(res);
-          }catch(_){
-            finish(firstRes || []);
-          }
-        };
-
-        if (custom && typeof custom.geocode === 'function'){
-          try{
-            custom.geocode(query, (res)=>{
-              const r = Array.isArray(res) ? res : [];
-              if (r.length >= 2) finish(r);
-              else mergeWithFallback(r);
-            }, context || this);
-            setTimeout(()=>{ if (!done) mergeWithFallback([]); }, 800);
-          }catch(_){
-            mergeWithFallback([]);
-          }
-        } else {
-          fallback.geocode(query, cb, context || this);
-        }
+        resolveQueryToCandidates(query, 7).then(res => cb.call(context, res)).catch(()=>cb.call(context, []));
       },
-
       reverse: function(latlng, scale, cb, context){
-        if (custom && typeof custom.reverse === 'function'){
-          try{ return custom.reverse(latlng, scale, cb, context || this); }catch(_){}
-        }
-        return fallback.reverse(latlng, scale, cb, context || this);
+        cb.call(context, [{name: latlng.lat.toFixed(6)+','+latlng.lng.toFixed(6), center:latlng}]);
       }
     };
   }
 
+  // --- Logic ---
   async function fetchOsrmLegs(profileKey, latLngs){
     const prof = (profileKey === 'walking') ? ROUTER.profiles.walking : ROUTER.profiles.driving;
     const coords = latLngs.map(ll => `${ll.lng},${ll.lat}`).join(';');
     const url = `${ROUTER.serviceUrl}/${encodeURIComponent(prof)}/${coords}?overview=false&steps=false&annotations=false`;
-
     const r = await fetch(url);
-    if (!r.ok) throw new Error('OSRM ' + r.status);
     const data = await r.json();
-    const legs = (data && data.routes && data.routes[0] && data.routes[0].legs) ? data.routes[0].legs : [];
-    return legs.map(l => ({ route_m: l.distance, sec: l.duration }));
+    return (data.routes?.[0]?.legs || []).map(l => ({ route_m: l.distance, sec: l.duration }));
   }
 
   function computeLegsSync(latLngs){
     const legs = [];
     let totalAir = 0;
-
     for (let i=0; i<latLngs.length-1; i++){
       const a = latLngs[i], b = latLngs[i+1];
       const air = a.distanceTo(b);
       totalAir += air;
-      const brng = bearingDeg(a, b);
-      legs.push({ air_m: air, route_m: NaN, sec: NaN, brngDeg: brng });
+      legs.push({ air_m: air, route_m: NaN, sec: NaN, brngDeg: bearingDeg(a, b) });
     }
     return { legs, totalAir };
   }
@@ -4083,7 +3771,7 @@ function _mp4BindPanelResizePersist(panel){
 
     if (latLngs.length < 2){
       listEl.innerHTML = '';
-      sumEl.textContent = 'Pievieno vismaz 2 punktus.';
+      sumEl.innerHTML = '<span style="color:#777">Pievieno KP...</span>';
       S.legs = null; S.totals = null;
       return;
     }
@@ -4095,9 +3783,7 @@ function _mp4BindPanelResizePersist(panel){
     }
 
     const { legs, totalAir } = computeLegsSync(latLngs);
-
-    let totalRoute = 0;
-    let totalSec = 0;
+    let totalRoute = 0, totalSec = 0;
 
     if (S.distanceMode === 'route' && S.profile !== 'direct'){
       try{
@@ -4105,8 +3791,8 @@ function _mp4BindPanelResizePersist(panel){
         for (let i=0; i<legs.length; i++){
           legs[i].route_m = osrmLegs[i]?.route_m;
           legs[i].sec     = osrmLegs[i]?.sec;
-          totalRoute += Number.isFinite(legs[i].route_m) ? legs[i].route_m : 0;
-          totalSec   += Number.isFinite(legs[i].sec)     ? legs[i].sec     : 0;
+          totalRoute += (legs[i].route_m || 0);
+          totalSec   += (legs[i].sec || 0);
         }
       }catch(_){
         for (let i=0; i<legs.length; i++) legs[i].route_m = legs[i].air_m;
@@ -4120,7 +3806,6 @@ function _mp4BindPanelResizePersist(panel){
     S.legs = legs;
     S.totals = { air_m: totalAir, route_m: totalRoute, sec: totalSec };
     S.lastLegKey = key;
-
     renderLegList(wps, legs, S.totals);
   }
 
@@ -4130,32 +3815,26 @@ function _mp4BindPanelResizePersist(panel){
     if (!listEl || !sumEl) return;
 
     const totalShown = fmtDist(totals.route_m);
-    const totalAir   = fmtDist(totals.air_m);
-    const tStr = (S.distanceMode === 'route' && S.profile !== 'direct') ? fmtTime(totals.sec) : '-';
-
+    const tStr = (S.distanceMode === 'route' && S.profile !== 'direct') ? fmtTime(totals.sec) : '';
+    
     sumEl.innerHTML = `
-      Kopā: <b>${totalShown}</b>
-      <span class="mp4-pill">GAISS: ${totalAir}</span>
-      <span class="mp4-pill">${(S.distanceMode==='route' && S.profile!=='direct') ? ('LAIKS: '+tStr) : 'TAISNE'}</span>
+      Kopā: <b style="color:#fff">${totalShown}</b>
+      ${tStr ? ` <span style="opacity:.7">(${tStr})</span>` : ''}
     `;
 
     const unitLabel = (S.bearingUnit === 'mil') ? 'mil' : '°';
-
     let html = '';
     for (let i=0; i<legs.length; i++){
       const aName = (i===0) ? 'S' : `KP-${i}`;
       const bName = (i===wps.length-2) ? 'F' : `KP-${i+1}`;
-
       const air = fmtDist(legs[i].air_m);
       const route = fmtDist(legs[i].route_m);
-      const br = (S.bearingUnit === 'mil')
-        ? Math.round(degToMil(legs[i].brngDeg))
-        : Math.round(legs[i].brngDeg);
+      const br = (S.bearingUnit === 'mil') ? Math.round(degToMil(legs[i].brngDeg)) : Math.round(legs[i].brngDeg);
 
       html += `
         <div class="mp4-leg">
           <div class="t1">${aName} → ${bName}<span class="mp4-pill">${br}${unitLabel}</span></div>
-          <div class="t2">CEĻŠ: <b>${route}</b> · GAISS: ${air}${Number.isFinite(legs[i].sec) ? (' · '+fmtTime(legs[i].sec)) : ''}</div>
+          <div class="t2">Ceļš: <b>${route}</b> · Gaiss: ${air}</div>
         </div>
       `;
     }
@@ -4167,100 +3846,58 @@ function _mp4BindPanelResizePersist(panel){
     S.debounceT = setTimeout(()=>{
       refreshLegs().catch(()=>{});
       dockPanel();
-      bindWaypointsDnd(); // pēc UI izmaiņām
+      bindWaypointsDnd();
     }, 250);
   }
 
-  // --- Drag&Drop secība LRM ievades laukiem (Google stilā) ---
   function bindWaypointsDnd(){
     try{
       if (!S.control) return;
-      const panel = S.control.getContainer && S.control.getContainer();
+      const panel = S.control.getContainer();
       if (!panel) return;
-
       const box = panel.querySelector('.leaflet-routing-geocoders');
       if (!box) return;
-
       const rows = Array.from(box.querySelectorAll('.leaflet-routing-geocoder'));
       if (!rows.length) return;
 
       rows.forEach((row, idx)=>{
         row.dataset.mp4Idx = String(idx);
         row.classList.add('mp4-wprow');
-
         if (!row.querySelector('.mp4-drag-handle')){
           const h = document.createElement('span');
           h.className = 'mp4-drag-handle';
-          h.title = 'Pārvietot (velc uz augšu/leju)';
           h.textContent = '⋮⋮';
           h.draggable = true;
-
-          h.addEventListener('dragstart', (e)=>{
-            S.dragFromIdx = idx;
-            row.classList.add('mp4-drop');
-            try{
-              if (e.dataTransfer){
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain','mp4');
-              }
-            }catch(_){}
-          });
-
-          h.addEventListener('dragend', ()=>{
-            S.dragFromIdx = null;
-            rows.forEach(r=>r.classList.remove('mp4-drop'));
-          });
-
+          h.addEventListener('dragstart', (e)=>{ S.dragFromIdx = idx; row.classList.add('mp4-drop'); });
+          h.addEventListener('dragend', ()=>{ S.dragFromIdx = null; rows.forEach(r=>r.classList.remove('mp4-drop')); });
           row.insertBefore(h, row.firstChild);
         }
-
-        row.addEventListener('dragover', (e)=>{
-          if (S.dragFromIdx == null) return;
-          e.preventDefault();
-          row.classList.add('mp4-drop');
-          try{ if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; }catch(_){}
-        });
-
-        row.addEventListener('dragleave', ()=>{
-          row.classList.remove('mp4-drop');
-        });
-
+        row.addEventListener('dragover', (e)=>{ if(S.dragFromIdx!=null){ e.preventDefault(); row.classList.add('mp4-drop'); } });
+        row.addEventListener('dragleave', ()=>{ row.classList.remove('mp4-drop'); });
         row.addEventListener('drop', (e)=>{
-          if (S.dragFromIdx == null) return;
-          e.preventDefault();
+           if (S.dragFromIdx == null) return;
+           e.preventDefault();
+           const toIdx = parseInt(row.dataset.mp4Idx, 10);
+           const fromIdx = S.dragFromIdx;
+           rows.forEach(r=>r.classList.remove('mp4-drop'));
+           S.dragFromIdx = null;
+           if (toIdx === fromIdx) return;
 
-          const toIdx = parseInt(row.dataset.mp4Idx || '0', 10);
-          const fromIdx = S.dragFromIdx;
-
-          rows.forEach(r=>r.classList.remove('mp4-drop'));
-          S.dragFromIdx = null;
-
-          if (!isFinite(toIdx) || !isFinite(fromIdx) || toIdx === fromIdx) return;
-
-          const wps = (S.control.getWaypoints && S.control.getWaypoints() || []).slice();
-          if (wps.length < 2) return;
-          if (fromIdx < 0 || fromIdx >= wps.length) return;
-          if (toIdx < 0 || toIdx >= wps.length) return;
-
-          const moved = wps.splice(fromIdx, 1)[0];
-          wps.splice(toIdx, 0, moved);
-
-          S.control.setWaypoints(wps);
-          S.lastLegKey = '';
-          debounceRefresh();
-
-          // LRM pārzīmē laukus → pēc mirkļa pārbindot indeksus
-          setTimeout(bindWaypointsDnd, 80);
+           const wps = S.control.getWaypoints().slice();
+           if (wps.length < 2) return;
+           const moved = wps.splice(fromIdx, 1)[0];
+           wps.splice(toIdx, 0, moved);
+           S.control.setWaypoints(wps);
+           S.lastLegKey = '';
+           debounceRefresh();
+           setTimeout(bindWaypointsDnd, 80);
         });
       });
     }catch(_){}
   }
 
-  // --- Panel dock: blakus toggleRouteBtn (enkurs: 🧹, lai nepārklājas) ---
-// --- Aizstāj šo funkciju pilnībā ---
   function dockPanel(){
     try{
-      // JAUNS: Ja panelis ir izslēgts, neko nedaram un paslēpjam to
       if (!S.enabled) {
          if (S.control) {
             const c = S.control.getContainer && S.control.getContainer();
@@ -4268,56 +3905,35 @@ function _mp4BindPanelResizePersist(panel){
          }
          return;
       }
-
       if (!S.control) return;
-      const panel = S.control.getContainer && S.control.getContainer();
+      const panel = S.control.getContainer();
       const btn = document.getElementById('toggleRouteBtn');
       const anchor = (S.dockClearBtn && S.dockClearBtn.style.display !== 'none') ? S.dockClearBtn : btn;
       if (!panel || !btn || !anchor) return;
 
-      if (panel.parentNode !== document.body){
-        document.body.appendChild(panel);
-      }
+      if (panel.parentNode !== document.body) document.body.appendChild(panel);
 
       panel.style.display = 'flex';
       panel.style.position = 'fixed';
-      panel.style.zIndex = '200000';
-      panel.style.margin = '0';
-
+      
       const pr = panel.getBoundingClientRect();
-      const pw = pr.width  || 420;
-      const ph = pr.height || 560;
-
       const ar = anchor.getBoundingClientRect();
       const pad = 10;
-
-      let bottomLimit = window.innerHeight - 10;
-      const bl = document.querySelector('.leaflet-bottom.leaflet-left');
-      if (bl){
-        const r = bl.getBoundingClientRect();
-        if (r && isFinite(r.top) && r.top > 0) bottomLimit = Math.min(bottomLimit, r.top - 8);
-      }
-
       let left = ar.right + pad;
       let top  = ar.top;
 
-      if (left + pw > window.innerWidth - 10){
-        left = ar.left;
-        top  = ar.bottom + pad;
+      if (left + pr.width > window.innerWidth - 10){
+        left = ar.left; top = ar.bottom + pad;
       }
-
-      left = clamp(left, 10, window.innerWidth  - pw - 10);
+      
+      left = clamp(left, 10, window.innerWidth - pr.width - 10);
+      let bottomLimit = window.innerHeight - 10;
+      const bl = document.querySelector('.leaflet-bottom.leaflet-left');
+      if (bl) bottomLimit = Math.min(bottomLimit, bl.getBoundingClientRect().top - 8);
 
       let maxH = Math.max(320, Math.floor(bottomLimit - top - 10));
-      const effH = Math.min(ph, maxH);
-
-      top = clamp(top, 10, bottomLimit - effH);
-      maxH = Math.max(320, Math.floor(bottomLimit - top - 10));
-      
       const currMaxH = parseInt(panel.style.maxHeight || '', 10);
-      if (!isFinite(currMaxH) || Math.abs(currMaxH - maxH) > 1){
-        panel.style.maxHeight = maxH + 'px';
-      }
+      if (!isFinite(currMaxH) || Math.abs(currMaxH - maxH) > 2) panel.style.maxHeight = maxH + 'px';
 
       panel.style.left = left + 'px';
       panel.style.top  = top  + 'px';
@@ -4326,360 +3942,123 @@ function _mp4BindPanelResizePersist(panel){
         L.DomEvent.disableClickPropagation(panel);
         L.DomEvent.disableScrollPropagation(panel);
       }
-
       if (!S.dockResizeBound){
         S.dockResizeBound = true;
-        window.addEventListener('resize', dockPanel, { passive:true });
-        window.addEventListener('scroll', dockPanel, { passive:true });
+        window.addEventListener('resize', dockPanel);
+        window.addEventListener('scroll', dockPanel);
       }
     }catch(_){}
   }
 
   function openPrintWindow(){
-    if (!S.control) return;
     const wps = S.control.getWaypoints().filter(w => w && w.latLng);
-    if (wps.length < 2){
-      alert('Nav maršruta ko drukāt (vajag vismaz 2 punktus).');
-      return;
-    }
-
+    if (wps.length < 2) return alert('Vajag vismaz 2 punktus.');
     const latLngs = wps.map(w=>w.latLng);
-    if (S.dockClearBtn) S.dockClearBtn.style.display = (latLngs.length >= 2) ? '' : 'none';
-    const base = computeLegsSync(latLngs);
-    const legs = (S.legs && S.legs.length === wps.length-1) ? S.legs : base.legs;
-
-    const unitLabel = (S.bearingUnit === 'mil') ? 'mil' : '°';
-    const dateLv = new Date().toLocaleDateString('lv-LV');
-
+    const { legs, totalAir } = computeLegsSync(latLngs);
+    const totals = S.totals || { air_m: totalAir, route_m: totalAir, sec: NaN };
+    
     let rows = '';
-    for (let i=0; i<wps.length; i++){
-      const wp = wps[i];
-      ensureWpId(wp);
-      const d = S.wpData.get(wp.__mp4id) || { note:'', symbol:DEFAULT_SYMBOL, title:'' };
+    wps.forEach((wp, i)=>{
+       ensureWpId(wp);
+       const d = S.wpData.get(wp.__mp4id) || {};
+       const name = (i===0) ? 'S' : (i===wps.length-1 ? 'F' : `KP-${i}`);
+       const { mgrsTxt } = getCoordStrings(wp.latLng);
+       
+       let next = '-', az = '-';
+       if (i < wps.length-1){
+         const l = (S.legs && S.legs[i]) ? S.legs[i] : legs[i];
+         next = `${fmtDist(l.route_m||l.air_m)}`;
+         const br = (S.bearingUnit==='mil')?Math.round(degToMil(l.brngDeg)):Math.round(l.brngDeg);
+         az = br + ((S.bearingUnit==='mil')?'mil':'°');
+       }
+       rows += `<tr><td><b>${name}</b></td><td>${symbolCell(d.symbol)}</td><td><code>${mgrsTxt}</code></td><td>${next}</td><td>${az}</td><td>${d.note||''}</td><td></td></tr>`;
+    });
 
-      const name = (i===0) ? 'S' : (i===wps.length-1 ? 'F' : `KP-${i}`);
-      const coord = coordByMode(wp.latLng);
-
-      let next = '-';
-      let az   = '-';
-      let air  = '-';
-      let route= '-';
-      let sec  = '-';
-
-      if (i < wps.length-1){
-        const lg = legs[i] || {};
-        const br = (S.bearingUnit === 'mil')
-          ? Math.round(degToMil(lg.brngDeg ?? bearingDeg(wps[i].latLng, wps[i+1].latLng)))
-          : Math.round(lg.brngDeg ?? bearingDeg(wps[i].latLng, wps[i+1].latLng));
-        az = `${br}${unitLabel}`;
-
-        air = fmtDist(lg.air_m ?? wps[i].latLng.distanceTo(wps[i+1].latLng));
-        route = fmtDist(lg.route_m ?? lg.air_m);
-        sec = fmtTime(lg.sec);
-
-        next = `${route} (gaiss ${air})`;
-      }
-
-      rows += `
-        <tr>
-          <td><b>${escapeHtml(name)}</b>${d.title ? `<div style="font-size:10px;color:#444;">${escapeHtml(d.title)}</div>` : ''}</td>
-          <td style="text-align:center">${symbolCell(d.symbol)}</td>
-          <td><code>${escapeHtml(coord)}</code></td>
-          <td><b>${escapeHtml(next)}</b></td>
-          <td><b>${escapeHtml(az)}</b>${sec!=='-' ? `<div style="font-size:10px;color:#444;">${escapeHtml(sec)}</div>` : ''}</td>
-          <td>${escapeHtml(d.note || '')}</td>
-          <td class="chk"></td>
-        </tr>
-      `;
-    }
-
-    const totals = S.totals || { air_m: base.totalAir, route_m: base.totalAir, sec: NaN };
-
-    const html = `<!doctype html>
-<html lang="lv">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Maršruta kartiņa</title>
-<style>
-  @page { size: A4; margin: 12mm; }
-  body{ font-family: "Times New Roman", serif; color:#000; }
-  .top{ border-bottom:3px solid #000; padding-bottom:8px; margin-bottom:14px; }
-  h1{ margin:0; font-size:22pt; letter-spacing:.4px; }
-  .meta{ margin-top:6px; font-size:11pt; }
-  .bar{ display:flex; gap:10px; justify-content:space-between; background:#eee; padding:8px 10px; border:1px solid #ccc; margin-bottom:14px; font-size:11pt; }
-  table{ width:100%; border-collapse:collapse; font-size:11pt; }
-  th, td{ border-bottom:1px solid #ccc; padding:7px 7px; vertical-align:top; }
-  th{ background:#ddd; border-bottom:2px solid #000; text-align:left; }
-  code{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:10.5pt; }
-  .chk{ border:1px solid #000; width:26px; }
-  .sym svg{ width:18px; height:18px; vertical-align:middle; }
-  .sig{ margin-top:40px; display:flex; justify-content:space-between; gap:20px; }
-  .sig > div{ border-top:1px solid #000; width:45%; padding-top:6px; }
-  .noprint{ position:sticky; top:0; background:#fff; padding:10px 0 8px; }
-  .noprint button{ padding:8px 14px; font-weight:900; cursor:pointer; }
-  @media print{ .noprint{ display:none; } }
-</style>
-</head>
-<body>
-  <div class="noprint">
-    <button onclick="window.print()">DRUKĀT</button>
-    <button onclick="window.close()">AIZVĒRT</button>
-  </div>
-
-  <div class="top">
-    <h1>MARŠRUTA KARTE</h1>
-    <div class="meta">
-      Operācija: ____________________ &nbsp;|&nbsp;
-      Datums: <b>${escapeHtml(dateLv)}</b> &nbsp;|&nbsp;
-      Profils: <b>${escapeHtml(S.profile.toUpperCase())}</b> &nbsp;|&nbsp;
-      Koord.: <b>${escapeHtml(S.coordMode)}</b> &nbsp;|&nbsp;
-      Azimuts: <b>${escapeHtml(S.bearingUnit === 'mil' ? 'MIL (6400)' : 'GRĀDI')}</b>
-    </div>
-  </div>
-
-  <div class="bar">
-    <div>Kopā (ceļš): <b>${escapeHtml(fmtDist(totals.route_m))}</b></div>
-    <div>Kopā (gaiss): <b>${escapeHtml(fmtDist(totals.air_m))}</b></div>
-    <div>Laiks (ja ir): <b>${escapeHtml(fmtTime(totals.sec))}</b></div>
-  </div>
-
-  <table>
-    <thead>
-      <tr>
-        <th style="width:12%;">Punkts</th>
-        <th style="width:7%; text-align:center;">Sym</th>
-        <th style="width:25%;">Koordinātes</th>
-        <th style="width:20%;">Uz nākamo</th>
-        <th style="width:13%;">Azimuts</th>
-        <th style="width:18%;">Uzdevums</th>
-        <th style="width:5%;">✓</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
-
-  <div class="sig">
-    <div>Sastādīja:</div>
-    <div>Apstiprināja:</div>
-  </div>
-</body>
-</html>`;
-
-    const w = window.open('', '_blank');
-    if (!w){
-      alert('Popup bloķēts. Atļauj popup šai lapai, lai drukātu maršruta kartiņu.');
-      return;
-    }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-  }
-
-  function escapeHtml(s){
-    return String(s ?? '')
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;')
-      .replace(/'/g,'&#39;');
-  }
-
-  function symbolCell(symbolId){
-    const stroke = '#000';
-    const fill = 'transparent';
-    let svg = '';
-    if (symbolId === 'square'){
-      svg = `<svg viewBox="0 0 36 36"><rect x="7" y="7" width="22" height="22" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="3"/></svg>`;
-    } else if (symbolId === 'diamond'){
-      svg = `<svg viewBox="0 0 36 36"><path d="M18 6 L30 18 L18 30 L6 18 Z" fill="${fill}" stroke="${stroke}" stroke-width="3"/></svg>`;
-    } else if (symbolId === 'triangle'){
-      svg = `<svg viewBox="0 0 36 36"><path d="M18 7 L30 29 L6 29 Z" fill="${fill}" stroke="${stroke}" stroke-width="3"/></svg>`;
-    } else if (symbolId === 'cross'){
-      svg = `<svg viewBox="0 0 36 36"><path d="M16 7h4v9h9v4h-9v9h-4v-9H7v-4h9z" fill="${fill}" stroke="${stroke}" stroke-width="2"/></svg>`;
-    } else {
-      svg = `<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="10" fill="${fill}" stroke="${stroke}" stroke-width="3"/></svg>`;
-    }
-    return `<span class="sym">${svg}</span>`;
+    const h = `<html><head><title>Maršruts</title><style>
+      body{font-family:serif;padding:20px;} table{width:100%;border-collapse:collapse;} 
+      th,td{border-bottom:1px solid #ccc;padding:5px;text-align:left;}
+    </style></head><body>
+      <h1>Maršruts</h1>
+      <p>Kopā: ${fmtDist(totals.route_m)}</p>
+      <table><thead><tr><th>Punkts</th><th>Sym</th><th>MGRS</th><th>Dist</th><th>Az</th><th>Uzdevums</th><th>✓</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      <script>window.print();</script>
+    </body></html>`;
+    const w = window.open('','_blank');
+    w.document.write(h); w.document.close();
   }
 
   function createMp4Marker(i, wp, nWps){
     ensureWpId(wp);
     const d = S.wpData.get(wp.__mp4id);
-
     const label = (i===0) ? 'S' : (i===nWps-1 ? 'F' : `KP-${i}`);
-
-    const iconHtml = `
-      <div class="mp4-kp">
-        ${symbolSvg(d.symbol || DEFAULT_SYMBOL)}
-        <div class="mp4-lbl">${label}</div>
-      </div>
-    `;
-
     const icon = L.divIcon({
       className: 'mp4-marker-icon',
-      html: iconHtml,
-      iconSize: [34,34],
-      iconAnchor: [17,17]
+      html: `<div class="mp4-kp">${symbolSvg(d.symbol || DEFAULT_SYMBOL)}<div class="mp4-lbl">${label}</div></div>`,
+      iconSize: [34,34], iconAnchor: [17,17]
     });
-
     const marker = L.marker(wp.latLng, { draggable:true, icon });
-
-    const content = document.createElement('div');
-    content.className = 'mp4-popup';
-
-    const { mgrsTxt, wgsTxt, lksTxt } = getCoordStrings(wp.latLng);
-
-    content.innerHTML = `
-      <h4>${label}</h4>
-
-      <div class="mp4-coords">
-        <div>MGRS: <code>${escapeHtml(mgrsTxt)}</code></div>
-        <div>WGS: <code>${escapeHtml(wgsTxt)}</code></div>
-        <div>LKS-92: <code>${escapeHtml(lksTxt)}</code></div>
-      </div>
-
-      <div class="mp4-row">
-        <button type="button" data-copy="mgrs">KOPĒ MGRS</button>
-        <button type="button" data-copy="wgs">KOPĒ WGS</button>
-        <button type="button" data-copy="lks">KOPĒ LKS</button>
-      </div>
-
-      <label style="display:block;font-weight:900;font-size:11px;color:#aeb8c7;margin:8px 0 4px;">Nosaukums (papildus)</label>
-      <input id="mp4Title" type="text" value="${escapeHtml(d.title||'')}"
-        style="width:100%;background:#0c1015;border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:12px;padding:9px 10px;font-weight:900;margin-bottom:8px;"
-        placeholder="piem. NOVĒROŠANA / ATBALSTA PUNKTS"/>
-
-      <label style="display:block;font-weight:900;font-size:11px;color:#aeb8c7;margin:4px 0 4px;">Simbols</label>
-      <select id="mp4Sym">
-        ${SYMBOLS.map(s => `<option value="${s.id}" ${s.id===(d.symbol||DEFAULT_SYMBOL)?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
-      </select>
-
-      <textarea id="mp4Note" placeholder="Ievadi uzdevumu...">${escapeHtml(d.note||'')}</textarea>
-    `;
-
-    content.querySelectorAll('button[data-copy]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const t = btn.getAttribute('data-copy');
-        if (t==='mgrs') copyText(mgrsTxt);
-        if (t==='wgs')  copyText(wgsTxt);
-        if (t==='lks')  copyText(lksTxt);
-      });
-    });
-
-    const titleEl = content.querySelector('#mp4Title');
-    titleEl.addEventListener('input', (e)=>{
-      d.title = e.target.value || '';
-      S.wpData.set(wp.__mp4id, d);
-    });
-
-    const noteEl = content.querySelector('#mp4Note');
-    noteEl.addEventListener('input', (e)=>{
-      d.note = e.target.value || '';
-      S.wpData.set(wp.__mp4id, d);
-    });
-
-    const symEl = content.querySelector('#mp4Sym');
-    symEl.addEventListener('change', ()=>{
-      d.symbol = symEl.value;
-      localStorage.setItem('mp4.defaultSymbol', d.symbol);
-      S.wpData.set(wp.__mp4id, d);
-
-      const html = `
-        <div class="mp4-kp">
-          ${symbolSvg(d.symbol)}
-          <div class="mp4-lbl">${label}</div>
-        </div>
-      `;
-      marker.setIcon(L.divIcon({
-        className:'mp4-marker-icon',
-        html,
-        iconSize:[34,34],
-        iconAnchor:[17,17]
-      }));
-    });
-
-    marker.bindPopup(content);
+    const c = document.createElement('div');
+    c.className = 'mp4-popup';
+    const { mgrsTxt } = getCoordStrings(wp.latLng);
+    c.innerHTML = `<h4>${label}</h4><div class="mp4-coords"><code>${mgrsTxt}</code></div>
+      <label style="display:block;font-size:10px;color:#888">Simbols</label>
+      <select id="mp4Sym">${SYMBOLS.map(s=>`<option value="${s.id}" ${s.id===d.symbol?'selected':''}>${s.name}</option>`).join('')}</select>
+      <textarea id="mp4Note" placeholder="Uzdevums...">${d.note||''}</textarea>`;
+    
+    c.querySelector('select').onchange = (e)=>{
+       d.symbol = e.target.value; S.wpData.set(wp.__mp4id, d);
+       marker.setIcon(L.divIcon({ className:'mp4-marker-icon', html:`<div class="mp4-kp">${symbolSvg(d.symbol)}<div class="mp4-lbl">${label}</div></div>`, iconSize:[34,34], iconAnchor:[17,17] }));
+    };
+    c.querySelector('textarea').oninput = (e)=>{ d.note=e.target.value; S.wpData.set(wp.__mp4id,d); };
+    marker.bindPopup(c);
     return marker;
   }
 
   function addWaypointLatLng(latlng){
     if (!S.control) return;
     const wps = S.control.getWaypoints().slice();
-
     let idx = wps.findIndex(w => !w || !w.latLng);
-    if (idx === -1){
-      idx = Math.max(1, wps.length - 1);
-      wps.splice(idx, 0, L.Routing.waypoint(latlng));
-    } else {
-      wps[idx] = L.Routing.waypoint(latlng);
-    }
+    if (idx === -1) idx = Math.max(1, wps.length - 1);
+    wps.splice(idx, 0, L.Routing.waypoint(latlng));
     S.control.setWaypoints(wps);
     debounceRefresh();
   }
 
   function setMapClickAdd(on){
-    const map = getMap();
-    if (!map) return;
+    const map = getMap(); if(!map)return;
     S.mapClickAdd = !!on;
-
-    const mc = map.getContainer && map.getContainer();
-    if (mc) mc.style.cursor = S.mapClickAdd ? 'crosshair' : '';
-
+    map.getContainer().style.cursor = S.mapClickAdd ? 'crosshair' : '';
     map.off('click', onMapClickAdd);
     if (S.mapClickAdd) map.on('click', onMapClickAdd);
   }
-
-  function onMapClickAdd(e){
-    if (!S.mapClickAdd) return;
-    addWaypointLatLng(e.latlng);
-  }
+  function onMapClickAdd(e){ if(S.mapClickAdd) addWaypointLatLng(e.latlng); }
 
   function init(){
     const map = getMap();
-    if (!map){
-      alert('Karte nav gatava (map). Pamēģini pēc mirkļa vēlreiz.');
-      return;
-    }
-    if (typeof L === 'undefined' || typeof L.Routing === 'undefined'){
-      alert('⚠️ Nav ielādēts Routing modulis (Leaflet Routing Machine).');
-      return;
-    }
+    if (!map || typeof L === 'undefined' || !L.Routing) return alert('Karte nav gatava.');
 
     const DirectRouter = L.Class.extend({
       route: function(waypoints, callback, context){
         const latLngs = waypoints.map(w=>w.latLng).filter(Boolean);
         const routes = [];
         if (latLngs.length >= 2){
-          let total = 0;
-          const instructions = [];
-          for (let i=0; i<latLngs.length-1; i++){
-            const dist = latLngs[i].distanceTo(latLngs[i+1]);
-            total += dist;
-            const br = bearingDeg(latLngs[i], latLngs[i+1]);
-            instructions.push({ type:'Straight', distance: dist, time: dist / 1.1, text: `Uz KP-${i+1}: ${Math.round(dist)}m @ ${Math.round(br)}°` });
-          }
-          routes.push({
-            name:'Taisne',
-            summary:{ totalDistance: total, totalTime: total / 1.1 },
-            coordinates: latLngs,
-            inputWaypoints: waypoints,
-            waypoints: waypoints,
-            instructions
-          });
+           let total = 0, instructions = [];
+           for (let i=0; i<latLngs.length-1; i++){
+             const dist = latLngs[i].distanceTo(latLngs[i+1]);
+             total += dist;
+             instructions.push({ type:'Straight', distance: dist, time: dist/1.1, text:'' });
+           }
+           routes.push({ name:'Taisne', summary:{ totalDistance: total, totalTime: total/1.1 }, coordinates: latLngs, inputWaypoints: waypoints, waypoints: waypoints, instructions });
         }
         callback.call(context, null, routes);
       }
     });
 
     S.control = L.Routing.control({
-      position: 'topleft',
-      waypoints: [ null, null ],
+      position: 'topleft', waypoints: [ null, null ],
       geocoder: createHybridGeocoder(),
-      routeWhileDragging: true,
-      showAlternatives: false,
-      fitSelectedRoutes: false,
+      routeWhileDragging: true, showAlternatives: false, fitSelectedRoutes: false,
       containerClassName: 'mp4-panel',
       router: L.Routing.osrmv1({ serviceUrl: ROUTER.serviceUrl, profile: ROUTER.profiles.driving }),
       lineOptions: { styles:[{ color:'#ff3b3b', opacity:0.85, weight:4, dashArray:'10,10' }] },
@@ -4687,524 +4066,250 @@ function _mp4BindPanelResizePersist(panel){
     }).addTo(map);
 
     setTimeout(()=>mountPanelUi(map, DirectRouter), 80);
-
     S.control.on('routesfound', ()=>debounceRefresh());
-    S.control.on('waypointschanged', ()=>{
-      debounceRefresh();
-      setTimeout(bindWaypointsDnd, 60);
-    });
-
+    S.control.on('waypointschanged', ()=>{ debounceRefresh(); setTimeout(bindWaypointsDnd, 60); });
     debounceRefresh();
   }
 
   function mountPanelUi(map, DirectRouter){
     const c = S.control && S.control.getContainer ? S.control.getContainer() : null;
-    if (!c) return;
-    if (c.querySelector('#mp4TopBar')) return;
+    if (!c || c.querySelector('#mp4TopBar')) return;
 
+    // --- STRUKTŪRA ---
+    // 1. Top Bar
     const top = document.createElement('div');
-    top.id = 'mp4TopBar';
-    top.className = 'mp4-top';
+    top.id = 'mp4TopBar'; top.className = 'mp4-top';
     top.innerHTML = `
-      <div class="mp4-btn active" id="mp4Car"  title="Pa ceļiem / auto">🚙 AUTO</div>
-      <div class="mp4-btn"        id="mp4Foot" title="Kājām (OSRM foot)">🚶 KĀJĀM</div>
-      <div class="mp4-btn"        id="mp4Line" title="Taisne (azimuts)">📏 TAISNE</div>
+      <div class="mp4-btn active" id="mp4Car">🚙 AUTO</div>
+      <div class="mp4-btn" id="mp4Foot">🚶 KĀJĀM</div>
+      <div class="mp4-btn" id="mp4Line">📏 TAISNE</div>
+      <div class="mp4-btn mp4-btn-settings" id="mp4SettingsToggle" title="Iestatījumi">⚙️</div>
     `;
 
+    // 2. Quick Add (ar floating dropdown)
     const quick = document.createElement('div');
     quick.className = 'mp4-quick';
     quick.innerHTML = `
-      <div class="mp4-qbtn" id="mp4AddFromMap" title="Ieslēdz režīmu: klikšķis kartē pievieno KP">➕ KP NO KARTES</div>
-      <div class="mp4-qbtn" id="mp4AddCenter"  title="Pievieno KP kartes centrā">➕ KP CENTRĀ</div>
-
+      <div class="mp4-qbtn" id="mp4AddFromMap" title="Klikšķini kartē">➕ NO KARTES</div>
+      <div class="mp4-qbtn" id="mp4AddCenter"  title="Kartes centrā">➕ CENTRĀ</div>
       <div class="mp4-qrow" id="mp4QuickRow">
-        <input id="mp4AddInput" type="text" autocomplete="off" placeholder="Adrese / MGRS / lat,lng / LKS (E,N)"/>
-        <button id="mp4AddGo" class="mp4-qicon" type="button" title="Atrast un pietuvināt">📍</button>
-        <button id="mp4AddApply" class="mp4-qicon" type="button" title="Pievienot kā KP maršrutam">➕</button>
+        <input id="mp4AddInput" type="text" autocomplete="off" placeholder="Adrese / MGRS / LatLon"/>
+        <button id="mp4AddGo" class="mp4-qicon" type="button">📍</button>
+        <button id="mp4AddApply" class="mp4-qicon" type="button">➕</button>
+        <div id="mp4AddSuggest" class="mp4-suggest"></div>
       </div>
-
-      <div id="mp4AddSuggest" class="mp4-suggest" aria-label="Ieteikumi"></div>
-
-      <div class="mp4-qhint">Piem.: “Brīvības iela 1, Rīga” · “56.9523, 24.1131” · “E,N (LKS-92)” · “34TET1234512345 (MGRS)”</div>
     `;
 
-// --- Aizstāj "const mid = ..." daļu ar šo ---
+    // 3. Inner Scroll Wrapper (Legs)
+    const inner = document.createElement('div');
+    inner.className = 'mp4-inner-scroll';
     
-    // Izmantojam <details> elementu, lai izveidotu nolaižamo bloku
-    const midDetails = document.createElement('details');
-    midDetails.className = 'mp4-details';
-    // Ja gribi, lai pēc noklusējuma ir atvērts, atkomentē nākamo rindu:
-    // midDetails.open = true; 
-
-    midDetails.innerHTML = `
-      <summary>⚙️ IESTATĪJUMI & INFO</summary>
-      <div class="mp4-mid">
-          <div class="mp4-field">
-            <label>Metri pēc</label>
-            <select id="mp4DistanceMode">
-              <option value="route">CEĻŠ (OSRM)</option>
-              <option value="air">GAISS (TAISNE)</option>
-            </select>
-          </div>
-          <div class="mp4-field">
-            <label>Koordinātes</label>
-            <select id="mp4CoordMode">
-              <option value="MGRS">MGRS</option>
-              <option value="WGS">Lat/Lng</option>
-              <option value="LKS">LKS-92</option>
-            </select>
-          </div>
-          <div class="mp4-field">
-            <label>Azimuta vienības</label>
-            <select id="mp4BearingUnit">
-              <option value="deg">Grādi (°)</option>
-              <option value="mil">Mil (6400)</option>
-            </select>
-          </div>
-          <div class="mp4-field">
-            <label>Info</label>
-            <div id="mp4SummaryLine" style="font-weight:900;color:#e9eef5;line-height:1.25;font-size:11px;">-</div>
-          </div>
-      </div>
-    `;
-
+    // Šeit tiks ievietots LRM (routing inputs) automātiski, bet mēs ieliekam Legs sarakstu
     const legs = document.createElement('div');
     legs.className = 'mp4-legs';
-    legs.innerHTML = `<h4>Posmi (KP → KP)</h4><div id="mp4LegList"></div>`;
+    legs.innerHTML = `
+       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+         <h4>Maršruts</h4>
+         <div id="mp4SummaryLine" style="font-size:11px;">-</div>
+       </div>
+       <div id="mp4LegList"></div>
+    `;
+    inner.appendChild(legs);
 
+    // 4. Footer
     const foot = document.createElement('div');
     foot.className = 'mp4-foot';
     foot.innerHTML = `
-      <button class="mp4-action mp4-print"  id="mp4Print">📄 DRUKĀT</button>
-      <button class="mp4-action mp4-export" id="mp4Export">⬇️ EKSPORTS</button>
-      <button class="mp4-action mp4-clear"  id="mp4Clear">✕ DZĒST</button>
+      <button class="mp4-action mp4-print" id="mp4Print">DRUKĀT</button>
+      <button class="mp4-action mp4-export" id="mp4Export">EKSPORTS</button>
+      <button class="mp4-action mp4-clear" id="mp4Clear">DZĒST</button>
     `;
 
-    c.insertBefore(foot, c.firstChild);
-    c.insertBefore(legs, c.firstChild);
-    c.insertBefore(midDetails,  c.firstChild);
-    c.insertBefore(quick,c.firstChild);
-    c.insertBefore(top,  c.firstChild);
+    // 5. Side Panel (Settings) - Absolute positioned right
+    const side = document.createElement('div');
+    side.className = 'mp4-side-panel';
+    side.id = 'mp4SidePanel';
+    side.innerHTML = `
+      <div class="mp4-field">
+        <label>Metri pēc</label>
+        <select id="mp4DistanceMode">
+          <option value="route">CEĻŠ (OSRM)</option>
+          <option value="air">GAISS (TAISNE)</option>
+        </select>
+      </div>
+      <div class="mp4-field">
+        <label>Koordinātes</label>
+        <select id="mp4CoordMode">
+          <option value="MGRS">MGRS</option>
+          <option value="WGS">Lat/Lng</option>
+          <option value="LKS">LKS-92</option>
+        </select>
+      </div>
+      <div class="mp4-field">
+        <label>Azimuta vienības</label>
+        <select id="mp4BearingUnit">
+          <option value="deg">Grādi (°)</option>
+          <option value="mil">Mil (6400)</option>
+        </select>
+      </div>
+      <div style="font-size:10px;color:#666;margin-top:20px;text-align:center;">
+        MissionPlanner v4
+      </div>
+    `;
 
-    const distSel = c.querySelector('#mp4DistanceMode');
-    const coordSel= c.querySelector('#mp4CoordMode');
-    const bearSel = c.querySelector('#mp4BearingUnit');
+    // Saliekam visu kopā konteinerī
+    // LRM inputs ir c.firstChild (parasti), tāpēc insertBefore
+    c.appendChild(top);
+    c.appendChild(quick);
+    // LRM inputs jāpārvieto? Nē, LRM inputs ir "c" bērns.
+    // Lai LRM inputs būtu scrollējams, mums vajag triku. 
+    // Bet vienkāršāk: atstājam LRM inputs kā ir, tie būs zem Quick Add.
+    // Un tad Inner Scroll zem tiem.
+    
+    // Pārkārtojam DOM:
+    // [Top]
+    // [Quick]
+    // [Routing-Geocoders (LRM)] <- šis jau ir iekšā, bet jāpārvieto secībā
+    // [InnerScroll -> Legs]
+    // [Footer]
+    // [SidePanel]
+
+    c.insertBefore(top, c.firstChild);
+    c.insertBefore(quick, top.nextSibling);
+    
+    // Atrodam LRM kasti
+    const lrmBox = c.querySelector('.leaflet-routing-geocoders');
+    if(lrmBox) c.insertBefore(lrmBox, quick.nextSibling);
+    
+    c.appendChild(inner);
+    c.appendChild(foot);
+    c.appendChild(side);
+
+    // --- Events ---
+    const distSel = side.querySelector('#mp4DistanceMode');
+    const coordSel= side.querySelector('#mp4CoordMode');
+    const bearSel = side.querySelector('#mp4BearingUnit');
+    const setToggleBtn = top.querySelector('#mp4SettingsToggle');
+    const sidePanel = side;
 
     distSel.value = S.distanceMode;
     coordSel.value= S.coordMode;
     bearSel.value = S.bearingUnit;
 
-    const setMode = (mode)=>{
-      S.profile = mode;
-      localStorage.setItem('mp4.profile', S.profile);
+    setToggleBtn.onclick = ()=>{
+       S.settingsOpen = !S.settingsOpen;
+       setToggleBtn.classList.toggle('active', S.settingsOpen);
+       sidePanel.classList.toggle('open', S.settingsOpen);
+    };
 
-      ['mp4Car','mp4Foot','mp4Line'].forEach(id=>{
-        const el = document.getElementById(id);
-        if (el) el.classList.remove('active');
-      });
-      if (mode==='driving') document.getElementById('mp4Car').classList.add('active');
-      if (mode==='walking') document.getElementById('mp4Foot').classList.add('active');
-      if (mode==='direct')  document.getElementById('mp4Line').classList.add('active');
+    const setMode = (mode)=>{
+      S.profile = mode; localStorage.setItem('mp4.profile', S.profile);
+      ['mp4Car','mp4Foot','mp4Line'].forEach(id=>document.getElementById(id).classList.remove('active'));
+      if(mode==='driving') document.getElementById('mp4Car').classList.add('active');
+      if(mode==='walking') document.getElementById('mp4Foot').classList.add('active');
+      if(mode==='direct')  document.getElementById('mp4Line').classList.add('active');
 
       let newRouter;
       if (mode === 'direct'){
         newRouter = new DirectRouter();
+        S.lastDistNonDirect = distSel.value || 'route';
+        S.distanceMode = 'air'; distSel.value = 'air'; distSel.disabled = true;
       } else {
         const prof = (mode === 'walking') ? ROUTER.profiles.walking : ROUTER.profiles.driving;
         newRouter = L.Routing.osrmv1({ serviceUrl: ROUTER.serviceUrl, profile: prof });
-      }
-      S.control._router = newRouter;
-      S.control.options.router = newRouter;
-
-      if (mode === 'direct'){
-        S.lastDistNonDirect = distSel.value || S.distanceMode || 'route';
-        localStorage.setItem('mp4.lastDistNonDirect', S.lastDistNonDirect);
-
-        S.distanceMode = 'air';
-        distSel.value = 'air';
-        distSel.disabled = true;
-      } else {
         distSel.disabled = false;
-
-        const restore = S.lastDistNonDirect
-          || localStorage.getItem('mp4.lastDistNonDirect')
-          || localStorage.getItem('mp4.distanceMode')
-          || 'route';
-
-        S.distanceMode = restore;
-        distSel.value = restore;
+        S.distanceMode = S.lastDistNonDirect || 'route'; distSel.value = S.distanceMode;
       }
-
-      S.lastLegKey = '';
-      S.control.route();
-      debounceRefresh();
+      S.control.router = newRouter; // hack update
+      S.control.route(); debounceRefresh();
     };
 
     document.getElementById('mp4Car').onclick  = ()=>setMode('driving');
     document.getElementById('mp4Foot').onclick = ()=>setMode('walking');
     document.getElementById('mp4Line').onclick = ()=>setMode('direct');
 
-    distSel.onchange = ()=>{
-      S.distanceMode = distSel.value;
-      if (S.profile !== 'direct'){
-        S.lastDistNonDirect = S.distanceMode;
-        localStorage.setItem('mp4.lastDistNonDirect', S.lastDistNonDirect);
-      }
-      S.lastLegKey = '';
-      localStorage.setItem('mp4.distanceMode', S.distanceMode);
-      debounceRefresh();
-    };
+    distSel.onchange = ()=>{ S.distanceMode=distSel.value; if(S.profile!=='direct') S.lastDistNonDirect=S.distanceMode; S.lastLegKey=''; debounceRefresh(); };
+    coordSel.onchange = ()=>{ S.coordMode=coordSel.value; S.lastLegKey=''; debounceRefresh(); };
+    bearSel.onchange = ()=>{ S.bearingUnit=bearSel.value; S.lastLegKey=''; debounceRefresh(); };
 
-    coordSel.onchange = ()=>{
-      S.coordMode = coordSel.value;
-      localStorage.setItem('mp4.coordMode', S.coordMode);
-      S.lastLegKey = '';
-      debounceRefresh();
-    };
-
-    bearSel.onchange = ()=>{
-      S.bearingUnit = bearSel.value;
-      localStorage.setItem('mp4.bearingUnit', S.bearingUnit);
-      S.lastLegKey = '';
-      debounceRefresh();
-    };
-
-    const btnAddFromMap = document.getElementById('mp4AddFromMap');
-    btnAddFromMap.onclick = ()=>{
-      const next = !S.mapClickAdd;
-      setMapClickAdd(next);
-      btnAddFromMap.classList.toggle('active', next);
-      dockPanel();
-    };
-
-    document.getElementById('mp4AddCenter').onclick = ()=>{
-      const center = map.getCenter();
-      addWaypointLatLng(center);
-      dockPanel();
-    };
-
-    // KP no ievades + ieteikumi
+    // Quick Add Logic (Dropdown)
     const addInp = document.getElementById('mp4AddInput');
-    const btnGo  = document.getElementById('mp4AddGo');
-    const btnAdd = document.getElementById('mp4AddApply');
-
     const suggestEl = document.getElementById('mp4AddSuggest');
-    const quickRow  = document.getElementById('mp4QuickRow');
-    const quickWrap = quick; // div.mp4-quick
-
-    function positionSuggest(){
-      if (!suggestEl || !quickRow || !quickWrap) return;
-      try{
-        const wr = quickWrap.getBoundingClientRect();
-        const rr = quickRow.getBoundingClientRect();
-        const top = Math.max(0, (rr.bottom - wr.top) + 6);
-        suggestEl.style.top = top + 'px';
-      }catch(_){}
-    }
-
-    function hideSuggest(){
-      if (!suggestEl) return;
-      suggestEl.style.display = 'none';
-      suggestEl.innerHTML = '';
-    }
-
-    function showSuggest(items, addIt){
-      if (!suggestEl) return;
-      if (!items || !items.length){ hideSuggest(); return; }
-
-      positionSuggest();
-
-      suggestEl.innerHTML = items.map((it, idx)=>{
-        const safe = escapeHtml(it.name || '');
-        const sub = it.raw && (it.raw.type || it.raw.class) ? `${escapeHtml(String(it.raw.type || it.raw.class))}` : '';
-        return `<div class="item" data-idx="${idx}">
-          ${safe}${sub ? `<span class="sub">${sub}</span>` : ''}
-        </div>`;
-      }).join('');
-      suggestEl.style.display = 'block';
-
-      suggestEl.querySelectorAll('.item').forEach(el=>{
-        el.addEventListener('click', ()=>{
-          const i = parseInt(el.getAttribute('data-idx')||'0',10);
-          const pick = items[i];
-          if (!pick || !pick.center) return;
-
-          map.setView(pick.center, Math.max(map.getZoom(), 14));
-          if (addIt){
-            addWaypointLatLng(pick.center);
-            if (addInp) addInp.value = '';
-          } else {
-            if (addInp) addInp.value = pick.name || (addInp.value||'');
-          }
-          hideSuggest();
-          dockPanel();
-        });
-      });
-    }
-
+    
+    // Tīrīšana uz dropdown
+    const hideSuggest = ()=>{ suggestEl.style.display='none'; suggestEl.innerHTML=''; };
+    
     async function doResolve(addIt){
-      const q = (addInp && addInp.value || '').trim();
-      if (!q) return;
-
+      const q = addInp.value.trim(); if(!q) return;
       hideSuggest();
-
-      if (addInp){ addInp.disabled = true; }
-      if (btnGo){ btnGo.disabled = true; }
-      if (btnAdd){ btnAdd.disabled = true; }
-
       try{
         const arr = await resolveQueryToCandidates(q, 7);
-        if (!arr || !arr.length){
-          alert('Neatradu šo adresi/koordinātas. Pamēģini citu formātu.');
-          return;
-        }
-
-        if (arr.length === 1){
-          const ll = arr[0].center;
-          map.setView(ll, Math.max(map.getZoom(), 14));
-          if (addIt){
-            addWaypointLatLng(ll);
-            if (addInp) addInp.value = '';
-          }
+        if(!arr.length) return alert('Neatradu.');
+        if(arr.length===1){
+           map.setView(arr[0].center, 14);
+           if(addIt) { addWaypointLatLng(arr[0].center); addInp.value=''; }
         } else {
-          showSuggest(arr.slice(0, 7), addIt);
+           suggestEl.innerHTML = arr.map((it,i)=>`<div class="item" data-i="${i}">${it.name}</div>`).join('');
+           suggestEl.style.display='block';
+           suggestEl.onclick = (e)=>{
+              const el = e.target.closest('.item');
+              if(!el) return;
+              const pick = arr[parseInt(el.dataset.i)];
+              map.setView(pick.center, 14);
+              if(addIt) { addWaypointLatLng(pick.center); addInp.value=''; }
+              else { addInp.value = pick.name; }
+              hideSuggest();
+           }
         }
-      }catch(err){
-        console.warn('[mp4] resolve failed', err);
-        alert('Meklēšana neizdevās (internets/CORS). Ievadi koordinātas vai mēģini vēlreiz.');
-      } finally {
-        if (addInp){ addInp.disabled = false; addInp.focus(); }
-        if (btnGo){ btnGo.disabled = false; }
-        if (btnAdd){ btnAdd.disabled = false; }
-        dockPanel();
-      }
+      }catch(e){ console.error(e); }
     }
 
-    if (btnGo)  btnGo.onclick  = ()=>doResolve(false);
-    if (btnAdd) btnAdd.onclick = ()=>doResolve(true);
-
-    if (addInp){
-      addInp.addEventListener('input', ()=>{ hideSuggest(); });
-      addInp.addEventListener('keydown', (e)=>{
-        if (e.key === 'Escape'){ e.preventDefault(); hideSuggest(); return; }
-        if (e.key === 'Enter'){ e.preventDefault(); doResolve(true); }
-      });
-      addInp.addEventListener('focus', ()=>{ positionSuggest(); });
-    }
-
-    // klikšķis ārpus ieteikumiem aizver
-    document.addEventListener('click', (e)=>{
-      try{
-        if (!suggestEl || suggestEl.style.display === 'none') return;
-        if (suggestEl.contains(e.target)) return;
-        if (addInp && addInp.contains(e.target)) return;
-        hideSuggest();
-      }catch(_){}
-    }, { capture:true });
+    document.getElementById('mp4AddGo').onclick = ()=>doResolve(false);
+    document.getElementById('mp4AddApply').onclick = ()=>doResolve(true);
+    addInp.onkeydown = (e)=>{ if(e.key==='Enter') doResolve(true); };
+    document.getElementById('mp4AddFromMap').onclick = (e)=>{ 
+       const on = !S.mapClickAdd; setMapClickAdd(on); e.target.classList.toggle('active', on);
+    };
+    document.getElementById('mp4AddCenter').onclick = ()=>{ addWaypointLatLng(map.getCenter()); };
 
     document.getElementById('mp4Print').onclick = openPrintWindow;
-
-    document.getElementById('mp4Clear').onclick = ()=>{
-      if (!confirm('Vai tiešām dzēst visu maršrutu?')) return;
-      try{
-        setMapClickAdd(false);
-        btnAddFromMap.classList.remove('active');
-
-        S.control.setWaypoints([null, null]);
-        S.wpData.clear();
-        S.legs=null; S.totals=null; S.lastLegKey='';
-        debounceRefresh();
-      }catch(_){}
+    document.getElementById('mp4Clear').onclick = ()=>{ 
+       if(confirm('Dzēst visu?')){ S.control.setWaypoints([null,null]); S.wpData.clear(); debounceRefresh(); } 
     };
-
-    document.getElementById('mp4Export').onclick = ()=>{
-      try{
-        const wps = S.control.getWaypoints().filter(w=>w && w.latLng);
-        const pack = wps.map((wp, idx)=>{
-          ensureWpId(wp);
-          const d = S.wpData.get(wp.__mp4id) || {};
-          const label = (idx===0) ? 'S' : (idx===wps.length-1 ? 'F' : `KP-${idx}`);
-          const { mgrsTxt, wgsTxt, lksTxt } = getCoordStrings(wp.latLng);
-          return {
-            label,
-            lat: wp.latLng.lat,
-            lng: wp.latLng.lng,
-            mgrs: mgrsTxt,
-            wgs: wgsTxt,
-            lks: lksTxt,
-            symbol: d.symbol || DEFAULT_SYMBOL,
-            title: d.title || '',
-            note: d.note || ''
-          };
-        });
-        const blob = new Blob([JSON.stringify({
-          version:'mp4',
-          createdAt: new Date().toISOString(),
-          profile: S.profile,
-          distanceMode: S.distanceMode,
-          coordMode: S.coordMode,
-          bearingUnit: S.bearingUnit,
-          waypoints: pack
-        }, null, 2)], {type:'application/json'});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'mission-package.json';
-        a.click();
-        setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
-      }catch(e){
-        alert('Eksports neizdevās.');
-        console.error(e);
-      }
-    };
-
+    
     _mp4ApplyStoredPanelSize(c);
     _mp4BindPanelResizePersist(c);
-
     setMode(S.profile);
-    dockPanel();
-
-    // uzreiz piesien drag&drop LRM ievades laukiem
-    setTimeout(bindWaypointsDnd, 120);
+    setTimeout(bindWaypointsDnd, 150);
   }
 
   function toggle(){
-    const map = getMap();
-    const btn = document.getElementById('toggleRouteBtn');
-
-    const searchUI = [
-      'smartSearchInput','smartSearchBtn',
-      'smartSearchResults','smartSearchClear'
-    ].map(id=>document.getElementById(id)).filter(Boolean);
-
     S.enabled = !S.enabled;
-
-    if (S.enabled){
-      if (btn){
-        btn.style.background = '#c62828';
-        btn.innerHTML = '✕';
-        btn.title = 'Aizvērt maršruta plānotāju';
-      }
-      searchUI.forEach(el=>el.style.display='none');
-
-      if (!S.control) init();
-      else {
-        const c = S.control.getContainer();
-        if (c) c.style.display = 'flex';
-        debounceRefresh();
-        setTimeout(bindWaypointsDnd, 80);
-      }
-
-      setTimeout(dockPanel, 80);
+    const btn = document.getElementById('toggleRouteBtn');
+    if(btn) { btn.innerHTML = S.enabled?'✕':'🔀'; btn.style.background=S.enabled?'#c62828':''; }
+    if(S.enabled){
+       if(!S.control) init(); else { S.control.getContainer().style.display='flex'; debounceRefresh(); }
+       setTimeout(dockPanel, 50);
     } else {
-      if (btn){
-        btn.style.background = '';
-        btn.innerHTML = '🔀';
-        btn.title = 'Maršrutēšana';
-      }
-      searchUI.forEach(el=>el.style.display='block');
-
-      try{
-        setMapClickAdd(false);
-        if (S.control){
-          const c = S.control.getContainer && S.control.getContainer();
-          if (c) c.style.display = 'none';
-        }
-        const addBtn = document.getElementById('mp4AddFromMap');
-        if (addBtn) addBtn.classList.remove('active');
-      }catch(_){}
-
-      try{
-        const mc = map && map.getContainer && map.getContainer();
-        if (mc) mc.style.cursor = '';
-      }catch(_){}
+       if(S.control) S.control.getContainer().style.display='none';
+       setMapClickAdd(false);
     }
   }
 
+  // Global Access
   window.MP4_setRouter = function(cfg){
-    try{
-      if (cfg?.serviceUrl) ROUTER.serviceUrl = cfg.serviceUrl;
-      if (cfg?.profiles?.driving) ROUTER.profiles.driving = cfg.profiles.driving;
-      if (cfg?.profiles?.walking) ROUTER.profiles.walking = cfg.profiles.walking;
-      if (S.control){
-        S.lastLegKey = '';
-        S.control.route();
-        debounceRefresh();
-      }
-      console.info('[MP4] Router config updated', ROUTER);
-    }catch(e){ console.warn(e); }
+     if(cfg?.serviceUrl) ROUTER.serviceUrl = cfg.serviceUrl;
   };
-
-  function _mp4HasRoute(){
-    if (!S.control) return false;
-    try{
-      const wps = (S.control.getWaypoints && S.control.getWaypoints() || []).filter(w=>w && w.latLng);
-      return wps.length >= 2;
-    }catch(_){ return false; }
-  }
-
-  function clearRouteFromMap(askConfirm){
-    if (!S.control) return;
-    if (askConfirm && !confirm('Notīrīt maršrutu no kartes?')) return;
-
-    try{
-      setMapClickAdd(false);
-      const addBtn = document.getElementById('mp4AddFromMap');
-      if (addBtn) addBtn.classList.remove('active');
-
-      S.control.setWaypoints([null, null]);
-      S.wpData.clear();
-      S.legs=null; S.totals=null; S.lastLegKey='';
-      debounceRefresh();
-    }catch(err){
-      console.warn('[mp4] clearRoute failed', err);
-    }
-
-    if (S.dockClearBtn) S.dockClearBtn.style.display = 'none';
-  }
-
-  function ensureDockClearBtn(toggleBtn){
-    if (!toggleBtn) return;
-    const parent = toggleBtn.parentElement;
-    if (!parent) return;
-
-    let b = document.getElementById('clearRouteBtn');
-    if (!b){
-      b = document.createElement('button');
-      b.id = 'clearRouteBtn';
-      b.type = 'button';
-      b.textContent = '🧹';
-      b.title = 'Notīrīt maršrutu no kartes';
-      b.className = toggleBtn.className || '';
-      b.style.marginLeft = '6px';
-      parent.insertBefore(b, toggleBtn.nextSibling);
-
-      b.addEventListener('click', (e)=>{
-        e.preventDefault();
-        e.stopPropagation();
-        clearRouteFromMap(true);
-      });
-    }
-    S.dockClearBtn = b;
-    b.style.display = _mp4HasRoute() ? '' : 'none';
-  }
-
+  
   onReady(()=>{
     const btn = document.getElementById('toggleRouteBtn');
-    if (!btn) return;
-
-    if (btn.dataset.mp4Bound === '1') return;
-    btn.dataset.mp4Bound = '1';
-    ensureDockClearBtn(btn);
-
-    btn.addEventListener('click', (e)=>{
-      if (e && e.preventDefault) e.preventDefault();
-      toggle();
-      ensureDockClearBtn(btn);
-    });
+    if(btn && !btn.dataset.mp4Bound){
+       btn.dataset.mp4Bound='1';
+       btn.addEventListener('click', (e)=>{ e.preventDefault(); toggle(); });
+    }
   });
 
 })();
-
 
 
     // --- 6. SOLIS: PARASTĀ MEKLĒŠANA ---
