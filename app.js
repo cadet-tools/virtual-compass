@@ -3252,8 +3252,7 @@ map.whenReady(() => {
     const searchControl = new Control({ position: 'topleft' });
     map.addControl(searchControl);
 
-
-// --- 5. SOLIS: MISSION PACKAGE (Taktiskā Maršrutēšana v2.0) ---
+// --- 5. SOLIS: MISSION PACKAGE (Taktiskā Maršrutēšana v2.1 FIX) ---
 
 // Globālie mainīgie modulim
 let missionControl = null;
@@ -3274,15 +3273,36 @@ let missionWaypointsData = {}; // Glabā piezīmes: { 0: "Teksts...", 1: "..." }
             border: 1px solid rgba(255,255,255,0.15);
             box-shadow: 0 4px 20px rgba(0,0,0,0.6);
             border-radius: 8px;
+            margin-top: 10px !important;
+            overflow: hidden;
         }
+        
+        /* Maršruta instrukciju saraksts - FONS UN TEKSTS */
         .leaflet-routing-container {
             margin: 0 !important; padding: 0 !important;
-            background: transparent !important; color: #fff !important;
+            background: transparent !important; 
             border: none !important; box-shadow: none !important;
+            color: #fff !important;
         }
-        .leaflet-routing-alt { max-height: 50vh; overflow-y: auto; padding: 5px; }
-        .leaflet-routing-alt tr:hover { background: rgba(255,255,255,0.1); }
-        
+        .leaflet-routing-alt { 
+            background: rgba(0, 0, 0, 0.6) !important; /* Tumšs fons tekstam */
+            max-height: 50vh; 
+            overflow-y: auto; 
+            padding: 10px; 
+        }
+        .leaflet-routing-alt tr:hover { 
+            background: rgba(255,255,255,0.1) !important; 
+            cursor: pointer;
+        }
+        .leaflet-routing-alt h2, .leaflet-routing-alt h3 {
+            color: #4caf50 !important; /* Zaļš virsraksts */
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        .leaflet-routing-alt-time {
+            background: #2e7d32; padding: 2px 5px; border-radius: 4px;
+        }
+
         /* KP Marķieri (Orientēšanās stils) */
         .kp-marker-icon {
             background: transparent;
@@ -3313,6 +3333,7 @@ let missionWaypointsData = {}; // Glabā piezīmes: { 0: "Teksts...", 1: "..." }
         .mission-toolbar {
             display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
             padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            background: rgba(20, 24, 30, 0.95);
         }
         .mission-btn {
             background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
@@ -3325,7 +3346,7 @@ let missionWaypointsData = {}; // Glabā piezīmes: { 0: "Teksts...", 1: "..." }
         
         .mission-tools-row {
             display: flex; gap: 5px; padding: 8px; justify-content: space-between;
-            border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2);
+            border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3);
         }
         .mission-action { flex: 1; padding: 6px; font-size: 11px; }
         .btn-print { background: #1565c0; border-color: #42a5f5; color:#fff; }
@@ -3334,7 +3355,7 @@ let missionWaypointsData = {}; // Glabā piezīmes: { 0: "Teksts...", 1: "..." }
         /* Checkbox stils */
         .mission-toggle-row {
             padding: 6px 8px; font-size: 12px; display: flex; align-items: center; gap: 8px;
-            color: #ccc; background: rgba(0,0,0,0.2);
+            color: #ccc; background: rgba(0,0,0,0.3);
         }
 
         /* Slēpt līnijas (tikai punkti) */
@@ -3444,10 +3465,11 @@ function initMissionControl() {
                         totalDist += latLngs[i].distanceTo(latLngs[i+1]);
                     }
                     routes.push({
-                        name: "Azimuts",
+                        name: "Azimuts (Taisne)",
                         summary: { totalDistance: totalDist, totalTime: totalDist / 1.1 }, // ~4km/h
                         coordinates: latLngs,
-                        waypoints: waypoints
+                        waypoints: waypoints,
+                        instructions: [] // Nav pagriezienu instrukciju taisnei
                     });
                 }
                 callback.call(context, null, routes);
@@ -3458,7 +3480,7 @@ function initMissionControl() {
         const osrmRouter = L.Routing.osrmv1({
             serviceUrl: 'https://router.project-osrm.org/route/v1',
             profile: 'driving', // Sākumā
-            language: 'en' // Lai OSRM nesajūk, tulkojam mēs paši
+            language: 'en'
         });
 
         // Izveidojam Kontroli
@@ -3542,7 +3564,7 @@ function initMissionControl() {
 
             // --- EVENT LISTENERS ---
             
-            // 1. PROFILI
+            // 1. PROFILI (LABOTS: Izmanto options.router, nevis setRouter)
             const bAuto = toolbar.querySelector('#modeAuto');
             const bWalk = toolbar.querySelector('#modeWalk');
             const bDir  = toolbar.querySelector('#modeDirect');
@@ -3558,19 +3580,17 @@ function initMissionControl() {
                 // Router update
                 if (mode === 'direct') {
                     // Iestata mūsu Dummy router
-                    missionControl.getRouter().options.serviceUrl = null; // disable OSRM
-                    missionControl.setRouter(new DirectRouter());
+                    missionControl.options.router = new DirectRouter();
                 } else {
                     // OSRM
-                    const profileStr = (mode === 'walking') ? 'foot' : 'driving'; // OSRM 'foot' parasti ir labāks takām
+                    const profileStr = (mode === 'walking') ? 'foot' : 'driving'; 
                     
                     // Re-init OSRM router to force update
-                    const newRouter = L.Routing.osrmv1({
+                    missionControl.options.router = L.Routing.osrmv1({
                         serviceUrl: 'https://router.project-osrm.org/route/v1',
                         profile: profileStr,
                         language: 'en'
                     });
-                    missionControl.setRouter(newRouter);
                 }
                 missionControl.route(); // Pārrēķina
             }
