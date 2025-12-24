@@ -3310,12 +3310,12 @@ map.whenReady(() => {
         box-shadow:0 10px 30px rgba(0,0,0,.6);
         border-radius:10px;
         margin:0 !important;                 /* IMPORTANT: docked režīmam */
-        width:460px;
+        width:360px;
         max-height:85vh;
         display:flex;
         flex-direction:column;
         overflow:hidden;
-        z-index:5;                      /* virs Leaflet */
+        z-index:200000;                      /* virs Leaflet */
       }
 
       /* lai drukājot parasto lapu panelis netraucē */
