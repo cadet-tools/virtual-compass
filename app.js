@@ -3658,6 +3658,40 @@ map.whenReady(() => {
         font-weight:900;
         margin-bottom:8px;
       }
+
+	  /* JAUNS: Nolaižamā paneļa stils (settings) */
+.mp4-details {
+  background: #14181e;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.mp4-details summary {
+  padding: 8px 10px;
+  cursor: pointer;
+  font-weight: 800;
+  color: #aeb8c7;
+  font-size: 11px;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255,255,255,.03);
+}
+.mp4-details summary::-webkit-details-marker { display: none; }
+.mp4-details summary:hover { background: rgba(255,255,255,.07); }
+.mp4-details summary::after { content: '+'; font-size: 14px; font-weight: 900; color: #666; }
+.mp4-details[open] summary::after { content: '−'; color: #ccc; }
+
+/* Pārveidojam mp4-mid, lai tas derētu iekšā */
+.mp4-mid {
+  padding: 10px;
+  background: #10141a; /* Mazliet tumšāks fons iekšpusē */
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: end;
+  border-top: 1px solid rgba(255,255,255,.05);
+}
     `;
     document.head.appendChild(style);
   })();
@@ -4223,8 +4257,18 @@ function _mp4BindPanelResizePersist(panel){
   }
 
   // --- Panel dock: blakus toggleRouteBtn (enkurs: 🧹, lai nepārklājas) ---
+// --- Aizstāj šo funkciju pilnībā ---
   function dockPanel(){
     try{
+      // JAUNS: Ja panelis ir izslēgts, neko nedaram un paslēpjam to
+      if (!S.enabled) {
+         if (S.control) {
+            const c = S.control.getContainer && S.control.getContainer();
+            if (c) c.style.display = 'none';
+         }
+         return;
+      }
+
       if (!S.control) return;
       const panel = S.control.getContainer && S.control.getContainer();
       const btn = document.getElementById('toggleRouteBtn');
@@ -4269,11 +4313,11 @@ function _mp4BindPanelResizePersist(panel){
 
       top = clamp(top, 10, bottomLimit - effH);
       maxH = Math.max(320, Math.floor(bottomLimit - top - 10));
+      
       const currMaxH = parseInt(panel.style.maxHeight || '', 10);
-if (!isFinite(currMaxH) || Math.abs(currMaxH - maxH) > 1){
-  panel.style.maxHeight = maxH + 'px';
-}
-
+      if (!isFinite(currMaxH) || Math.abs(currMaxH - maxH) > 1){
+        panel.style.maxHeight = maxH + 'px';
+      }
 
       panel.style.left = left + 'px';
       panel.style.top  = top  + 'px';
@@ -4684,34 +4728,43 @@ if (!isFinite(currMaxH) || Math.abs(currMaxH - maxH) > 1){
       <div class="mp4-qhint">Piem.: “Brīvības iela 1, Rīga” · “56.9523, 24.1131” · “E,N (LKS-92)” · “34TET1234512345 (MGRS)”</div>
     `;
 
-    const mid = document.createElement('div');
-    mid.className = 'mp4-mid';
-    mid.innerHTML = `
-      <div class="mp4-field">
-        <label>Metri pēc</label>
-        <select id="mp4DistanceMode">
-          <option value="route">CEĻŠ (OSRM)</option>
-          <option value="air">GAISS (TAISNE)</option>
-        </select>
-      </div>
-      <div class="mp4-field">
-        <label>Koordinātes</label>
-        <select id="mp4CoordMode">
-          <option value="MGRS">MGRS</option>
-          <option value="WGS">Lat/Lng</option>
-          <option value="LKS">LKS-92</option>
-        </select>
-      </div>
-      <div class="mp4-field">
-        <label>Azimuta vienības</label>
-        <select id="mp4BearingUnit">
-          <option value="deg">Grādi (°)</option>
-          <option value="mil">Mil (6400)</option>
-        </select>
-      </div>
-      <div class="mp4-field">
-        <label>Info</label>
-        <div id="mp4SummaryLine" style="font-weight:900;color:#e9eef5;line-height:1.25;">-</div>
+// --- Aizstāj "const mid = ..." daļu ar šo ---
+    
+    // Izmantojam <details> elementu, lai izveidotu nolaižamo bloku
+    const midDetails = document.createElement('details');
+    midDetails.className = 'mp4-details';
+    // Ja gribi, lai pēc noklusējuma ir atvērts, atkomentē nākamo rindu:
+    // midDetails.open = true; 
+
+    midDetails.innerHTML = `
+      <summary>⚙️ IESTATĪJUMI & INFO</summary>
+      <div class="mp4-mid">
+          <div class="mp4-field">
+            <label>Metri pēc</label>
+            <select id="mp4DistanceMode">
+              <option value="route">CEĻŠ (OSRM)</option>
+              <option value="air">GAISS (TAISNE)</option>
+            </select>
+          </div>
+          <div class="mp4-field">
+            <label>Koordinātes</label>
+            <select id="mp4CoordMode">
+              <option value="MGRS">MGRS</option>
+              <option value="WGS">Lat/Lng</option>
+              <option value="LKS">LKS-92</option>
+            </select>
+          </div>
+          <div class="mp4-field">
+            <label>Azimuta vienības</label>
+            <select id="mp4BearingUnit">
+              <option value="deg">Grādi (°)</option>
+              <option value="mil">Mil (6400)</option>
+            </select>
+          </div>
+          <div class="mp4-field">
+            <label>Info</label>
+            <div id="mp4SummaryLine" style="font-weight:900;color:#e9eef5;line-height:1.25;font-size:11px;">-</div>
+          </div>
       </div>
     `;
 
@@ -4729,7 +4782,7 @@ if (!isFinite(currMaxH) || Math.abs(currMaxH - maxH) > 1){
 
     c.insertBefore(foot, c.firstChild);
     c.insertBefore(legs, c.firstChild);
-    c.insertBefore(mid,  c.firstChild);
+    c.insertBefore(midDetails,  c.firstChild);
     c.insertBefore(quick,c.firstChild);
     c.insertBefore(top,  c.firstChild);
 
