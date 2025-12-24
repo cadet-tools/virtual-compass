@@ -3268,7 +3268,7 @@ map.whenReady(() => {
 
   const ROUTER = {
     serviceUrl: 'https://router.project-osrm.org/route/v1',
-    profiles: { driving: 'driving', walking: 'foot' } // OSRM demo parasti ir foot/bike/driving
+    profiles: { driving: 'driving', walking: 'foot' }
   };
 
   const S = {
@@ -3276,8 +3276,8 @@ map.whenReady(() => {
     enabled: false,
     profile: localStorage.getItem('mp4.profile') || 'driving',         // driving | walking | direct
     distanceMode: localStorage.getItem('mp4.distanceMode') || 'route', // route | air
-    coordMode: localStorage.getItem('mp4.coordMode') || 'MGRS',   // MGRS | WGS | LKS
-    bearingUnit: localStorage.getItem('mp4.bearingUnit') || 'deg',// deg | mil
+    coordMode: localStorage.getItem('mp4.coordMode') || 'MGRS',        // MGRS | WGS | LKS
+    bearingUnit: localStorage.getItem('mp4.bearingUnit') || 'deg',     // deg | mil
     wpData: new Map(),
     wpSeq: 0,
     legs: null,
@@ -3286,7 +3286,8 @@ map.whenReady(() => {
     debounceT: 0,
     dockResizeBound: false,
     mapClickAdd: false,
-    lastDistNonDirect: localStorage.getItem('mp4.lastDistNonDirect') || (localStorage.getItem('mp4.distanceMode') || 'route')
+    lastDistNonDirect: localStorage.getItem('mp4.lastDistNonDirect') || (localStorage.getItem('mp4.distanceMode') || 'route'),
+    dragFromIdx: null
   };
 
   const SYMBOLS = [
@@ -3310,22 +3311,21 @@ map.whenReady(() => {
         border:1px solid rgba(255,255,255,.14);
         box-shadow:0 10px 30px rgba(0,0,0,.6);
         border-radius:10px;
-        margin:0 !important;                 /* IMPORTANT: docked režīmam */
+        margin:0 !important;
         width:420px;
         min-width:380px;
         max-width:92vw;
         height:560px;
         min-height:420px;
         max-height:calc(100vh - 120px);
-        resize:both;                         /* lietotājs var koriģēt izmēru */
+        resize:both;
         box-sizing:border-box;
         display:flex;
         flex-direction:column;
         overflow:hidden;
-        z-index:200000;                      /* virs Leaflet */
+        z-index:200000;
       }
 
-      /* lai drukājot parasto lapu panelis netraucē */
       @media print { .mp4-panel{ display:none !important; } }
       body.print-mode .mp4-panel{ display:none !important; }
 
@@ -3337,20 +3337,33 @@ map.whenReady(() => {
         width:100% !important;
         color:#cfd6df !important;
       }
+
+      /* ROUTING INPUTI (daudz KP → iekšējais scroll) */
       .mp4-panel .leaflet-routing-geocoders{
         padding:10px !important;
         background:#1c222a !important;
         border-bottom:1px solid rgba(255,255,255,.08);
+        max-height:28vh;
+        overflow:auto;
       }
+
+      /* katra rindas vizuālais noformējums + vieta drag handle */
+      .mp4-panel .leaflet-routing-geocoder{
+        position:relative;
+        padding-left:26px !important;
+      }
+
       .mp4-panel .leaflet-routing-geocoders input{
         background:#0c1015 !important;
         border:1px solid rgba(255,255,255,.18) !important;
         color:#fff !important;
         border-radius:10px !important;
         padding:8px 10px !important;
-        width:260px !important;
+        width:100% !important; /* lai nav šaurs, kad ir drag handle */
         margin-bottom:6px !important;
+        box-sizing:border-box !important;
       }
+
       .mp4-panel .leaflet-routing-add-waypoint,
       .mp4-panel .leaflet-routing-remove-waypoint{
         background:transparent !important;
@@ -3359,6 +3372,7 @@ map.whenReady(() => {
       }
       .mp4-panel .leaflet-routing-add-waypoint:after{ content:'+'; color:#3ddc84; font-weight:900; font-size:18px; }
       .mp4-panel .leaflet-routing-remove-waypoint:after{ content:'×'; color:#ff5b5b; font-weight:900; font-size:18px; }
+
       .mp4-panel .leaflet-routing-alt{
         max-height:18vh;
         overflow:auto;
@@ -3366,6 +3380,29 @@ map.whenReady(() => {
         background:rgba(0,0,0,.18) !important;
       }
       .mp4-panel .leaflet-routing-collapse-btn{ display:none !important; }
+
+      /* Drag handle */
+      .mp4-drag-handle{
+        position:absolute;
+        left:8px;
+        top:10px;
+        width:14px;
+        height:20px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        cursor:grab;
+        user-select:none;
+        opacity:.85;
+        font-weight:1000;
+        color:#aeb8c7;
+      }
+      .mp4-drag-handle:active{ cursor:grabbing; opacity:1; }
+      .mp4-wprow.mp4-drop{
+        outline:2px solid rgba(67,126,18,.55);
+        outline-offset:4px;
+        border-radius:10px;
+      }
 
       .mp4-top{
         padding:10px;
@@ -3402,6 +3439,7 @@ map.whenReady(() => {
         display:grid;
         grid-template-columns: 1fr 1fr;
         gap:8px;
+        position:relative; /* priekš ieteikumu dropdown */
       }
       .mp4-qbtn{
         background:rgba(255,255,255,.08);
@@ -3426,6 +3464,7 @@ map.whenReady(() => {
         font-weight:900;
         font-size:12px;
         outline:none;
+        box-sizing:border-box;
       }
       .mp4-qrow input:focus{ border-color: rgba(67,126,18,.85); box-shadow: 0 0 0 2px rgba(67,126,18,.18); }
       .mp4-qicon{
@@ -3433,7 +3472,8 @@ map.whenReady(() => {
         border:1px solid rgba(255,255,255,.14);
         color:#fff;
         border-radius:10px;
-        width:44px; height:38px; padding:0; display:inline-flex; align-items:center; justify-content:center;
+        width:44px; height:38px; padding:0;
+        display:inline-flex; align-items:center; justify-content:center;
         font-weight:1000;
         cursor:pointer;
         font-size:12px;
@@ -3442,7 +3482,38 @@ map.whenReady(() => {
       .mp4-qicon:hover{ background:rgba(255,255,255,.12); }
       .mp4-qicon:disabled{ opacity:.55; cursor:not-allowed; }
       .mp4-qhint{ grid-column:1 / -1; font-size:11px; color:#aeb8c7; line-height:1.2; margin-top:-2px; }
-      .mp4-qbtn:hover{ background:rgba(255,255,255,.12); }
+
+      /* Ieteikumi — OVERLAY (nevis stumj paneli uz leju) */
+      .mp4-suggest{
+        position:absolute;
+        left:10px;
+        right:10px;
+        background:#0c1015;
+        border:1px solid rgba(255,255,255,.18);
+        border-radius:10px;
+        overflow:auto;
+        max-height:220px;
+        display:none;
+        z-index:5;
+        box-shadow:0 10px 26px rgba(0,0,0,.6);
+      }
+      .mp4-suggest .item{
+        padding:8px 10px;
+        cursor:pointer;
+        font-weight:900;
+        font-size:12px;
+        border-bottom:1px solid rgba(255,255,255,.08);
+      }
+      .mp4-suggest .item:last-child{ border-bottom:none; }
+      .mp4-suggest .item:hover{ background:rgba(255,255,255,.10); }
+      .mp4-suggest .sub{
+        display:block;
+        margin-top:2px;
+        font-size:11px;
+        font-weight:600;
+        opacity:.9;
+        color:#aeb8c7;
+      }
 
       .mp4-mid{
         padding:10px;
@@ -3588,50 +3659,6 @@ map.whenReady(() => {
         font-weight:900;
         margin-bottom:8px;
       }
-
-      /* Ievades ieteikumi (adrese/objekts) */
-      .mp4-suggest{
-        grid-column:1 / -1;
-        width:100%;
-        margin-top:6px;
-        background:#0c1015;
-        border:1px solid rgba(255,255,255,.18);
-        border-radius:10px;
-        overflow:auto;
-        max-height:170px;
-        display:none;
-      }
-      .mp4-suggest .item{
-        padding:8px 10px;
-        cursor:pointer;
-        font-weight:900;
-        font-size:12px;
-        border-bottom:1px solid rgba(255,255,255,.08);
-      }
-      .mp4-suggest .item:last-child{ border-bottom:none; }
-      .mp4-suggest .item:hover{ background:rgba(255,255,255,.10); }
-      .mp4-suggest .sub{
-        display:block;
-        margin-top:2px;
-        font-size:11px;
-        font-weight:600;
-        opacity:.9;
-        color:#aeb8c7;
-      }
-
-      /* Secības maiņa (S ↔ F) */
-      .mp4-swaprow{ display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
-      .mp4-swapbtn{
-        background:rgba(255,255,255,.08);
-        border:1px solid rgba(255,255,255,.14);
-        color:#fff;
-        border-radius:10px;
-        padding:6px 8px;
-        font-weight:1000;
-        cursor:pointer;
-        font-size:11px;
-      }
-      .mp4-swapbtn:hover{ background:rgba(255,255,255,.12); }
     `;
     document.head.appendChild(style);
   })();
@@ -3771,7 +3798,6 @@ map.whenReady(() => {
     q = String(q||'').trim();
     if (!q) return null;
 
-    // 1) WGS84: "56.95, 24.10" vai "56.95 24.10"
     let m = q.match(/^\s*(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)\s*$/);
     if (m){
       const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
@@ -3780,7 +3806,6 @@ map.whenReady(() => {
       }
     }
 
-    // 2) LKS-92 (EPSG:3059): "E,N" (parasti 6–7 cipari)
     m = q.match(/^\s*(\d{5,7})\s*[, ]\s*(\d{5,7})\s*$/);
     if (m){
       const E = parseFloat(m[1]), N = parseFloat(m[2]);
@@ -3789,25 +3814,23 @@ map.whenReady(() => {
           const p = lksToWGS(E, N);
           if (p && isFinite(p.lat) && isFinite(p.lng)) return L.latLng(p.lat, p.lng);
         } else if (typeof proj4 !== 'undefined'){
-          const out = proj4('EPSG:3059','EPSG:4326',[E,N]); // [lon,lat]
+          const out = proj4('EPSG:3059','EPSG:4326',[E,N]);
           if (out && out.length >= 2) return L.latLng(out[1], out[0]);
         }
       }catch(_){}
     }
 
-    // 3) MGRS: "34TET1234512345" (ar/bez atstarpēm)
     const mgrsLike = q.replace(/\s+/g,'').toUpperCase();
     if (/^\d{1,2}[C-X][A-Z]{2}\d{2,10}$/i.test(mgrsLike)){
       try{
         const lib = (typeof mgrs !== 'undefined') ? mgrs : (window.mgrs || null);
         if (lib && typeof lib.toPoint === 'function'){
-          const pt = lib.toPoint(mgrsLike); // [lon,lat]
+          const pt = lib.toPoint(mgrsLike);
           if (pt && pt.length >= 2) return L.latLng(pt[1], pt[0]);
         }
       }catch(_){}
     }
 
-    // 4) Ja tev jau ir globāls parsētājs (no Smart Search) – izmanto arī to
     try{
       if (typeof parseCoordinates === 'function'){
         const r = parseCoordinates(q);
@@ -3896,7 +3919,6 @@ map.whenReady(() => {
     };
   }
 
-  // Ja ir MyCustomGeocoder, tad apvieno ar Nominatim (lai būtu izvēle no vairākiem rezultātiem)
   function createHybridGeocoder(){
     const custom = (window.MyCustomGeocoder) ? new MyCustomGeocoder() : null;
     const fallback = createFallbackGeocoder();
@@ -3946,7 +3968,6 @@ map.whenReady(() => {
               if (r.length >= 2) finish(r);
               else mergeWithFallback(r);
             }, context || this);
-
             setTimeout(()=>{ if (!done) mergeWithFallback([]); }, 800);
           }catch(_){
             mergeWithFallback([]);
@@ -4083,7 +4104,96 @@ map.whenReady(() => {
 
   function debounceRefresh(){
     clearTimeout(S.debounceT);
-    S.debounceT = setTimeout(()=>{ refreshLegs().catch(()=>{}); dockPanel(); }, 250);
+    S.debounceT = setTimeout(()=>{
+      refreshLegs().catch(()=>{});
+      dockPanel();
+      bindWaypointsDnd(); // pēc UI izmaiņām
+    }, 250);
+  }
+
+  // --- Drag&Drop secība LRM ievades laukiem (Google stilā) ---
+  function bindWaypointsDnd(){
+    try{
+      if (!S.control) return;
+      const panel = S.control.getContainer && S.control.getContainer();
+      if (!panel) return;
+
+      const box = panel.querySelector('.leaflet-routing-geocoders');
+      if (!box) return;
+
+      const rows = Array.from(box.querySelectorAll('.leaflet-routing-geocoder'));
+      if (!rows.length) return;
+
+      rows.forEach((row, idx)=>{
+        row.dataset.mp4Idx = String(idx);
+        row.classList.add('mp4-wprow');
+
+        if (!row.querySelector('.mp4-drag-handle')){
+          const h = document.createElement('span');
+          h.className = 'mp4-drag-handle';
+          h.title = 'Pārvietot (velc uz augšu/leju)';
+          h.textContent = '⋮⋮';
+          h.draggable = true;
+
+          h.addEventListener('dragstart', (e)=>{
+            S.dragFromIdx = idx;
+            row.classList.add('mp4-drop');
+            try{
+              if (e.dataTransfer){
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain','mp4');
+              }
+            }catch(_){}
+          });
+
+          h.addEventListener('dragend', ()=>{
+            S.dragFromIdx = null;
+            rows.forEach(r=>r.classList.remove('mp4-drop'));
+          });
+
+          row.insertBefore(h, row.firstChild);
+        }
+
+        row.addEventListener('dragover', (e)=>{
+          if (S.dragFromIdx == null) return;
+          e.preventDefault();
+          row.classList.add('mp4-drop');
+          try{ if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; }catch(_){}
+        });
+
+        row.addEventListener('dragleave', ()=>{
+          row.classList.remove('mp4-drop');
+        });
+
+        row.addEventListener('drop', (e)=>{
+          if (S.dragFromIdx == null) return;
+          e.preventDefault();
+
+          const toIdx = parseInt(row.dataset.mp4Idx || '0', 10);
+          const fromIdx = S.dragFromIdx;
+
+          rows.forEach(r=>r.classList.remove('mp4-drop'));
+          S.dragFromIdx = null;
+
+          if (!isFinite(toIdx) || !isFinite(fromIdx) || toIdx === fromIdx) return;
+
+          const wps = (S.control.getWaypoints && S.control.getWaypoints() || []).slice();
+          if (wps.length < 2) return;
+          if (fromIdx < 0 || fromIdx >= wps.length) return;
+          if (toIdx < 0 || toIdx >= wps.length) return;
+
+          const moved = wps.splice(fromIdx, 1)[0];
+          wps.splice(toIdx, 0, moved);
+
+          S.control.setWaypoints(wps);
+          S.lastLegKey = '';
+          debounceRefresh();
+
+          // LRM pārzīmē laukus → pēc mirkļa pārbindot indeksus
+          setTimeout(bindWaypointsDnd, 80);
+        });
+      });
+    }catch(_){}
   }
 
   // --- Panel dock: blakus toggleRouteBtn (enkurs: 🧹, lai nepārklājas) ---
@@ -4095,7 +4205,6 @@ map.whenReady(() => {
       const anchor = (S.dockClearBtn && S.dockClearBtn.style.display !== 'none') ? S.dockClearBtn : btn;
       if (!panel || !btn || !anchor) return;
 
-      // pārliekam uz body (lai Leaflet "kolonna" netraucē)
       if (panel.parentNode !== document.body){
         document.body.appendChild(panel);
       }
@@ -4112,7 +4221,6 @@ map.whenReady(() => {
       const ar = anchor.getBoundingClientRect();
       const pad = 10;
 
-      // apakšējais limits (lai nepārklāj leaflet-bottom-left)
       let bottomLimit = window.innerHeight - 10;
       const bl = document.querySelector('.leaflet-bottom.leaflet-left');
       if (bl){
@@ -4120,11 +4228,9 @@ map.whenReady(() => {
         if (r && isFinite(r.top) && r.top > 0) bottomLimit = Math.min(bottomLimit, r.top - 8);
       }
 
-      // Primāri — pa labi no enkura
       let left = ar.right + pad;
       let top  = ar.top;
 
-      // ja pa labi nav vietas, liekam zem enkura
       if (left + pw > window.innerWidth - 10){
         left = ar.left;
         top  = ar.bottom + pad;
@@ -4132,7 +4238,6 @@ map.whenReady(() => {
 
       left = clamp(left, 10, window.innerWidth  - pw - 10);
 
-      // maxHeight, lai neuzkrīt uz apakšējiem Leaflet paneļiem
       let maxH = Math.max(320, Math.floor(bottomLimit - top - 10));
       const effH = Math.min(ph, maxH);
 
@@ -4143,7 +4248,6 @@ map.whenReady(() => {
       panel.style.left = left + 'px';
       panel.style.top  = top  + 'px';
 
-      // Leaflet event propagation stop
       if (typeof L !== 'undefined' && L.DomEvent){
         L.DomEvent.disableClickPropagation(panel);
         L.DomEvent.disableScrollPropagation(panel);
@@ -4426,12 +4530,10 @@ map.whenReady(() => {
     return marker;
   }
 
-  // --- KP pievienošana no kartes ---
   function addWaypointLatLng(latlng){
     if (!S.control) return;
     const wps = S.control.getWaypoints().slice();
 
-    // aizpilda pirmo tukšo, citādi ieliek pirms F
     let idx = wps.findIndex(w => !w || !w.latLng);
     if (idx === -1){
       idx = Math.max(1, wps.length - 1);
@@ -4513,7 +4615,10 @@ map.whenReady(() => {
     setTimeout(()=>mountPanelUi(map, DirectRouter), 80);
 
     S.control.on('routesfound', ()=>debounceRefresh());
-    S.control.on('waypointschanged', ()=>debounceRefresh());
+    S.control.on('waypointschanged', ()=>{
+      debounceRefresh();
+      setTimeout(bindWaypointsDnd, 60);
+    });
 
     debounceRefresh();
   }
@@ -4538,12 +4643,14 @@ map.whenReady(() => {
       <div class="mp4-qbtn" id="mp4AddFromMap" title="Ieslēdz režīmu: klikšķis kartē pievieno KP">➕ KP NO KARTES</div>
       <div class="mp4-qbtn" id="mp4AddCenter"  title="Pievieno KP kartes centrā">➕ KP CENTRĀ</div>
 
-      <div class="mp4-qrow">
+      <div class="mp4-qrow" id="mp4QuickRow">
         <input id="mp4AddInput" type="text" autocomplete="off" placeholder="Adrese / MGRS / lat,lng / LKS (E,N)"/>
         <button id="mp4AddGo" class="mp4-qicon" type="button" title="Atrast un pietuvināt">📍</button>
         <button id="mp4AddApply" class="mp4-qicon" type="button" title="Pievienot kā KP maršrutam">➕</button>
       </div>
+
       <div id="mp4AddSuggest" class="mp4-suggest" aria-label="Ieteikumi"></div>
+
       <div class="mp4-qhint">Piem.: “Brīvības iela 1, Rīga” · “56.9523, 24.1131” · “E,N (LKS-92)” · “34TET1234512345 (MGRS)”</div>
     `;
 
@@ -4596,28 +4703,6 @@ map.whenReady(() => {
     c.insertBefore(quick,c.firstChild);
     c.insertBefore(top,  c.firstChild);
 
-    // Secības maiņa (S ↔ F) pie maršruta ievades laukiem
-    try{
-      const geoBox = c.querySelector('.leaflet-routing-geocoders');
-      if (geoBox && !geoBox.querySelector('#mp4SwapBtn')){
-        const row = document.createElement('div');
-        row.className = 'mp4-swaprow';
-        row.innerHTML = `<button id="mp4SwapBtn" class="mp4-swapbtn" type="button" title="Apmainīt secību (S ↔ F)">⇅ APMAINĪT</button>`;
-        geoBox.appendChild(row);
-
-        row.querySelector('#mp4SwapBtn').addEventListener('click', ()=>{
-          if (!S.control) return;
-          const wps = S.control.getWaypoints().slice();
-          if (wps.length < 2) return;
-          const reversed = wps.slice().reverse();
-          S.control.setWaypoints(reversed);
-          S.lastLegKey = '';
-          debounceRefresh();
-          dockPanel();
-        });
-      }
-    }catch(_){}
-
     const distSel = c.querySelector('#mp4DistanceMode');
     const coordSel= c.querySelector('#mp4CoordMode');
     const bearSel = c.querySelector('#mp4BearingUnit');
@@ -4649,7 +4734,6 @@ map.whenReady(() => {
       S.control.options.router = newRouter;
 
       if (mode === 'direct'){
-        // iegaumē pēdējo (ne-taisnes) izvēli, lai atgriežoties nebūtu jāklikšķina vēlreiz
         S.lastDistNonDirect = distSel.value || S.distanceMode || 'route';
         localStorage.setItem('mp4.lastDistNonDirect', S.lastDistNonDirect);
 
@@ -4702,7 +4786,6 @@ map.whenReady(() => {
       debounceRefresh();
     };
 
-    // KP no kartes
     const btnAddFromMap = document.getElementById('mp4AddFromMap');
     btnAddFromMap.onclick = ()=>{
       const next = !S.mapClickAdd;
@@ -4711,19 +4794,30 @@ map.whenReady(() => {
       dockPanel();
     };
 
-    // KP centrā
     document.getElementById('mp4AddCenter').onclick = ()=>{
       const center = map.getCenter();
       addWaypointLatLng(center);
       dockPanel();
     };
 
-    // KP no ievades (adrese / koordinātas / MGRS / LKS)
+    // KP no ievades + ieteikumi
     const addInp = document.getElementById('mp4AddInput');
     const btnGo  = document.getElementById('mp4AddGo');
     const btnAdd = document.getElementById('mp4AddApply');
 
     const suggestEl = document.getElementById('mp4AddSuggest');
+    const quickRow  = document.getElementById('mp4QuickRow');
+    const quickWrap = quick; // div.mp4-quick
+
+    function positionSuggest(){
+      if (!suggestEl || !quickRow || !quickWrap) return;
+      try{
+        const wr = quickWrap.getBoundingClientRect();
+        const rr = quickRow.getBoundingClientRect();
+        const top = Math.max(0, (rr.bottom - wr.top) + 6);
+        suggestEl.style.top = top + 'px';
+      }catch(_){}
+    }
 
     function hideSuggest(){
       if (!suggestEl) return;
@@ -4734,6 +4828,8 @@ map.whenReady(() => {
     function showSuggest(items, addIt){
       if (!suggestEl) return;
       if (!items || !items.length){ hideSuggest(); return; }
+
+      positionSuggest();
 
       suggestEl.innerHTML = items.map((it, idx)=>{
         const safe = escapeHtml(it.name || '');
@@ -4803,20 +4899,25 @@ map.whenReady(() => {
 
     if (btnGo)  btnGo.onclick  = ()=>doResolve(false);
     if (btnAdd) btnAdd.onclick = ()=>doResolve(true);
+
     if (addInp){
       addInp.addEventListener('input', ()=>{ hideSuggest(); });
       addInp.addEventListener('keydown', (e)=>{
-        if (e.key === 'Escape'){
-          e.preventDefault();
-          hideSuggest();
-          return;
-        }
-        if (e.key === 'Enter'){
-          e.preventDefault();
-          doResolve(true);
-        }
+        if (e.key === 'Escape'){ e.preventDefault(); hideSuggest(); return; }
+        if (e.key === 'Enter'){ e.preventDefault(); doResolve(true); }
       });
+      addInp.addEventListener('focus', ()=>{ positionSuggest(); });
     }
+
+    // klikšķis ārpus ieteikumiem aizver
+    document.addEventListener('click', (e)=>{
+      try{
+        if (!suggestEl || suggestEl.style.display === 'none') return;
+        if (suggestEl.contains(e.target)) return;
+        if (addInp && addInp.contains(e.target)) return;
+        hideSuggest();
+      }catch(_){}
+    }, { capture:true });
 
     document.getElementById('mp4Print').onclick = openPrintWindow;
 
@@ -4873,12 +4974,14 @@ map.whenReady(() => {
       }
     };
 
-    // Lietotāja paneļa izmērs (persistē)
     _mp4ApplyStoredPanelSize(c);
     _mp4BindPanelResizePersist(c);
 
     setMode(S.profile);
     dockPanel();
+
+    // uzreiz piesien drag&drop LRM ievades laukiem
+    setTimeout(bindWaypointsDnd, 120);
   }
 
   function toggle(){
@@ -4905,6 +5008,7 @@ map.whenReady(() => {
         const c = S.control.getContainer();
         if (c) c.style.display = 'flex';
         debounceRefresh();
+        setTimeout(bindWaypointsDnd, 80);
       }
 
       setTimeout(dockPanel, 80);
@@ -4933,7 +5037,6 @@ map.whenReady(() => {
     }
   }
 
-  // publiska API (ja vajag mainīt OSRM)
   window.MP4_setRouter = function(cfg){
     try{
       if (cfg?.serviceUrl) ROUTER.serviceUrl = cfg.serviceUrl;
