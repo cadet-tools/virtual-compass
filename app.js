@@ -3251,7 +3251,9 @@ map.whenReady(() => {
     // Liekam kreisajā augšējā stūrī
     const searchControl = new Control({ position: 'topleft' });
     map.addControl(searchControl);
-
+// ==============================================================
+// 5. SOLIS ...
+//===============================================================	
 (function MissionPlannerV4(){
   if (window.__MP4_INSTALLED__) return;
   window.__MP4_INSTALLED__ = true;
