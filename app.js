@@ -3676,27 +3676,54 @@ map.whenReady(() => {
     }catch(_){}
   }
 
-  function _mp4BindPanelResizePersist(panel){
-    if (!panel || panel.__mp4ResizeBound) return;
-    panel.__mp4ResizeBound = true;
+function _mp4BindPanelResizePersist(panel){
+  if (!panel || panel.__mp4ResizeBound) return;
+  panel.__mp4ResizeBound = true;
 
-    const save = ()=>{
-      try{
-        const r = panel.getBoundingClientRect();
-        if (r && r.width)  localStorage.setItem(_MP4_PANEL_W_KEY, String(Math.round(r.width)));
-        if (r && r.height) localStorage.setItem(_MP4_PANEL_H_KEY, String(Math.round(r.height)));
-      }catch(_){}
-    };
+  const rafFn = window.requestAnimationFrame || function(cb){ return setTimeout(cb, 16); };
+  const cafFn = window.cancelAnimationFrame || function(id){ clearTimeout(id); };
 
-    if (window.ResizeObserver){
-      const ro = new ResizeObserver(()=>{ save(); try{ dockPanel(); }catch(_){} });
-      ro.observe(panel);
-      panel.__mp4RO = ro;
-    } else {
-      panel.addEventListener('mouseup',  ()=>{ save(); try{ dockPanel(); }catch(_){} }, { passive:true });
-      panel.addEventListener('touchend',()=>{ save(); try{ dockPanel(); }catch(_){} }, { passive:true });
-    }
+  const save = ()=>{
+    try{
+      const r = panel.getBoundingClientRect();
+      if (r && r.width)  localStorage.setItem(_MP4_PANEL_W_KEY, String(Math.round(r.width)));
+      if (r && r.height) localStorage.setItem(_MP4_PANEL_H_KEY, String(Math.round(r.height)));
+    }catch(_){}
+  };
+
+  // RO callback = tikai saglabā izmēru (NEKĀDU dockPanel te!)
+  let raf = 0;
+  const saveRaf = ()=>{
+    if (raf) cafFn(raf);
+    raf = rafFn(()=>{ raf = 0; save(); });
+  };
+
+  if (window.ResizeObserver){
+    const ro = new ResizeObserver(()=>{ saveRaf(); });
+    ro.observe(panel);
+    panel.__mp4RO = ro;
+  } else {
+    // veciem pārlūkiem: saglabā uz "atlaists"
+    panel.addEventListener('mouseup', save, { passive:true });
+    panel.addEventListener('touchend', save, { passive:true });
   }
+
+  // Kad lietotājs pabeidz resize → 1x saglabā + 1x dock (bez RO loop)
+  let dockRaf = 0;
+  const dockOnce = ()=>{
+    if (dockRaf) cafFn(dockRaf);
+    dockRaf = rafFn(()=>{
+      dockRaf = 0;
+      save();
+      try{ dockPanel(); }catch(_){}
+    });
+  };
+
+  panel.addEventListener('pointerup', dockOnce, { passive:true });
+  panel.addEventListener('mouseup', dockOnce, { passive:true });
+  panel.addEventListener('touchend', dockOnce, { passive:true });
+}
+
 
   function bearingDeg(a, b){
     const toRad = (x)=>x*Math.PI/180;
