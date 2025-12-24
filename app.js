@@ -4267,7 +4267,11 @@ function _mp4BindPanelResizePersist(panel){
 
       top = clamp(top, 10, bottomLimit - effH);
       maxH = Math.max(320, Math.floor(bottomLimit - top - 10));
-      panel.style.maxHeight = maxH + 'px';
+      const currMaxH = parseInt(panel.style.maxHeight || '', 10);
+if (!isFinite(currMaxH) || Math.abs(currMaxH - maxH) > 1){
+  panel.style.maxHeight = maxH + 'px';
+}
+
 
       panel.style.left = left + 'px';
       panel.style.top  = top  + 'px';
