@@ -5021,6 +5021,7 @@ map.whenReady(() => {
 
 
 
+
     // --- 6. SOLIS: PARASTĀ MEKLĒŠANA ---
     const input = document.getElementById('smartSearchInput');
     const searchBtn = document.getElementById('smartSearchBtn');
