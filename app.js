@@ -3252,532 +3252,1190 @@ map.whenReady(() => {
     const searchControl = new Control({ position: 'topleft' });
     map.addControl(searchControl);
 
-// --- 5. SOLIS: MISSION PACKAGE (MILITARY EDITION v3.0) ---
+// =====================================================================
+// 5. SOLIS: MISSION PLANNER v4 (SCOPED + PRINT WINDOW, NEKONFLIKTĒ DRUKAS)
+// =====================================================================
+(function MissionPlannerV4(){
+  if (window.__MP4_INSTALLED__) return;
+  window.__MP4_INSTALLED__ = true;
 
-// Globālie mainīgie
-let missionControl = null;
-let isMissionMode = false;
-let currentMissionProfile = 'driving'; // 'driving', 'walking', 'direct'
-let missionWaypointsData = {}; // Piezīmes: { 0: "Teksts...", 1: "..." }
+  // --- drošs onDomReady (ja tavā app jau ir, lietos to) ---
+  const onReady = window.onDomReady || function(fn){
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once:true });
+    else fn();
+  };
 
-// --- A. TACTICAL CSS (Pilnīga dizaina pārrakstīšana) ---
-(function injectTacticalStyles() {
-    if (document.getElementById('mission-tactical-css')) return;
+  // --- droša map/L piekļuve ---
+  const getMap = () => window.map || (window.__getMap && window.__getMap()) || null;
+
+  // --- Konfigurācija (vari pēc tam pārslēgt ar window.MP4_setRouter) ---
+  const ROUTER = {
+    serviceUrl: 'https://router.project-osrm.org/route/v1',
+    profiles: {
+      driving: 'driving',
+      walking: 'walking', // demo serverī var būt “tas pats kas driving” (skat. piezīmi augstāk)
+    }
+  };
+
+  // --- State ---
+  const S = {
+    control: null,
+    enabled: false,
+
+    // profili: driving | walking | direct
+    profile: 'driving',
+
+    // distanceMode: 'route' (OSRM) | 'air' (taisne)
+    distanceMode: 'route',
+
+    // coordMode: 'MGRS' | 'WGS' | 'LKS'
+    coordMode: localStorage.getItem('mp4.coordMode') || 'MGRS',
+
+    // bearingUnit: 'deg' | 'mil'
+    bearingUnit: localStorage.getItem('mp4.bearingUnit') || 'deg',
+
+    // per-waypoint data (key=waypoint.__mp4id)
+    wpData: new Map(),
+    wpSeq: 0,
+
+    // legs cache
+    legs: null,           // [{air_m, route_m, sec, brngDeg}, ...] length = wps-1
+    totals: null,         // {air_m, route_m, sec}
+    lastLegKey: '',
+    debounceT: 0
+  };
+
+  // --- Symbolu katalogs (paplašini te) ---
+  const SYMBOLS = [
+    { id:'circle',  name:'Aplis' },
+    { id:'square',  name:'Kvadrāts' },
+    { id:'diamond', name:'Rombs' },
+    { id:'triangle',name:'Trīsstūris' },
+    { id:'cross',   name:'Krusts' }
+  ];
+  const DEFAULT_SYMBOL = localStorage.getItem('mp4.defaultSymbol') || 'circle';
+
+  // --- CSS (SCOPED tikai uz .mp4-panel un .mp4-*) ---
+  (function injectCss(){
+    if (document.getElementById('mp4-css')) return;
     const style = document.createElement('style');
-    style.id = 'mission-tactical-css';
+    style.id = 'mp4-css';
     style.textContent = `
-        /* 1. PANEĻA KONTEINERS */
-        .mission-panel-container {
-            background-color: #1b1f25 !important; /* Tumšs fons */
-            color: #eef2f7 !important;
-            border: 1px solid rgba(255,255,255,0.15);
-            box-shadow: 0 8px 30px rgba(0,0,0,0.8);
-            border-radius: 6px;
-            margin-top: 10px !important;
-            margin-left: 10px !important;
-            width: 320px; /* Fiksēts platums */
-            max-height: 85vh; /* Lai neiet ārpus ekrāna */
-            display: flex;
-            flex-direction: column;
-            overflow: hidden; /* Iekšējais skrollis */
-            z-index: 2000;
-        }
+      .mp4-panel{
+        background:#14181e !important;
+        color:#e9eef5 !important;
+        border:1px solid rgba(255,255,255,.14);
+        box-shadow:0 10px 30px rgba(0,0,0,.6);
+        border-radius:10px;
+        margin:10px !important;
+        width:360px;
+        max-height:85vh;
+        display:flex;
+        flex-direction:column;
+        overflow:hidden;
+        z-index:2000;
+      }
 
-        /* 2. LEAFLET ROUTING MACHINE OVERRIDE (Svarīgi!) */
-        .leaflet-routing-container {
-            margin: 0 !important; padding: 0 !important;
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            width: 100% !important;
-            color: #ccc !important;
-        }
-        
-        /* Adrešu ievades lauki */
-        .leaflet-routing-geocoders {
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            padding: 10px !important;
-            background: #232830 !important;
-        }
-        .leaflet-routing-geocoders input {
-            background: #0f1318 !important;
-            border: 1px solid #444 !important;
-            color: #fff !important;
-            border-radius: 4px;
-            padding: 6px;
-            width: 230px !important; /* Pielāgots platums */
-            margin-bottom: 4px;
-        }
-        .leaflet-routing-geocoders input:focus {
-            border-color: #4caf50 !important;
-            outline: none;
-        }
+      /* Leaflet Routing Machine – tikai paneļa iekšienē */
+      .mp4-panel .leaflet-routing-container{
+        margin:0 !important; padding:0 !important;
+        background:transparent !important;
+        border:none !important;
+        box-shadow:none !important;
+        width:100% !important;
+        color:#cfd6df !important;
+      }
+      .mp4-panel .leaflet-routing-geocoders{
+        padding:10px !important;
+        background:#1c222a !important;
+        border-bottom:1px solid rgba(255,255,255,.08);
+      }
+      .mp4-panel .leaflet-routing-geocoders input{
+        background:#0c1015 !important;
+        border:1px solid rgba(255,255,255,.18) !important;
+        color:#fff !important;
+        border-radius:8px !important;
+        padding:8px 10px !important;
+        width:265px !important;
+        margin-bottom:6px !important;
+      }
+      .mp4-panel .leaflet-routing-add-waypoint,
+      .mp4-panel .leaflet-routing-remove-waypoint{
+        background:transparent !important;
+        border:none !important;
+        opacity:.85;
+      }
+      .mp4-panel .leaflet-routing-add-waypoint:after{ content:'+'; color:#3ddc84; font-weight:900; font-size:18px; }
+      .mp4-panel .leaflet-routing-remove-waypoint:after{ content:'×'; color:#ff5b5b; font-weight:900; font-size:18px; }
+      .mp4-panel .leaflet-routing-alt{
+        max-height:22vh;
+        overflow:auto;
+        border-top:1px solid rgba(255,255,255,.08);
+        background:rgba(0,0,0,.18) !important;
+      }
+      .mp4-panel .leaflet-routing-collapse-btn{ display:none !important; }
 
-        /* +/- Pogas (Add/Remove Waypoint) */
-        .leaflet-routing-add-waypoint, .leaflet-routing-remove-waypoint {
-            background-color: transparent !important;
-            border: none !important;
-            color: #aaa !important;
-            font-size: 18px;
-            font-weight: bold;
-            opacity: 0.7;
-        }
-        .leaflet-routing-add-waypoint:after { content: '+'; color: #4caf50; }
-        .leaflet-routing-remove-waypoint:after { content: '×'; color: #d32f2f; }
-        .leaflet-routing-add-waypoint:hover, .leaflet-routing-remove-waypoint:hover { opacity: 1; transform: scale(1.1); }
+      /* MP4 header */
+      .mp4-top{
+        padding:10px;
+        display:grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap:6px;
+        background:#10141a;
+        border-bottom:1px solid rgba(255,255,255,.08);
+      }
+      .mp4-btn{
+        background:rgba(255,255,255,.08);
+        border:1px solid rgba(255,255,255,.14);
+        color:#dbe3ee;
+        border-radius:10px;
+        padding:9px 8px;
+        font-weight:900;
+        font-size:11px;
+        letter-spacing:.3px;
+        text-align:center;
+        cursor:pointer;
+        user-select:none;
+      }
+      .mp4-btn:hover{ background:rgba(255,255,255,.12); }
+      .mp4-btn.active{
+        background:#1b5e20;
+        border-color:#2e7d32;
+        box-shadow:0 0 0 2px rgba(46,125,50,.18) inset;
+      }
 
-        /* Maršruta instrukciju saraksts (Skrollējams) */
-        .leaflet-routing-alt {
-            max-height: 40vh; /* Ierobežots augstums */
-            overflow-y: auto; /* Skrollis */
-            padding: 0 !important;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            background: rgba(0,0,0,0.2) !important;
-        }
-        .leaflet-routing-alt table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .leaflet-routing-alt tr {
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            transition: background 0.2s;
-        }
-        .leaflet-routing-alt tr:hover {
-            background: rgba(46, 125, 50, 0.2) !important; /* Zaļgans hover */
-            cursor: pointer;
-        }
-        .leaflet-routing-alt td {
-            padding: 8px !important;
-            font-size: 12px;
-            color: #ddd;
-        }
-        
-        /* Slēpjam liekos OSRM elementus */
-        .leaflet-routing-collapse-btn { display: none !important; }
-        
-        /* 3. MŪSU TOOLBAR (Pogas augšā) */
-        .mission-toolbar {
-            display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
-            padding: 8px; 
-            background: #15191e;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        .mission-btn {
-            background: rgba(255,255,255,0.08); 
-            border: 1px solid rgba(255,255,255,0.15);
-            color: #aaa; padding: 8px; border-radius: 4px; cursor: pointer;
-            font-size: 10px; font-weight: 700; text-transform: uppercase;
-            text-align: center; letter-spacing: 0.5px;
-            transition: all 0.2s;
-        }
-        .mission-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
-        .mission-btn.active { 
-            background: #1b5e20; /* Taktiski zaļš */
-            border-color: #2e7d32; 
-            color: #fff; 
-            box-shadow: 0 0 5px rgba(46,125,50,0.5);
-        }
+      .mp4-mid{
+        padding:10px;
+        background:#14181e;
+        border-bottom:1px solid rgba(255,255,255,.08);
+        display:grid;
+        grid-template-columns: 1fr 1fr;
+        gap:8px;
+        align-items:end;
+      }
+      .mp4-field label{
+        display:block;
+        font-size:11px;
+        color:#aeb8c7;
+        margin-bottom:4px;
+        font-weight:800;
+        letter-spacing:.2px;
+      }
+      .mp4-field select{
+        width:100%;
+        background:#0c1015;
+        color:#fff;
+        border:1px solid rgba(255,255,255,.18);
+        border-radius:10px;
+        padding:8px 10px;
+        font-weight:800;
+        font-size:12px;
+      }
 
-        /* 4. APAKŠĒJĀ RĪKU JOSLA */
-        .mission-footer {
-            padding: 8px;
-            background: #15191e;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            display: flex; gap: 6px;
-        }
-        .btn-action { flex: 1; padding: 8px; font-size: 11px; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .btn-print { background: #1565c0; }
-        .btn-print:hover { background: #0d47a1; }
-        .btn-clear { background: #c62828; }
-        .btn-clear:hover { background: #b71c1c; }
+      .mp4-legs{
+        padding:10px;
+        overflow:auto;
+        flex:1;
+      }
+      .mp4-legs h4{
+        margin:0 0 8px 0;
+        font-size:12px;
+        color:#aeb8c7;
+        letter-spacing:.25px;
+      }
+      .mp4-leg{
+        border:1px solid rgba(255,255,255,.10);
+        background:rgba(255,255,255,.05);
+        border-radius:12px;
+        padding:10px;
+        margin-bottom:8px;
+      }
+      .mp4-leg .t1{ font-weight:900; }
+      .mp4-leg .t2{ font-size:12px; color:#cfd6df; margin-top:3px; line-height:1.25; }
+      .mp4-pill{
+        display:inline-block;
+        padding:2px 8px;
+        border:1px solid rgba(255,255,255,.14);
+        border-radius:999px;
+        font-size:11px;
+        font-weight:900;
+        margin-left:6px;
+        color:#e9eef5;
+        background:rgba(0,0,0,.18);
+      }
 
-        /* 5. KP MARKERI (Sarkanie aplīši) */
-        .kp-marker-icon { background: transparent; pointer-events: none; }
-        .kp-viz {
-            position: absolute; left: -10px; top: -10px;
-            width: 20px; height: 20px;
-            border: 3px solid #ff3333;
-            border-radius: 50%;
-            background: rgba(255, 0, 0, 0.1);
-            box-shadow: 0 0 4px rgba(0,0,0,0.8);
-            pointer-events: auto; /* Lai var uzklikšķināt */
-        }
-        .kp-viz::after {
-            content: ''; position: absolute; left: 50%; top: 50%;
-            transform: translate(-50%, -50%);
-            width: 2px; height: 2px; background: #ff3333;
-        }
-        .kp-label {
-            position: absolute; left: 14px; top: -14px;
-            color: #ff3333; font-weight: 800; font-size: 14px;
-            text-shadow: 2px 2px 0 #000, -1px -1px 0 #000;
-        }
+      .mp4-foot{
+        padding:10px;
+        background:#10141a;
+        border-top:1px solid rgba(255,255,255,.08);
+        display:flex;
+        gap:8px;
+      }
+      .mp4-action{
+        flex:1;
+        border:none;
+        border-radius:12px;
+        padding:10px 10px;
+        font-weight:1000;
+        cursor:pointer;
+        color:#fff;
+      }
+      .mp4-print{ background:#1565c0; }
+      .mp4-print:hover{ background:#0d47a1; }
+      .mp4-export{ background:#455a64; }
+      .mp4-export:hover{ background:#37474f; }
+      .mp4-clear{ background:#c62828; }
+      .mp4-clear:hover{ background:#b71c1c; }
 
-        /* 6. POPUP DIZAINS */
-        .mission-popup { width: 220px; }
-        .mission-popup h4 { margin: 0 0 8px 0; color: #4caf50; border-bottom: 1px solid #444; padding-bottom: 4px; }
-        .mission-popup textarea {
-            width: 100%; height: 70px; 
-            background: #111; border: 1px solid #444; color: #eee; 
-            padding: 5px; font-family: sans-serif; font-size: 12px; resize: vertical;
-        }
+      /* MARKERI */
+      .mp4-marker-icon{ background:transparent; }
+      .mp4-kp{
+        width:34px; height:34px;
+        display:flex; align-items:center; justify-content:center;
+        position:relative;
+        filter: drop-shadow(0 2px 3px rgba(0,0,0,.7));
+      }
+      .mp4-kp svg{ width:34px; height:34px; }
+      .mp4-kp .mp4-lbl{
+        position:absolute;
+        top:-18px; left:50%;
+        transform:translateX(-50%);
+        padding:1px 6px;
+        border-radius:999px;
+        font-size:12px;
+        font-weight:1000;
+        color:#ff3b3b;
+        text-shadow: 0 2px 0 #000;
+        background:rgba(0,0,0,.35);
+        border:1px solid rgba(255,255,255,.12);
+        white-space:nowrap;
+      }
 
-        /* 7. DRUKAS LAPA */
-        #missionPrintModal {
-            position: fixed; inset: 0; z-index: 10000;
-            background: rgba(0,0,0,0.9); display: none;
-            overflow-y: auto; padding: 20px;
-        }
-        .print-sheet {
-            width: 210mm; min-height: 297mm; 
-            background: #fff; color: #000;
-            margin: 0 auto; padding: 15mm;
-            font-family: 'Times New Roman', serif;
-            box-shadow: 0 0 50px #000;
-        }
-        @media print {
-            body > * { display: none !important; }
-            #missionPrintModal { display: block !important; position: absolute; inset: 0; padding: 0; background: #fff; }
-            .print-sheet { box-shadow: none; width: 100%; height: auto; margin: 0; }
-            .no-print { display: none !important; }
-        }
+      /* POPUP */
+      .mp4-popup{ width:260px; }
+      .mp4-popup h4{ margin:0 0 8px 0; color:#3ddc84; border-bottom:1px solid rgba(255,255,255,.12); padding-bottom:6px; }
+      .mp4-coords{
+        font-size:11px;
+        color:#aeb8c7;
+        line-height:1.3;
+        margin-bottom:8px;
+      }
+      .mp4-coords code{ color:#fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .mp4-row{ display:flex; gap:6px; margin:6px 0; }
+      .mp4-row button{
+        flex:1;
+        background:rgba(255,255,255,.08);
+        border:1px solid rgba(255,255,255,.14);
+        color:#fff;
+        border-radius:10px;
+        padding:7px 8px;
+        font-weight:900;
+        cursor:pointer;
+        font-size:11px;
+      }
+      .mp4-row button:hover{ background:rgba(255,255,255,.12); }
+      .mp4-popup textarea{
+        width:100%;
+        height:80px;
+        background:#0c1015;
+        border:1px solid rgba(255,255,255,.18);
+        color:#fff;
+        border-radius:12px;
+        padding:10px;
+        resize:vertical;
+        font-size:12px;
+      }
+      .mp4-popup select{
+        width:100%;
+        background:#0c1015;
+        border:1px solid rgba(255,255,255,.18);
+        color:#fff;
+        border-radius:12px;
+        padding:9px 10px;
+        font-weight:900;
+        margin-bottom:8px;
+      }
     `;
     document.head.appendChild(style);
-})();
+  })();
 
-// --- B. IESLĒGT / IZSLĒGT MODULI ---
-document.getElementById('toggleRouteBtn').addEventListener('click', () => {
-    // 1. Bibliotēku pārbaude
-    if (typeof L === 'undefined' || typeof L.Routing === 'undefined') {
-        alert("⚠️ Kļūda: Nav ielādēts Routing modulis. Pārbaudiet interneta savienojumu vai bibliotēkas.");
-        return;
+  // --- helpers ---
+  function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+
+  function bearingDeg(a, b){
+    const toRad = (x)=>x*Math.PI/180;
+    const y = Math.sin(toRad(b.lng - a.lng)) * Math.cos(toRad(b.lat));
+    const x = Math.cos(toRad(a.lat))*Math.sin(toRad(b.lat)) -
+              Math.sin(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.cos(toRad(b.lng - a.lng));
+    let brng = Math.atan2(y, x) * 180/Math.PI;
+    brng = (brng + 360) % 360;
+    return brng;
+  }
+  function degToMil(deg){ return (deg * 6400) / 360; }
+
+  function fmtDist(m){
+    if (!Number.isFinite(m)) return '-';
+    if (m >= 1000) return (m/1000).toFixed(2) + ' km';
+    return Math.round(m) + ' m';
+  }
+  function fmtTime(sec){
+    if (!Number.isFinite(sec)) return '-';
+    const m = Math.round(sec/60);
+    const h = Math.floor(m/60);
+    const mm = m % 60;
+    return h ? `${h}h ${mm}min` : `${mm}min`;
+  }
+
+  function getCoordStrings(latlng){
+    const lat = latlng.lat, lng = latlng.lng;
+
+    // MGRS (tavs toMGRS8 ir app.js) :contentReference[oaicite:4]{index=4}
+    let mgrsTxt = '-';
+    try{
+      if (typeof toMGRS8 === 'function') mgrsTxt = toMGRS8(lat, lng, false);
+      else if (typeof mgrs !== 'undefined' && mgrs.forward) mgrsTxt = mgrs.forward([lng, lat]);
+    }catch(_){}
+
+    // WGS
+    const wgsTxt = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+    // LKS-92 (tev ir wgsToLKS) :contentReference[oaicite:5]{index=5}
+    let lksTxt = '-';
+    try{
+      if (typeof wgsToLKS === 'function'){
+        const {E,N} = wgsToLKS(lat, lng);
+        lksTxt = `${Math.round(E)}, ${Math.round(N)}`;
+      } else if (typeof proj4 !== 'undefined'){
+        const p = proj4('EPSG:4326','EPSG:3059',[lng,lat]);
+        lksTxt = `${Math.round(p[0])}, ${Math.round(p[1])}`;
+      }
+    }catch(_){}
+
+    return { mgrsTxt, wgsTxt, lksTxt };
+  }
+
+  function coordByMode(latlng){
+    const { mgrsTxt, wgsTxt, lksTxt } = getCoordStrings(latlng);
+    if (S.coordMode === 'MGRS') return mgrsTxt;
+    if (S.coordMode === 'LKS')  return lksTxt;
+    return wgsTxt;
+  }
+
+  function ensureWpId(wp){
+    if (!wp.__mp4id) wp.__mp4id = (++S.wpSeq) + '-' + Date.now().toString(36);
+    if (!S.wpData.has(wp.__mp4id)){
+      S.wpData.set(wp.__mp4id, { note:'', symbol: DEFAULT_SYMBOL, title:'' });
+    }
+    return wp.__mp4id;
+  }
+
+  function symbolSvg(symbolId){
+    const stroke = '#ff3b3b';
+    const fill   = 'rgba(255, 59, 59, 0.12)';
+    if (symbolId === 'square'){
+      return `<svg viewBox="0 0 36 36" aria-hidden="true">
+        <rect x="5" y="5" width="26" height="26" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="3"/>
+      </svg>`;
+    }
+    if (symbolId === 'diamond'){
+      return `<svg viewBox="0 0 36 36" aria-hidden="true">
+        <path d="M18 4 L32 18 L18 32 L4 18 Z" fill="${fill}" stroke="${stroke}" stroke-width="3"/>
+      </svg>`;
+    }
+    if (symbolId === 'triangle'){
+      return `<svg viewBox="0 0 36 36" aria-hidden="true">
+        <path d="M18 5 L32 30 L4 30 Z" fill="${fill}" stroke="${stroke}" stroke-width="3" />
+      </svg>`;
+    }
+    if (symbolId === 'cross'){
+      return `<svg viewBox="0 0 36 36" aria-hidden="true">
+        <path d="M16 6h4v10h10v4H20v10h-4V20H6v-4h10z" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
+        <rect x="5" y="5" width="26" height="26" rx="6" fill="none" stroke="${stroke}" stroke-width="2" opacity=".55"/>
+      </svg>`;
+    }
+    // circle default
+    return `<svg viewBox="0 0 36 36" aria-hidden="true">
+      <circle cx="18" cy="18" r="12" fill="${fill}" stroke="${stroke}" stroke-width="3"/>
+      <circle cx="18" cy="18" r="1.5" fill="${stroke}"/>
+    </svg>`;
+  }
+
+  function copyText(txt){
+    try{
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt);
+    }catch(_){}
+    // fallback
+    window.prompt('Kopē tekstu:', txt);
+    return Promise.resolve();
+  }
+
+  // --- OSRM legs fetch (distance+duration per leg) ---
+  async function fetchOsrmLegs(profileKey, latLngs){
+    const prof = (profileKey === 'walking') ? ROUTER.profiles.walking : ROUTER.profiles.driving;
+    const coords = latLngs.map(ll => `${ll.lng},${ll.lat}`).join(';');
+    const url = `${ROUTER.serviceUrl}/${encodeURIComponent(prof)}/${coords}?overview=false&steps=false&annotations=false`;
+
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('OSRM ' + r.status);
+    const data = await r.json();
+    const legs = (data && data.routes && data.routes[0] && data.routes[0].legs) ? data.routes[0].legs : [];
+    return legs.map(l => ({ route_m: l.distance, sec: l.duration }));
+  }
+
+  function computeLegsSync(latLngs){
+    const legs = [];
+    let totalAir = 0;
+
+    for (let i=0; i<latLngs.length-1; i++){
+      const a = latLngs[i], b = latLngs[i+1];
+      const air = a.distanceTo(b);
+      totalAir += air;
+      const brng = bearingDeg(a, b);
+      legs.push({ air_m: air, route_m: NaN, sec: NaN, brngDeg: brng });
     }
 
-    isMissionMode = !isMissionMode;
-    const btn = document.getElementById('toggleRouteBtn');
-    
-    // UI slēpšana/rādīšana
-    const searchUI = [
-        'smartSearchInput', 'smartSearchBtn', 
-        'smartSearchResults', 'smartSearchClear'
-    ].map(id => document.getElementById(id)).filter(e => e);
+    return { legs, totalAir };
+  }
 
-    if (isMissionMode) {
-        // --> AKTIVIZĒT
-        btn.style.background = '#c62828'; // Sarkans (Aizvērt)
-        btn.innerHTML = '✕'; // Ikona mainās
-        btn.title = "Aizvērt maršruta plānotāju";
-        
-        searchUI.forEach(el => el.style.display = 'none'); // Paslēpj meklētāju
+  // --- UI update (leg list + totals) ---
+  async function refreshLegs(){
+    if (!S.control) return;
+    const wps = S.control.getWaypoints().filter(w => w && w.latLng);
+    const latLngs = wps.map(w => w.latLng);
+    const listEl = document.getElementById('mp4LegList');
+    const sumEl  = document.getElementById('mp4SummaryLine');
+    if (!listEl || !sumEl){
+      return;
+    }
 
-        if (!missionControl) {
-            initMissionLogic(); // Iniciējam
-        } else {
-            missionControl.getContainer().style.display = 'flex';
+    if (latLngs.length < 2){
+      listEl.innerHTML = '';
+      sumEl.textContent = 'Pievieno vismaz 2 punktus.';
+      S.legs = null; S.totals = null;
+      return;
+    }
+
+    // key (lai nefetch’o lieki)
+    const key = `${S.profile}|${S.distanceMode}|${S.coordMode}|${latLngs.map(ll=>ll.lat.toFixed(5)+','+ll.lng.toFixed(5)).join('|')}`;
+    if (S.lastLegKey === key && S.legs && S.totals){
+      renderLegList(wps, S.legs, S.totals);
+      return;
+    }
+
+    const { legs, totalAir } = computeLegsSync(latLngs);
+
+    // maršruta (ceļa) metri/sekundes – tikai ja nav "air" un nav direct
+    let totalRoute = 0;
+    let totalSec = 0;
+
+    if (S.distanceMode === 'route' && S.profile !== 'direct'){
+      try{
+        const osrmLegs = await fetchOsrmLegs(S.profile, latLngs);
+        for (let i=0; i<legs.length; i++){
+          legs[i].route_m = osrmLegs[i]?.route_m;
+          legs[i].sec     = osrmLegs[i]?.sec;
+          totalRoute += Number.isFinite(legs[i].route_m) ? legs[i].route_m : 0;
+          totalSec   += Number.isFinite(legs[i].sec)     ? legs[i].sec     : 0;
         }
-
+      }catch(err){
+        // fallback uz air
+        for (let i=0; i<legs.length; i++){
+          legs[i].route_m = legs[i].air_m;
+        }
+        totalRoute = totalAir;
+      }
     } else {
-        // --> DEAKTIVIZĒT
-        btn.style.background = ''; // Reset
-        btn.innerHTML = '🔀';
-        btn.title = "Maršrutēšana";
-        
-        searchUI.forEach(el => el.style.display = 'block'); // Atjauno meklētāju
-        
-        // Pilnīga tīrīšana
-        if (missionControl) {
-            missionControl.setWaypoints([]); // Notīra karti
-            map.removeControl(missionControl); // Noņem paneli
-            missionControl = null;
-        }
-        missionWaypointsData = {}; 
-    }
-});
-
-// --- C. GALVENĀ LOĢIKA ---
-function initMissionLogic() {
-    try {
-        // 1. "Taisnās Līnijas" Rūteris (Azimuts)
-        const DirectRouter = L.Class.extend({
-            route: function(waypoints, callback, context, options) {
-                const routes = [];
-                const latLngs = waypoints.map(wp => wp.latLng).filter(ll => ll != null);
-                
-                if (latLngs.length >= 2) {
-                    let totalDist = 0;
-                    const instructions = [];
-                    
-                    for(let i=0; i<latLngs.length-1; i++) {
-                        const dist = latLngs[i].distanceTo(latLngs[i+1]);
-                        totalDist += dist;
-                        
-                        // Aprēķinam azimutu
-                        const y = Math.sin(latLngs[i+1].lng * Math.PI/180 - latLngs[i].lng * Math.PI/180) * Math.cos(latLngs[i+1].lat * Math.PI/180);
-                        const x = Math.cos(latLngs[i].lat * Math.PI/180) * Math.sin(latLngs[i+1].lat * Math.PI/180) -
-                                  Math.sin(latLngs[i].lat * Math.PI/180) * Math.cos(latLngs[i+1].lat * Math.PI/180) * Math.cos(latLngs[i+1].lng * Math.PI/180 - latLngs[i].lng * Math.PI/180);
-                        let brng = Math.atan2(y, x) * 180 / Math.PI;
-                        brng = (brng + 360) % 360;
-
-                        instructions.push({
-                            type: 'Straight',
-                            distance: dist,
-                            time: dist / 1.1, // ~4km/h
-                            text: `Uz KP-${i+1}: ${Math.round(dist)}m @ ${Math.round(brng)}°`
-                        });
-                    }
-
-                    routes.push({
-                        name: "Azimuta Gājiens",
-                        summary: { totalDistance: totalDist, totalTime: totalDist / 1.1 },
-                        coordinates: latLngs,
-                        inputWaypoints: waypoints,
-                        waypoints: waypoints,
-                        instructions: instructions 
-                    });
-                }
-                callback.call(context, null, routes);
-            }
-        });
-
-        // 2. Izveidojam Kontroli
-        missionControl = L.Routing.control({
-            position: 'topleft', // Novietojums
-            waypoints: [ null, null ], 
-            geocoder: new MyCustomGeocoder(), 
-            routeWhileDragging: true,
-            showAlternatives: false,
-            fitSelectedRoutes: false, // Lai nelēkā
-            containerClassName: 'mission-panel-container', // Mūsu klase
-            
-            // Sākumā OSRM Auto
-            router: L.Routing.osrmv1({
-                serviceUrl: 'https://router.project-osrm.org/route/v1',
-                profile: 'driving'
-            }),
-
-            lineOptions: {
-                styles: [{color: '#ff3333', opacity: 0.8, weight: 4, dashArray: '10, 10'}]
-            },
-
-            // 3. Pielāgoti KP Marķieri
-            createMarker: function(i, wp, nWps) {
-                const label = (i === 0) ? "START" : (i === nWps - 1 ? "FINISH" : `KP-${i}`);
-                
-                const html = `
-                    <div class="kp-viz"></div>
-                    <div class="kp-label">${label}</div>
-                `;
-                
-                const icon = L.divIcon({
-                    className: 'kp-marker-icon',
-                    html: html,
-                    iconSize: [20, 20],
-                    iconAnchor: [0, 0] // Centrs
-                });
-
-                const marker = L.marker(wp.latLng, { draggable: true, icon: icon });
-
-                // Datu popup
-                let savedNote = missionWaypointsData[i] || "";
-                let lat = wp.latLng.lat.toFixed(5);
-                let lng = wp.latLng.lng.toFixed(5);
-                let mgrs = (typeof toMGRS8 === 'function') ? toMGRS8(wp.latLng.lat, wp.latLng.lng, true) : "-";
-
-                const content = document.createElement('div');
-                content.className = 'mission-popup';
-                content.innerHTML = `
-                    <h4>${label}</h4>
-                    <div style="font-size:11px; color:#aaa; margin-bottom:5px;">
-                        MGRS: <span style="color:#fff; font-family:monospace;">${mgrs}</span><br>
-                        WGS: ${lat}, ${lng}
-                    </div>
-                    <textarea placeholder="Ievadi uzdevumu...">${savedNote}</textarea>
-                `;
-                
-                content.querySelector('textarea').addEventListener('input', (e) => {
-                    missionWaypointsData[i] = e.target.value;
-                });
-
-                marker.bindPopup(content);
-                return marker;
-            }
-        }).addTo(map);
-
-        // 4. Ievietojam "Tactical Toolbar" tieši panelī
-        // Mēs to darām asinhroni, lai sagaidītu, kad LRM izveido savu konteineru
-        setTimeout(() => {
-            const lrmContainer = missionControl.getContainer(); // .mission-panel-container
-            if (!lrmContainer) return;
-
-            // Izveidojam mūsu rīkjoslu
-            const toolbar = document.createElement('div');
-            toolbar.innerHTML = `
-                <div class="mission-toolbar">
-                    <div class="mission-btn active" id="btnModeCar" title="Pa ceļiem">🚙 AUTO</div>
-                    <div class="mission-btn" id="btnModeFoot" title="Pa takām">🚶 KĀJĀM</div>
-                    <div class="mission-btn" id="btnModeLine" title="Taisni (Azimuts)">📏 TAISNE</div>
-                </div>
-                <div style="flex:1;"></div> <div class="mission-footer">
-                    <button class="btn-action btn-print" id="btnPrintMission">📄 DRUKĀT</button>
-                    <button class="btn-action btn-clear" id="btnClearMission">✕ DZĒST</button>
-                </div>
-            `;
-            
-            // Ievietojam PAŠĀ AUGŠĀ (pirms inputiem)
-            lrmContainer.insertBefore(toolbar, lrmContainer.firstChild);
-
-            // --- POGU LOĢIKA ---
-            
-            // Profilu maiņa
-            const setMode = (mode) => {
-                currentMissionProfile = mode;
-                // UI
-                ['btnModeCar', 'btnModeFoot', 'btnModeLine'].forEach(id => {
-                    document.getElementById(id).classList.remove('active');
-                });
-                if(mode === 'driving') document.getElementById('btnModeCar').classList.add('active');
-                if(mode === 'walking') document.getElementById('btnModeFoot').classList.add('active');
-                if(mode === 'direct')  document.getElementById('btnModeLine').classList.add('active');
-
-                // Router Logic
-                if (mode === 'direct') {
-                    // Iestatām mūsu Dummy router
-                    missionControl.options.router = new DirectRouter();
-                } else {
-                    // OSRM
-                    const profile = (mode === 'walking') ? 'foot' : 'driving';
-                    missionControl.options.router = L.Routing.osrmv1({
-                        serviceUrl: 'https://router.project-osrm.org/route/v1',
-                        profile: profile
-                    });
-                }
-                missionControl.route(); // Pārrēķināt
-            };
-
-            document.getElementById('btnModeCar').onclick = () => setMode('driving');
-            document.getElementById('btnModeFoot').onclick = () => setMode('walking');
-            document.getElementById('btnModeLine').onclick = () => setMode('direct');
-
-            // Dzēšana
-            document.getElementById('btnClearMission').onclick = () => {
-                if(confirm('Vai tiešām dzēst visu maršrutu?')) {
-                    missionControl.setWaypoints([null, null]);
-                    missionWaypointsData = {};
-                }
-            };
-
-            // Druka
-            document.getElementById('btnPrintMission').onclick = openMissionPrint;
-
-        }, 150);
-
-    } catch (e) {
-        console.error("Mission init error:", e);
-        alert("Kļūda inicializējot plānotāju.");
-    }
-}
-
-// --- D. DRUKAS FUNKCIJA (Profesionāla lapa) ---
-function openMissionPrint() {
-    if (!missionControl || !missionControl._routes || missionControl._routes.length === 0) {
-        alert("Nav maršruta ko drukāt.");
-        return;
+      // air / direct
+      for (let i=0; i<legs.length; i++){
+        legs[i].route_m = legs[i].air_m;
+      }
+      totalRoute = totalAir;
     }
 
-    const route = missionControl._routes[0];
-    const wps = missionControl.getWaypoints();
-    const distKm = (route.summary.totalDistance / 1000).toFixed(2);
-    
-    // Aprēķinam laiku (ja Direct, tad pieņemam 4km/h)
-    let timeMin = Math.round(route.summary.totalTime / 60);
-    if (currentMissionProfile === 'direct') {
-        timeMin = Math.round((route.summary.totalDistance / 1000) / 4 * 60);
-    }
-    const h = Math.floor(timeMin / 60);
-    const m = timeMin % 60;
-    const timeStr = `${h}h ${m}min`;
-
-    let rowsHTML = '';
-    
-    // Ģenerējam tabulu
-    for (let i = 0; i < wps.length; i++) {
-        if (!wps[i].latLng) continue;
-        
-        const ll = wps[i].latLng;
-        const mgrs = (typeof toMGRS8 === 'function') ? toMGRS8(ll.lat, ll.lng, true) : "-";
-        const note = missionWaypointsData[i] || "";
-        const name = (i === 0) ? "START" : (i === wps.length - 1 ? "FINISH" : `KP-${i}`);
-
-        // Info uz nākamo punktu
-        let nextInfo = "";
-        if (i < wps.length - 1 && wps[i+1].latLng) {
-            const next = wps[i+1].latLng;
-            const dist = ll.distanceTo(next);
-            // Azimuts
-            const y = Math.sin(next.lng * Math.PI/180 - ll.lng * Math.PI/180) * Math.cos(next.lat * Math.PI/180);
-            const x = Math.cos(ll.lat * Math.PI/180) * Math.sin(next.lat * Math.PI/180) -
-                      Math.sin(ll.lat * Math.PI/180) * Math.cos(next.lat * Math.PI/180) * Math.cos(next.lng * Math.PI/180 - ll.lng * Math.PI/180);
-            let brng = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-            
-            nextInfo = `<b>${Math.round(dist)}m</b> @ <b>${Math.round(brng)}°</b>`;
-        }
-
-        rowsHTML += `
-            <tr style="border-bottom:1px solid #ccc;">
-                <td style="padding:8px;"><b>${name}</b></td>
-                <td style="padding:8px; font-family:monospace;">${mgrs}</td>
-                <td style="padding:8px;">${nextInfo}</td>
-                <td style="padding:8px;">${note}</td>
-                <td style="border:1px solid #000;"></td> </tr>
-        `;
+    // bearing cache
+    for (let i=0; i<legs.length; i++){
+      if (!Number.isFinite(legs[i].brngDeg)){
+        legs[i].brngDeg = bearingDeg(latLngs[i], latLngs[i+1]);
+      }
     }
 
-    // Modāļa saturs
-    const modalHTML = `
-        <div id="missionPrintModal">
-            <div class="print-sheet">
-                <div class="no-print" style="text-align:right; margin-bottom:20px;">
-                    <button onclick="window.print()" style="padding:10px 20px; background:#1b5e20; color:#fff; border:none; cursor:pointer; font-weight:bold;">DRUKĀT</button>
-                    <button onclick="document.getElementById('missionPrintModal').remove()" style="padding:10px 20px; background:#b71c1c; color:#fff; border:none; cursor:pointer;">AIZVĒRT</button>
-                </div>
+    S.legs = legs;
+    S.totals = { air_m: totalAir, route_m: totalRoute, sec: totalSec };
+    S.lastLegKey = key;
 
-                <div style="text-align:center; border-bottom:3px solid #000; padding-bottom:10px; margin-bottom:20px;">
-                    <h1 style="margin:0; font-size:24pt;">MARŠRUTA KARTE</h1>
-                    <p style="margin:5px 0;">Operācija: ____________________ | Datums: ${new Date().toLocaleDateString('lv-LV')}</p>
-                </div>
+    renderLegList(wps, legs, S.totals);
+  }
 
-                <div style="display:flex; justify-content:space-between; margin-bottom:20px; font-size:14px; background:#eee; padding:10px;">
-                    <div>Profils: <strong>${currentMissionProfile.toUpperCase()}</strong></div>
-                    <div>Kopējā distance: <strong>${distKm} km</strong></div>
-                    <div>Aprēķinātais laiks: <strong>${timeStr}</strong></div>
-                </div>
+  function renderLegList(wps, legs, totals){
+    const listEl = document.getElementById('mp4LegList');
+    const sumEl  = document.getElementById('mp4SummaryLine');
+    if (!listEl || !sumEl) return;
 
-                <table style="width:100%; border-collapse:collapse; font-size:12pt;">
-                    <thead>
-                        <tr style="background:#ddd; border-bottom:2px solid #000;">
-                            <th style="text-align:left; padding:8px;">Punkts</th>
-                            <th style="text-align:left; padding:8px;">MGRS</th>
-                            <th style="text-align:left; padding:8px;">Uz nākamo</th>
-                            <th style="text-align:left; padding:8px; width:35%;">Uzdevums</th>
-                            <th style="text-align:left; padding:8px; width:10%;">Izpilde</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rowsHTML}</tbody>
-                </table>
+    const totalShown = fmtDist(totals.route_m);
+    const totalAir   = fmtDist(totals.air_m);
+    const tStr = (S.distanceMode === 'route' && S.profile !== 'direct') ? fmtTime(totals.sec) : '-';
 
-                <div style="margin-top:60px; display:flex; justify-content:space-between; font-size:12pt;">
-                    <div style="border-top:1px solid #000; width:40%; padding-top:5px;">Sastādīja:</div>
-                    <div style="border-top:1px solid #000; width:40%; padding-top:5px;">Apstiprināja:</div>
-                </div>
-            </div>
-        </div>
+    sumEl.innerHTML = `
+      Kopā: <b>${totalShown}</b>
+      <span class="mp4-pill">GAISS: ${totalAir}</span>
+      <span class="mp4-pill">${(S.distanceMode==='route' && S.profile!=='direct') ? ('LAIKS: '+tStr) : 'TAISNE'}</span>
     `;
 
-    // Notīram veco un ieliekam jauno
-    const existing = document.getElementById('missionPrintModal');
-    if(existing) existing.remove();
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-}
+    const unitLabel = (S.bearingUnit === 'mil') ? 'mil' : '°';
+
+    let html = '';
+    for (let i=0; i<legs.length; i++){
+      const a = wps[i], b = wps[i+1];
+      const aName = (i===0) ? 'START' : `KP-${i}`;
+      const bName = (i===wps.length-2) ? 'FINISH' : `KP-${i+1}`;
+
+      const air = fmtDist(legs[i].air_m);
+      const route = fmtDist(legs[i].route_m);
+      const br = (S.bearingUnit === 'mil')
+        ? Math.round(degToMil(legs[i].brngDeg))
+        : Math.round(legs[i].brngDeg);
+
+      html += `
+        <div class="mp4-leg">
+          <div class="t1">${aName} → ${bName}
+            <span class="mp4-pill">${br}${unitLabel}</span>
+          </div>
+          <div class="t2">CEĻŠ: <b>${route}</b> · GAISS: ${air}
+            ${Number.isFinite(legs[i].sec) ? (' · '+fmtTime(legs[i].sec)) : ''}
+          </div>
+        </div>
+      `;
+    }
+    listEl.innerHTML = html;
+  }
+
+  function debounceRefresh(){
+    clearTimeout(S.debounceT);
+    S.debounceT = setTimeout(()=>{ refreshLegs().catch(()=>{}); }, 250);
+  }
+
+  // --- Print (NEW WINDOW) ---
+  function openPrintWindow(){
+    if (!S.control) return;
+    const wps = S.control.getWaypoints().filter(w => w && w.latLng);
+    if (wps.length < 2){
+      alert('Nav maršruta ko drukāt (vajag vismaz 2 punktus).');
+      return;
+    }
+
+    // ja vēl nav legs, saskaiti tagad (sync fallback)
+    const latLngs = wps.map(w=>w.latLng);
+    const base = computeLegsSync(latLngs);
+    const legs = (S.legs && S.legs.length === wps.length-1) ? S.legs : base.legs;
+
+    const unitLabel = (S.bearingUnit === 'mil') ? 'mil' : '°';
+    const now = new Date();
+    const dateLv = now.toLocaleDateString('lv-LV');
+
+    let rows = '';
+    for (let i=0; i<wps.length; i++){
+      const wp = wps[i];
+      ensureWpId(wp);
+      const d = S.wpData.get(wp.__mp4id) || { note:'', symbol:DEFAULT_SYMBOL, title:'' };
+
+      const name = (i===0) ? 'START' : (i===wps.length-1 ? 'FINISH' : `KP-${i}`);
+      const coord = coordByMode(wp.latLng);
+
+      let next = '-';
+      let az   = '-';
+      let air  = '-';
+      let route= '-';
+      let sec  = '-';
+
+      if (i < wps.length-1){
+        const lg = legs[i] || {};
+        const br = (S.bearingUnit === 'mil')
+          ? Math.round(degToMil(lg.brngDeg ?? bearingDeg(wps[i].latLng, wps[i+1].latLng)))
+          : Math.round(lg.brngDeg ?? bearingDeg(wps[i].latLng, wps[i+1].latLng));
+        az = `${br}${unitLabel}`;
+
+        air = fmtDist(lg.air_m ?? wps[i].latLng.distanceTo(wps[i+1].latLng));
+        route = fmtDist(lg.route_m ?? lg.air_m);
+        sec = fmtTime(lg.sec);
+
+        next = `${route} (gaiss ${air})`;
+      }
+
+      rows += `
+        <tr>
+          <td><b>${name}</b>${d.title ? `<div style="font-size:10px;color:#444;">${escapeHtml(d.title)}</div>` : ''}</td>
+          <td style="text-align:center">${symbolCell(d.symbol)}</td>
+          <td><code>${escapeHtml(coord)}</code></td>
+          <td><b>${escapeHtml(next)}</b></td>
+          <td><b>${escapeHtml(az)}</b>${sec!=='-' ? `<div style="font-size:10px;color:#444;">${escapeHtml(sec)}</div>` : ''}</td>
+          <td>${escapeHtml(d.note || '')}</td>
+          <td class="chk"></td>
+        </tr>
+      `;
+    }
+
+    const totals = S.totals || { air_m: base.totalAir, route_m: base.totalAir, sec: NaN };
+
+    const html = `
+<!doctype html>
+<html lang="lv">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Maršruta kartiņa</title>
+<style>
+  @page { size: A4; margin: 12mm; }
+  body{ font-family: "Times New Roman", serif; color:#000; }
+  .top{ border-bottom:3px solid #000; padding-bottom:8px; margin-bottom:14px; }
+  h1{ margin:0; font-size:22pt; letter-spacing:.4px; }
+  .meta{ margin-top:6px; font-size:11pt; }
+  .bar{ display:flex; gap:10px; justify-content:space-between; background:#eee; padding:8px 10px; border:1px solid #ccc; margin-bottom:14px; font-size:11pt; }
+  table{ width:100%; border-collapse:collapse; font-size:11pt; }
+  th, td{ border-bottom:1px solid #ccc; padding:7px 7px; vertical-align:top; }
+  th{ background:#ddd; border-bottom:2px solid #000; text-align:left; }
+  code{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:10.5pt; }
+  .chk{ border:1px solid #000; width:26px; }
+  .sym svg{ width:18px; height:18px; vertical-align:middle; }
+  .sig{ margin-top:40px; display:flex; justify-content:space-between; gap:20px; }
+  .sig > div{ border-top:1px solid #000; width:45%; padding-top:6px; }
+  .noprint{ position:sticky; top:0; background:#fff; padding:10px 0 8px; }
+  .noprint button{ padding:8px 14px; font-weight:900; cursor:pointer; }
+  @media print{ .noprint{ display:none; } }
+</style>
+</head>
+<body>
+  <div class="noprint">
+    <button onclick="window.print()">DRUKĀT</button>
+    <button onclick="window.close()">AIZVĒRT</button>
+  </div>
+
+  <div class="top">
+    <h1>MARŠRUTA KARTE</h1>
+    <div class="meta">
+      Operācija: ____________________ &nbsp;|&nbsp;
+      Datums: <b>${escapeHtml(dateLv)}</b> &nbsp;|&nbsp;
+      Profils: <b>${escapeHtml(S.profile.toUpperCase())}</b> &nbsp;|&nbsp;
+      Koord.: <b>${escapeHtml(S.coordMode)}</b> &nbsp;|&nbsp;
+      Azimuts: <b>${escapeHtml(S.bearingUnit === 'mil' ? 'MIL (6400)' : 'GRĀDI')}</b>
+    </div>
+  </div>
+
+  <div class="bar">
+    <div>Kopā (ceļš): <b>${escapeHtml(fmtDist(totals.route_m))}</b></div>
+    <div>Kopā (gaiss): <b>${escapeHtml(fmtDist(totals.air_m))}</b></div>
+    <div>Laiks (ja ir): <b>${escapeHtml(fmtTime(totals.sec))}</b></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:12%;">Punkts</th>
+        <th style="width:7%; text-align:center;">Sym</th>
+        <th style="width:25%;">Koordinātes</th>
+        <th style="width:20%;">Uz nākamo</th>
+        <th style="width:13%;">Azimuts</th>
+        <th style="width:18%;">Uzdevums</th>
+        <th style="width:5%;">✓</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+    </tbody>
+  </table>
+
+  <div class="sig">
+    <div>Sastādīja:</div>
+    <div>Apstiprināja:</div>
+  </div>
+</body>
+</html>`;
+
+    const w = window.open('', '_blank');
+    if (!w){
+      alert('Popup bloķēts. Atļauj popup šai lapai, lai drukātu maršruta kartiņu.');
+      return;
+    }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+  }
+
+  function escapeHtml(s){
+    return String(s ?? '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+
+  function symbolCell(symbolId){
+    // mini svg melnbalts drukai
+    const stroke = '#000';
+    const fill = 'transparent';
+    let svg = '';
+    if (symbolId === 'square'){
+      svg = `<svg viewBox="0 0 36 36"><rect x="7" y="7" width="22" height="22" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="3"/></svg>`;
+    } else if (symbolId === 'diamond'){
+      svg = `<svg viewBox="0 0 36 36"><path d="M18 6 L30 18 L18 30 L6 18 Z" fill="${fill}" stroke="${stroke}" stroke-width="3"/></svg>`;
+    } else if (symbolId === 'triangle'){
+      svg = `<svg viewBox="0 0 36 36"><path d="M18 7 L30 29 L6 29 Z" fill="${fill}" stroke="${stroke}" stroke-width="3"/></svg>`;
+    } else if (symbolId === 'cross'){
+      svg = `<svg viewBox="0 0 36 36"><path d="M16 7h4v9h9v4h-9v9h-4v-9H7v-4h9z" fill="${fill}" stroke="${stroke}" stroke-width="2"/></svg>`;
+    } else {
+      svg = `<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="10" fill="${fill}" stroke="${stroke}" stroke-width="3"/></svg>`;
+    }
+    return `<span class="sym">${svg}</span>`;
+  }
+
+  // --- createMarker (ar popup: coords+copy, symbol select, title, note) ---
+  function createMp4Marker(i, wp, nWps){
+    ensureWpId(wp);
+    const d = S.wpData.get(wp.__mp4id);
+
+    const label = (i===0) ? 'START' : (i===nWps-1 ? 'FINISH' : `KP-${i}`);
+
+    const iconHtml = `
+      <div class="mp4-kp">
+        ${symbolSvg(d.symbol || DEFAULT_SYMBOL)}
+        <div class="mp4-lbl">${label}</div>
+      </div>
+    `;
+
+    const icon = L.divIcon({
+      className: 'mp4-marker-icon',
+      html: iconHtml,
+      iconSize: [34,34],
+      iconAnchor: [17,17]
+    });
+
+    const marker = L.marker(wp.latLng, { draggable:true, icon });
+
+    const content = document.createElement('div');
+    content.className = 'mp4-popup';
+
+    const { mgrsTxt, wgsTxt, lksTxt } = getCoordStrings(wp.latLng);
+
+    content.innerHTML = `
+      <h4>${label}</h4>
+
+      <div class="mp4-coords">
+        <div>MGRS: <code>${escapeHtml(mgrsTxt)}</code></div>
+        <div>WGS: <code>${escapeHtml(wgsTxt)}</code></div>
+        <div>LKS-92: <code>${escapeHtml(lksTxt)}</code></div>
+      </div>
+
+      <div class="mp4-row">
+        <button type="button" data-copy="mgrs">KOPĒ MGRS</button>
+        <button type="button" data-copy="wgs">KOPĒ WGS</button>
+        <button type="button" data-copy="lks">KOPĒ LKS</button>
+      </div>
+
+      <label style="display:block;font-weight:900;font-size:11px;color:#aeb8c7;margin:8px 0 4px;">Nosaukums (papildus)</label>
+      <input id="mp4Title" type="text" value="${escapeHtml(d.title||'')}"
+        style="width:100%;background:#0c1015;border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:12px;padding:9px 10px;font-weight:900;margin-bottom:8px;"
+        placeholder="piem. NOVĒROŠANA / ATBALSTA PUNKTS"/>
+
+      <label style="display:block;font-weight:900;font-size:11px;color:#aeb8c7;margin:4px 0 4px;">Simbols</label>
+      <select id="mp4Sym">
+        ${SYMBOLS.map(s => `<option value="${s.id}" ${s.id===(d.symbol||DEFAULT_SYMBOL)?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
+      </select>
+
+      <textarea id="mp4Note" placeholder="Ievadi uzdevumu...">${escapeHtml(d.note||'')}</textarea>
+    `;
+
+    // copy handlers
+    content.querySelectorAll('button[data-copy]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const t = btn.getAttribute('data-copy');
+        if (t==='mgrs') copyText(mgrsTxt);
+        if (t==='wgs')  copyText(wgsTxt);
+        if (t==='lks')  copyText(lksTxt);
+      });
+    });
+
+    // title
+    const titleEl = content.querySelector('#mp4Title');
+    titleEl.addEventListener('input', (e)=>{
+      d.title = e.target.value || '';
+      S.wpData.set(wp.__mp4id, d);
+    });
+
+    // note
+    const noteEl = content.querySelector('#mp4Note');
+    noteEl.addEventListener('input', (e)=>{
+      d.note = e.target.value || '';
+      S.wpData.set(wp.__mp4id, d);
+    });
+
+    // symbol
+    const symEl = content.querySelector('#mp4Sym');
+    symEl.addEventListener('change', ()=>{
+      d.symbol = symEl.value;
+      localStorage.setItem('mp4.defaultSymbol', d.symbol);
+      S.wpData.set(wp.__mp4id, d);
+
+      // atjauno ikonu uzreiz
+      const html = `
+        <div class="mp4-kp">
+          ${symbolSvg(d.symbol)}
+          <div class="mp4-lbl">${label}</div>
+        </div>
+      `;
+      marker.setIcon(L.divIcon({
+        className:'mp4-marker-icon',
+        html,
+        iconSize:[34,34],
+        iconAnchor:[17,17]
+      }));
+    });
+
+    marker.bindPopup(content);
+    return marker;
+  }
+
+  // --- control init ---
+  function init(){
+    const map = getMap();
+    if (!map){
+      alert('Karte nav gatava (map). Pamēģini pēc mirkļa vēlreiz.');
+      return;
+    }
+    if (typeof L === 'undefined' || typeof L.Routing === 'undefined'){
+      alert('⚠️ Nav ielādēts Routing modulis (Leaflet Routing Machine).');
+      return;
+    }
+    if (!window.MyCustomGeocoder){
+      // pieņemam, ka tev tas ir definēts tajā pašā routing sadaļā :contentReference[oaicite:6]{index=6}
+      console.warn('[MP4] MyCustomGeocoder nav atrasts (turpinām bez).');
+    }
+
+    // Direct router (taisne)
+    const DirectRouter = L.Class.extend({
+      route: function(waypoints, callback, context){
+        const latLngs = waypoints.map(w=>w.latLng).filter(Boolean);
+        const routes = [];
+        if (latLngs.length >= 2){
+          let total = 0;
+          const instructions = [];
+          for (let i=0; i<latLngs.length-1; i++){
+            const dist = latLngs[i].distanceTo(latLngs[i+1]);
+            total += dist;
+            const br = bearingDeg(latLngs[i], latLngs[i+1]);
+            instructions.push({
+              type:'Straight', distance: dist, time: dist / 1.1,
+              text: `Uz KP-${i+1}: ${Math.round(dist)}m @ ${Math.round(br)}°`
+            });
+          }
+          routes.push({
+            name:'Taisne',
+            summary:{ totalDistance: total, totalTime: total / 1.1 },
+            coordinates: latLngs,
+            inputWaypoints: waypoints,
+            waypoints: waypoints,
+            instructions
+          });
+        }
+        callback.call(context, null, routes);
+      }
+    });
+
+    S.control = L.Routing.control({
+      position: 'topleft',
+      waypoints: [ null, null ],
+      geocoder: window.MyCustomGeocoder ? new MyCustomGeocoder() : undefined,
+      routeWhileDragging: true,
+      showAlternatives: false,
+      fitSelectedRoutes: false,
+      containerClassName: 'mp4-panel',
+      router: L.Routing.osrmv1({
+        serviceUrl: ROUTER.serviceUrl,
+        profile: ROUTER.profiles.driving
+      }),
+      lineOptions: { styles:[{ color:'#ff3b3b', opacity:0.85, weight:4, dashArray:'10,10' }] },
+      createMarker: createMp4Marker
+    }).addTo(map);
+
+    // Ieliekam savu UI virsū paneļa augšā
+    setTimeout(()=>mountPanelUi(map, DirectRouter), 120);
+
+    // events
+    S.control.on('routesfound', ()=>debounceRefresh());
+    S.control.on('waypointschanged', ()=>debounceRefresh());
+
+    debounceRefresh();
+  }
+
+  function mountPanelUi(map, DirectRouter){
+    const c = S.control && S.control.getContainer ? S.control.getContainer() : null;
+    if (!c) return;
+
+    // ja jau ir
+    if (c.querySelector('#mp4TopBar')) return;
+
+    const top = document.createElement('div');
+    top.id = 'mp4TopBar';
+    top.className = 'mp4-top';
+    top.innerHTML = `
+      <div class="mp4-btn active" id="mp4Car" title="Pa ceļiem / auto">🚙 AUTO</div>
+      <div class="mp4-btn" id="mp4Foot" title="Kājām (ja serviss atbalsta)">🚶 KĀJĀM</div>
+      <div class="mp4-btn" id="mp4Line" title="Taisne (azimuts)">📏 TAISNE</div>
+    `;
+
+    const mid = document.createElement('div');
+    mid.className = 'mp4-mid';
+    mid.innerHTML = `
+      <div class="mp4-field">
+        <label>Metri pēc</label>
+        <select id="mp4DistanceMode">
+          <option value="route">CEĻŠ (OSRM)</option>
+          <option value="air">GAISS (TAISNE)</option>
+        </select>
+      </div>
+      <div class="mp4-field">
+        <label>Koordinātes</label>
+        <select id="mp4CoordMode">
+          <option value="MGRS">MGRS</option>
+          <option value="WGS">Lat/Lng</option>
+          <option value="LKS">LKS-92</option>
+        </select>
+      </div>
+      <div class="mp4-field">
+        <label>Azimuta vienības</label>
+        <select id="mp4BearingUnit">
+          <option value="deg">Grādi (°)</option>
+          <option value="mil">Mil (6400)</option>
+        </select>
+      </div>
+      <div class="mp4-field">
+        <label>Info</label>
+        <div id="mp4SummaryLine" style="font-weight:900;color:#e9eef5;line-height:1.25;">-</div>
+      </div>
+    `;
+
+    const legs = document.createElement('div');
+    legs.className = 'mp4-legs';
+    legs.innerHTML = `
+      <h4>Posmi (KP → KP)</h4>
+      <div id="mp4LegList"></div>
+    `;
+
+    const foot = document.createElement('div');
+    foot.className = 'mp4-foot';
+    foot.innerHTML = `
+      <button class="mp4-action mp4-print"  id="mp4Print">📄 DRUKĀT</button>
+      <button class="mp4-action mp4-export" id="mp4Export">⬇️ EKSPORTS</button>
+      <button class="mp4-action mp4-clear"  id="mp4Clear">✕ DZĒST</button>
+    `;
+
+    // ieliekam pašā augšā
+    c.insertBefore(foot, c.firstChild);
+    c.insertBefore(legs, c.firstChild);
+    c.insertBefore(mid,  c.firstChild);
+    c.insertBefore(top,  c.firstChild);
+
+    // preset UI values
+    const distSel = c.querySelector('#mp4DistanceMode');
+    const coordSel= c.querySelector('#mp4CoordMode');
+    const bearSel = c.querySelector('#mp4BearingUnit');
+
+    distSel.value = S.distanceMode;
+    coordSel.value= S.coordMode;
+    bearSel.value = S.bearingUnit;
+
+    // mode switching
+    const setMode = (mode)=>{
+      S.profile = mode;
+
+      ['mp4Car','mp4Foot','mp4Line'].forEach(id=>{
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('active');
+      });
+      if (mode==='driving') document.getElementById('mp4Car').classList.add('active');
+      if (mode==='walking') document.getElementById('mp4Foot').classList.add('active');
+      if (mode==='direct')  document.getElementById('mp4Line').classList.add('active');
+
+      // router
+      if (mode === 'direct'){
+        S.control.options.router = new DirectRouter();
+      } else {
+        const prof = (mode === 'walking') ? ROUTER.profiles.walking : ROUTER.profiles.driving;
+        S.control.options.router = L.Routing.osrmv1({ serviceUrl: ROUTER.serviceUrl, profile: prof });
+      }
+
+      // direct režīmā distanceMode piespiedu “air”
+      if (mode === 'direct'){
+        S.distanceMode = 'air';
+        distSel.value = 'air';
+        distSel.disabled = true;
+      } else {
+        distSel.disabled = false;
+      }
+
+      S.lastLegKey = '';
+      S.control.route();
+      debounceRefresh();
+    };
+
+    document.getElementById('mp4Car').onclick  = ()=>setMode('driving');
+    document.getElementById('mp4Foot').onclick = ()=>setMode('walking');
+    document.getElementById('mp4Line').onclick = ()=>setMode('direct');
+
+    distSel.onchange = ()=>{
+      S.distanceMode = distSel.value;
+      S.lastLegKey = '';
+      localStorage.setItem('mp4.distanceMode', S.distanceMode);
+      debounceRefresh();
+    };
+
+    coordSel.onchange = ()=>{
+      S.coordMode = coordSel.value;
+      localStorage.setItem('mp4.coordMode', S.coordMode);
+      S.lastLegKey = '';
+      debounceRefresh();
+    };
+
+    bearSel.onchange = ()=>{
+      S.bearingUnit = bearSel.value;
+      localStorage.setItem('mp4.bearingUnit', S.bearingUnit);
+      S.lastLegKey = '';
+      debounceRefresh();
+    };
+
+    // actions
+    document.getElementById('mp4Print').onclick = openPrintWindow;
+
+    document.getElementById('mp4Clear').onclick = ()=>{
+      if (!confirm('Vai tiešām dzēst visu maršrutu?')) return;
+      try{
+        S.control.setWaypoints([null, null]);
+        S.wpData.clear();
+        S.legs=null; S.totals=null; S.lastLegKey='';
+        debounceRefresh();
+      }catch(_){}
+    };
+
+    document.getElementById('mp4Export').onclick = ()=>{
+      // vienkāršs JSON exports (mission package)
+      try{
+        const wps = S.control.getWaypoints().filter(w=>w && w.latLng);
+        const pack = wps.map((wp, idx)=>{
+          ensureWpId(wp);
+          const d = S.wpData.get(wp.__mp4id) || {};
+          const label = (idx===0) ? 'START' : (idx===wps.length-1 ? 'FINISH' : `KP-${idx}`);
+          const { mgrsTxt, wgsTxt, lksTxt } = getCoordStrings(wp.latLng);
+          return {
+            label,
+            lat: wp.latLng.lat,
+            lng: wp.latLng.lng,
+            mgrs: mgrsTxt,
+            wgs: wgsTxt,
+            lks: lksTxt,
+            symbol: d.symbol || DEFAULT_SYMBOL,
+            title: d.title || '',
+            note: d.note || ''
+          };
+        });
+        const blob = new Blob([JSON.stringify({
+          version:'mp4',
+          createdAt: new Date().toISOString(),
+          profile: S.profile,
+          distanceMode: S.distanceMode,
+          coordMode: S.coordMode,
+          bearingUnit: S.bearingUnit,
+          waypoints: pack
+        }, null, 2)], {type:'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'mission-package.json';
+        a.click();
+        setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
+      }catch(e){
+        alert('Eksports neizdevās.');
+        console.error(e);
+      }
+    };
+
+    // initial setMode
+    setMode(S.profile);
+  }
+
+  // --- toggle integration ar tavu pogu #toggleRouteBtn ---
+  function toggle(){
+    const map = getMap();
+    const btn = document.getElementById('toggleRouteBtn');
+
+    // paslēp/atgriež meklētāju (tavs esošais UI) :contentReference[oaicite:7]{index=7}
+    const searchUI = [
+      'smartSearchInput','smartSearchBtn',
+      'smartSearchResults','smartSearchClear'
+    ].map(id=>document.getElementById(id)).filter(Boolean);
+
+    S.enabled = !S.enabled;
+
+    if (S.enabled){
+      if (btn){
+        btn.style.background = '#c62828';
+        btn.innerHTML = '✕';
+        btn.title = 'Aizvērt maršruta plānotāju';
+      }
+      searchUI.forEach(el=>el.style.display='none');
+
+      if (!S.control) init();
+      else {
+        const c = S.control.getContainer();
+        if (c) c.style.display = 'flex';
+        debounceRefresh();
+      }
+    } else {
+      if (btn){
+        btn.style.background = '';
+        btn.innerHTML = '🔀';
+        btn.title = 'Maršrutēšana';
+      }
+      searchUI.forEach(el=>el.style.display='block');
+
+      try{
+        if (S.control){
+          S.control.setWaypoints([]);
+          map && map.removeControl(S.control);
+          S.control = null;
+        }
+      }catch(_){}
+      S.wpData.clear();
+      S.legs=null; S.totals=null; S.lastLegKey='';
+    }
+  }
+
+  // publiska API (ja gribi konfigurēt routeri vēlāk)
+  window.MP4_setRouter = function(cfg){
+    try{
+      if (cfg?.serviceUrl) ROUTER.serviceUrl = cfg.serviceUrl;
+      if (cfg?.profiles?.driving) ROUTER.profiles.driving = cfg.profiles.driving;
+      if (cfg?.profiles?.walking) ROUTER.profiles.walking = cfg.profiles.walking;
+      if (S.control){
+        S.lastLegKey = '';
+        S.control.route();
+        debounceRefresh();
+      }
+      console.info('[MP4] Router config updated', ROUTER);
+    }catch(e){ console.warn(e); }
+  };
+
+  onReady(()=>{
+    const btn = document.getElementById('toggleRouteBtn');
+    if (!btn) return;
+
+    // lai nav dubult-binds
+    if (btn.dataset.mp4Bound === '1') return;
+    btn.dataset.mp4Bound = '1';
+
+    btn.addEventListener('click', toggle);
+  });
+
+})();
+
     // --- 6. SOLIS: PARASTĀ MEKLĒŠANA ---
     const input = document.getElementById('smartSearchInput');
     const searchBtn = document.getElementById('smartSearchBtn');
