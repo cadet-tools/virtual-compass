@@ -4718,7 +4718,7 @@ map.whenReady(() => {
           '</select>' +
         '</div>' +
         '<div class="mp4-field">' +
-          '<div id="mp4SummaryLine" style="font-weight:900;color:#e9eef5;line-height:1.4;font-size:11px;">-</div>' +
+          '<div id="mp4SummaryLine" style="font-weight:900;color:#e9eef5;line-height:1.4;font-size:20px;">-</div>' +
         '</div>' +
       '</div>';
 
