@@ -3310,6 +3310,12 @@ map.whenReady(() => {
     hasRoute: false,
     lastRoute: null,
 	hoverMarker: null
+	// NEW: hover marķiera krāsas (nav panel hover)
+    hoverStroke: localStorage.getItem('mp4.hoverStroke') || '#000000',
+    hoverFill:   localStorage.getItem('mp4.hoverFill')   || '#0003FF',
+
+    // NEW: maršruta līnijas redzamība
+    showRouteLine: (localStorage.getItem('mp4.showRouteLine') || '1') === '1'
   };
 
   var SYMBOLS = [
@@ -3320,6 +3326,81 @@ map.whenReady(() => {
     { id:'cross',   name:'Krusts' }
   ];
   var DEFAULT_SYMBOL = localStorage.getItem('mp4.defaultSymbol') || 'circle';
+
+
+ // ------------------------------
+  // NEW: Color presets for dropdowns
+  // ------------------------------
+  var MP4_COLORS = [
+    { name:'Melns',   v:'#000000' },
+    { name:'Balts',   v:'#ffffff' },
+    { name:'Sarkans', v:'#ff2a2a' },
+    { name:'Oranžs',  v:'#ff8a00' },
+    { name:'Dzeltens',v:'#ffd400' },
+    { name:'Zaļš',    v:'#2ecc71' },
+    { name:'Zils',    v:'#2979ff' },
+    { name:'Cians',   v:'#00e5ff' },
+    { name:'Violets', v:'#b388ff' }
+  ];
+
+  function mp4ColorOptionsHtml(selected){
+    return MP4_COLORS.map(function(c){
+      return '<option value="'+c.v+'" '+(c.v===selected?'selected':'')+'>'+c.name+'</option>';
+    }).join('');
+  }
+
+  function mp4HoverMarkerStyle(){
+    return {
+      radius: 6,
+      color: S.hoverStroke,
+      weight: 2,
+      fillColor: S.hoverFill,
+      fillOpacity: 1,
+      interactive: false
+    };
+  }
+
+  function mp4ApplyHoverMarkerStyleIfAny(){
+    try{
+      if (S.hoverMarker && typeof S.hoverMarker.setStyle === 'function'){
+        S.hoverMarker.setStyle({ color: S.hoverStroke, fillColor: S.hoverFill });
+      }
+    }catch(_){}
+  }
+
+  // NEW: route line visibility apply
+  function mp4RouteLineStyle(on){
+    return on
+      ? { color:'#ff3b3b', opacity:0.85, weight:4, dashArray:'10,10' }
+      : { color:'#ff3b3b', opacity:0,    weight:0 };
+  }
+
+  function mp4ApplyRouteLineVisibility(){
+    try{
+      if (!S.control) return;
+
+      var st = mp4RouteLineStyle(!!S.showRouteLine);
+
+      // saglabājam arī options, lai nākamajos pārrēķinos LRM lieto pareizo
+      S.control.options.lineOptions = S.control.options.lineOptions || {};
+      S.control.options.lineOptions.styles = [st];
+
+      // uzreiz uzliekam jau uzzīmētajai līnijai (LRM iekšējie privātie lauki dažādos buildos var atšķirties)
+      if (S.control._line && typeof S.control._line.setStyle === 'function') S.control._line.setStyle(st);
+
+      // ja kaut kur parādās alternatīvas līnijas (citos LRM buildos)
+      if (S.control._altLines){
+        try{
+          Object.keys(S.control._altLines).forEach(function(k){
+            var ln = S.control._altLines[k];
+            if (ln && typeof ln.setStyle === 'function') ln.setStyle(st);
+          });
+        }catch(_){}
+      }
+    }catch(_){}
+  }
+
+	
 
   // ------------------------------
   // CSS
@@ -4104,7 +4185,7 @@ map.whenReady(() => {
           S.control.setWaypoints(wps);
           S.lastLegKey = '';
           debounceRefresh();
-
+mp4ApplyRouteLineVisibility();
           setTimeout(bindWaypointsDnd, 80);
         });
       });
@@ -4202,6 +4283,7 @@ map.whenReady(() => {
 
       S.lastLegKey = '';
       debounceRefresh();
+		mp4ApplyRouteLineVisibility();
     }catch(_){}
   }
 
@@ -4447,14 +4529,7 @@ function _mp4RenderNavFromRoute(route){
 
           
           // Izveidojam jaunu spilgtu apli
-          S.hoverMarker = L.circleMarker([lat, lng], {
-            radius: 6,
-            color: '#000000',
-            weight: 2,
-            fillColor: '#0003FF', // Cyan krāsa, lai labi redz
-            fillOpacity: 1,
-            interactive: false
-          }).addTo(map);
+         S.hoverMarker = L.circleMarker([lat, lng], mp4HoverMarkerStyle()).addTo(map);
         }
       });
 
@@ -4511,6 +4586,7 @@ function _mp4RenderNavPanel(){
 
     S.control.setWaypoints(wps);
     debounceRefresh();
+	  mp4ApplyRouteLineVisibility();
   }
 
   function setMapClickAdd(on){
@@ -4686,7 +4762,7 @@ function _mp4RenderNavPanel(){
       fitSelectedRoutes: false,
       containerClassName: 'mp4-panel',
       router: L.Routing.osrmv1({ serviceUrl: ROUTER.serviceUrl, profile: ROUTER.profiles.driving }),
-      lineOptions: { styles:[{ color:'#ff3b3b', opacity:0.85, weight:4, dashArray:'10,10' }] },
+      lineOptions: { styles:[ mp4RouteLineStyle(!!S.showRouteLine) ] },
       createMarker: createMp4Marker
     }).addTo(map);
 
@@ -4704,7 +4780,7 @@ function _mp4RenderNavPanel(){
       }
 
       debounceRefresh();
-
+	  mp4ApplyRouteLineVisibility();
       // atjauno NAV paneli un (1x) atver automātiski
       _mp4RenderNavPanel();
       if (!S.navAutoOpened){
@@ -4727,11 +4803,13 @@ function _mp4RenderNavPanel(){
         }
       }catch(_){}
       debounceRefresh();
+	  mp4ApplyRouteLineVisibility();
       setTimeout(bindWaypointsDnd, 60);
       _mp4UpdateAuxButtons();
     });
 
     debounceRefresh();
+	  mp4ApplyRouteLineVisibility();
     _mp4UpdateAuxButtons();
   }
 
@@ -4791,6 +4869,21 @@ function _mp4RenderNavPanel(){
           '<select id="mp4BearingUnit">' +
             '<option value="deg">Grādi (°)</option>' +
             '<option value="mil">Mil (6400)</option>' +
+          '</select>' +
+        '</div>' +
+		        '<div class="mp4-field">' +
+          '<label>Hover marķieris — apmale</label>' +
+          '<select id="mp4HoverStroke">' + mp4ColorOptionsHtml(S.hoverStroke) + '</select>' +
+        '</div>' +
+        '<div class="mp4-field">' +
+          '<label>Hover marķieris — pildījums</label>' +
+          '<select id="mp4HoverFill">' + mp4ColorOptionsHtml(S.hoverFill) + '</select>' +
+        '</div>' +
+        '<div class="mp4-field">' +
+          '<label>Maršruta līnija</label>' +
+          '<select id="mp4ShowRouteLine">' +
+            '<option value="1">Rādīt līniju + KP</option>' +
+            '<option value="0">Rādīt tikai kontrolpunktus</option>' +
           '</select>' +
         '</div>' +
         '<div class="mp4-field">' +
@@ -4862,6 +4955,37 @@ function _mp4RenderNavPanel(){
     var coordSel = sidePanel.querySelector('#mp4CoordMode');
     var bearSel = sidePanel.querySelector('#mp4BearingUnit');
 
+	  var hoverStrokeSel = sidePanel.querySelector('#mp4HoverStroke');
+var hoverFillSel   = sidePanel.querySelector('#mp4HoverFill');
+var showLineSel    = sidePanel.querySelector('#mp4ShowRouteLine');
+
+if (hoverStrokeSel) hoverStrokeSel.value = S.hoverStroke;
+if (hoverFillSel)   hoverFillSel.value   = S.hoverFill;
+if (showLineSel)    showLineSel.value    = S.showRouteLine ? '1' : '0';
+
+if (hoverStrokeSel){
+  hoverStrokeSel.onchange = function(){
+    S.hoverStroke = hoverStrokeSel.value;
+    localStorage.setItem('mp4.hoverStroke', S.hoverStroke);
+    mp4ApplyHoverMarkerStyleIfAny();
+  };
+}
+if (hoverFillSel){
+  hoverFillSel.onchange = function(){
+    S.hoverFill = hoverFillSel.value;
+    localStorage.setItem('mp4.hoverFill', S.hoverFill);
+    mp4ApplyHoverMarkerStyleIfAny();
+  };
+}
+if (showLineSel){
+  showLineSel.onchange = function(){
+    S.showRouteLine = (showLineSel.value === '1');
+    localStorage.setItem('mp4.showRouteLine', S.showRouteLine ? '1' : '0');
+    mp4ApplyRouteLineVisibility();
+  };
+}
+
+
     distSel.value = S.distanceMode;
     coordSel.value = S.coordMode;
     bearSel.value = S.bearingUnit;
@@ -4900,6 +5024,7 @@ function _mp4RenderNavPanel(){
       S.lastLegKey = '';
       S.control.route();
       debounceRefresh();
+		mp4ApplyRouteLineVisibility();
     }
 
     document.getElementById('mp4Car').onclick  = function(){ setMode('driving'); };
@@ -4912,6 +5037,7 @@ function _mp4RenderNavPanel(){
       S.lastLegKey = '';
       localStorage.setItem('mp4.distanceMode', S.distanceMode);
       debounceRefresh();
+		mp4ApplyRouteLineVisibility();
     };
 
     coordSel.onchange = function(){
@@ -4919,6 +5045,7 @@ function _mp4RenderNavPanel(){
       localStorage.setItem('mp4.coordMode', S.coordMode);
       S.lastLegKey = '';
       debounceRefresh();
+		mp4ApplyRouteLineVisibility();
     };
 
     bearSel.onchange = function(){
@@ -4926,6 +5053,7 @@ function _mp4RenderNavPanel(){
       localStorage.setItem('mp4.bearingUnit', S.bearingUnit);
       S.lastLegKey = '';
       debounceRefresh();
+		mp4ApplyRouteLineVisibility();
     };
 
     var btnAddFromMap = document.getElementById('mp4AddFromMap');
@@ -5084,6 +5212,7 @@ function _mp4RenderNavPanel(){
     if (sc) sc.innerHTML = _mp4NavPlaceholder();
 
     debounceRefresh();
+	  mp4ApplyRouteLineVisibility();
     _mp4UpdateAuxButtons();
   }
 
@@ -5106,6 +5235,7 @@ function _mp4RenderNavPanel(){
         var c0 = S.control.getContainer();
         if (c0) c0.style.display = 'flex';
         debounceRefresh();
+		  mp4ApplyRouteLineVisibility();
         setTimeout(bindWaypointsDnd, 80);
         setTimeout(bindAutocompleteToInputs, 120);
       }
