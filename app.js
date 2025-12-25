@@ -3253,7 +3253,7 @@ map.whenReady(() => {
     map.addControl(searchControl);
 
 // =====================================================================
-// 5. SOLIS: MISSION PLANNER v4.1 (Ar sānu paneli un Live Search)
+// 5. SOLIS: MISSION PLANNER v4.1 (FIX: Layout, Z-index, Broom)
 // =====================================================================
 (function MissionPlannerV4(){
   if (window.__MP4_INSTALLED__) return;
@@ -3288,7 +3288,8 @@ map.whenReady(() => {
     mapClickAdd: false,
     lastDistNonDirect: localStorage.getItem('mp4.lastDistNonDirect') || (localStorage.getItem('mp4.distanceMode') || 'route'),
     dragFromIdx: null,
-    settingsOpen: false // Vai iestatījumu panelis ir vaļā
+    settingsOpen: false,
+    dockClearBtn: null
   };
 
   const SYMBOLS = [
@@ -3316,9 +3317,9 @@ map.whenReady(() => {
         width:420px;
         min-width:380px;
         max-width:92vw;
-        height:560px;
-        min-height:420px;
-        max-height:calc(100vh - 120px);
+        height:600px; /* Nedaudz augstāks */
+        min-height:450px;
+        max-height:calc(100vh - 100px);
         resize:both;
         box-sizing:border-box;
         display:flex;
@@ -3328,10 +3329,10 @@ map.whenReady(() => {
         position: relative;
       }
 
-      /* JAUNS: Sānu panelis iestatījumiem */
+      /* Sānu panelis iestatījumiem */
       .mp4-side-panel {
         position: absolute;
-        left: 100%; /* Tieši pa labi no galvenā paneļa */
+        left: 100%;
         top: 0;
         width: 260px;
         background: #10141a;
@@ -3339,16 +3340,18 @@ map.whenReady(() => {
         border-radius: 0 10px 10px 0;
         box-shadow: 4px 0 10px rgba(0,0,0,0.4);
         padding: 10px;
-        display: none; /* Slēpts pēc noklusējuma */
+        display: none;
         flex-direction: column;
         gap: 10px;
         margin-left: 2px;
+        z-index: 199999; /* Zem galvenā paneļa suggest */
       }
       .mp4-side-panel.open { display: flex; }
 
       @media print { .mp4-panel{ display:none !important; } }
       body.print-mode .mp4-panel{ display:none !important; }
 
+      /* Ierobežojam LRM ievades lauku augstumu, lai tie neapēd visu vietu */
       .mp4-panel .leaflet-routing-container{
         margin:0 !important; padding:0 !important;
         background:transparent !important;
@@ -3356,30 +3359,33 @@ map.whenReady(() => {
         box-shadow:none !important;
         width:100% !important;
         color:#cfd6df !important;
+        flex-shrink: 0; 
+        max-height: 35vh; /* Maksimums 35% no augstuma */
+        overflow-y: auto; /* Ritjosla, ja daudz punktu */
+        border-bottom: 1px solid rgba(255,255,255,.1);
       }
 
       .mp4-panel .leaflet-routing-geocoders{
-        padding:10px !important;
+        padding:8px !important;
         background:#1c222a !important;
-        border-bottom:1px solid rgba(255,255,255,.08);
-        max-height:28vh;
-        overflow:auto;
       }
 
       .mp4-panel .leaflet-routing-geocoder{
         position:relative;
         padding-left:26px !important;
+        padding-bottom: 4px !important;
       }
 
       .mp4-panel .leaflet-routing-geocoders input{
         background:#0c1015 !important;
         border:1px solid rgba(255,255,255,.18) !important;
         color:#fff !important;
-        border-radius:10px !important;
-        padding:8px 10px !important;
+        border-radius:8px !important;
+        padding:6px 8px !important;
         width:100% !important;
-        margin-bottom:6px !important;
+        margin-bottom:4px !important;
         box-sizing:border-box !important;
+        height: 32px !important; /* Fiksēts augstums */
       }
 
       .mp4-panel .leaflet-routing-add-waypoint,
@@ -3391,141 +3397,120 @@ map.whenReady(() => {
       .mp4-panel .leaflet-routing-add-waypoint:after{ content:'+'; color:#3ddc84; font-weight:900; font-size:18px; }
       .mp4-panel .leaflet-routing-remove-waypoint:after{ content:'×'; color:#ff5b5b; font-weight:900; font-size:18px; }
 
-      .mp4-panel .leaflet-routing-alt{
-        max-height:18vh;
-        overflow:auto;
-        border-top:1px solid rgba(255,255,255,.08);
-        background:rgba(0,0,0,.18) !important;
-      }
-      .mp4-panel .leaflet-routing-collapse-btn{ display:none !important; }
-
       .mp4-drag-handle{
-        position:absolute; left:8px; top:10px; width:14px; height:20px;
+        position:absolute; left:6px; top:8px; width:14px; height:20px;
         display:flex; align-items:center; justify-content:center;
         cursor:grab; user-select:none; opacity:.85; font-weight:1000; color:#aeb8c7;
       }
-      .mp4-drag-handle:active{ cursor:grabbing; opacity:1; }
-      .mp4-wprow.mp4-drop{
-        outline:2px solid rgba(67,126,18,.55);
-        outline-offset:4px; border-radius:10px;
-      }
-
+      
       .mp4-top{
-        padding:10px;
+        padding:8px;
         display:grid;
-        grid-template-columns: 1fr 1fr 1fr 40px; /* Pievienota vieta Settings pogai */
+        grid-template-columns: 1fr 1fr 1fr 36px;
         gap:6px;
         background:#10141a;
         border-bottom:1px solid rgba(255,255,255,.08);
+        flex-shrink: 0;
       }
       .mp4-btn{
         background:rgba(255,255,255,.08);
         border:1px solid rgba(255,255,255,.14);
-        color:#dbe3ee; border-radius:10px;
-        padding:9px 4px; /* Mazāka padding */
+        color:#dbe3ee; border-radius:8px;
+        padding:6px 4px;
         font-weight:900; font-size:11px;
-        letter-spacing:.3px; text-align:center;
-        cursor:pointer; user-select:none;
+        text-align:center; cursor:pointer;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       }
-      .mp4-btn:hover{ background:rgba(255,255,255,.12); }
       .mp4-btn.active{
         background:#1b5e20; border-color:#2e7d32;
-        box-shadow:0 0 0 2px rgba(46,125,50,.18) inset;
-      }
-      .mp4-btn-set { /* Settings poga */
-        font-size: 16px; display: flex; align-items: center; justify-content: center;
       }
 
       .mp4-quick{
-        padding:10px; background:#14181e;
+        padding:8px; background:#14181e;
         border-bottom:1px solid rgba(255,255,255,.08);
-        display:grid; grid-template-columns: 1fr 1fr; gap:8px;
-        position:relative;
+        display:grid; grid-template-columns: 1fr 1fr; gap:6px;
+        position:relative; /* Svarīgi priekš absolute suggest */
+        flex-shrink: 0;
+        z-index: 20; /* Lai būtu virs saraksta */
       }
       .mp4-qbtn{
         background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
-        color:#fff; border-radius:10px; padding:9px 10px;
-        font-weight:1000; cursor:pointer; text-align:center; font-size:11px;
+        color:#fff; border-radius:8px; padding:6px;
+        font-weight:900; cursor:pointer; text-align:center; font-size:10px;
       }
       .mp4-qbtn.active{ background:#c77712; border-color:#f0a43a; color:#111; }
-      .mp4-qrow{ grid-column:1 / -1; display:grid; grid-template-columns: 1fr 44px 44px; gap:6px; align-items:center; }
+      
+      .mp4-qrow{ grid-column:1 / -1; display:grid; grid-template-columns: 1fr 36px 36px; gap:4px; align-items:center; }
       .mp4-qrow input{
         width:100%; background:#0c1015; border:1px solid rgba(255,255,255,.18);
-        color:#fff; border-radius:10px; padding:9px 10px;
+        color:#fff; border-radius:8px; padding:6px 8px;
         font-weight:900; font-size:12px; outline:none; box-sizing:border-box;
       }
-      .mp4-qrow input:focus{ border-color: rgba(67,126,18,.85); box-shadow: 0 0 0 2px rgba(67,126,18,.18); }
       .mp4-qicon{
         background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
-        color:#fff; border-radius:10px; width:44px; height:38px; padding:0;
+        color:#fff; border-radius:8px; width:36px; height:30px; padding:0;
         display:inline-flex; align-items:center; justify-content:center;
-        font-weight:1000; cursor:pointer; font-size:12px; line-height:1;
+        font-weight:1000; cursor:pointer; font-size:12px;
       }
-      .mp4-qicon:hover{ background:rgba(255,255,255,.12); }
-      .mp4-qhint{ grid-column:1 / -1; font-size:11px; color:#aeb8c7; line-height:1.2; margin-top:-2px; }
 
+      /* Ieteikumu saraksts - UZLABOTS */
       .mp4-suggest{
-        position:absolute; left:10px; right:10px;
-        background:#0c1015; border:1px solid rgba(255,255,255,.18);
-        border-radius:10px; overflow:auto; max-height:220px;
-        display:none; z-index:10; box-shadow:0 10px 26px rgba(0,0,0,.6);
+        position:absolute; 
+        top: 100%; /* Tieši zem input */
+        left: 8px; right: 8px;
+        background:#0c1015; 
+        border:1px solid rgba(255,255,255,.25);
+        border-radius:0 0 8px 8px; 
+        overflow-y:auto; 
+        max-height:200px;
+        display:none; 
+        z-index: 9999; /* Ļoti augsts, lai ietu pāri visam */
+        box-shadow:0 10px 30px rgba(0,0,0,.9);
       }
       .mp4-suggest .item{
-        padding:8px 10px; cursor:pointer; font-weight:900;
+        padding:8px 10px; cursor:pointer; font-weight:700;
         font-size:12px; border-bottom:1px solid rgba(255,255,255,.08);
+        color: #ddd;
       }
-      .mp4-suggest .item:last-child{ border-bottom:none; }
-      .mp4-suggest .item:hover{ background:rgba(255,255,255,.10); }
-      .mp4-suggest .sub{ display:block; margin-top:2px; font-size:11px; font-weight:600; opacity:.9; color:#aeb8c7; }
+      .mp4-suggest .item:hover{ background:rgba(255,255,255,.15); color:#fff; }
+      .mp4-suggest .sub{ display:block; margin-top:2px; font-size:10px; font-weight:400; color:#aaa; }
 
-      /* Iestatījumu saturs sānu panelī */
-      .mp4-field label{
-        display:block; font-size:11px; color:#aeb8c7;
-        margin-bottom:4px; font-weight:800; letter-spacing:.2px;
+      /* Posmu saraksts - tagad aizņem visu atlikušo vietu */
+      .mp4-legs{ 
+        padding:10px; 
+        overflow-y:auto; /* Ritjosla posmiem */
+        flex: 1;         /* Aizņem visu brīvo vietu */
+        min-height: 100px; 
+        background: rgba(0,0,0,0.1);
       }
-      .mp4-field select{
-        width:100%; background:#0c1015; color:#fff;
-        border:1px solid rgba(255,255,255,.18); border-radius:10px;
-        padding:8px 10px; font-weight:800; font-size:12px;
-      }
-      .mp4-side-title {
-        font-size:12px; font-weight:900; color:#fff;
-        border-bottom:1px solid rgba(255,255,255,.1); padding-bottom:6px;
-      }
-
-      .mp4-legs{ padding:10px; overflow:auto; flex:1; }
       .mp4-legs h4{ margin:0 0 8px 0; font-size:12px; color:#aeb8c7; letter-spacing:.25px; }
       .mp4-leg{
         border:1px solid rgba(255,255,255,.10); background:rgba(255,255,255,.05);
-        border-radius:12px; padding:10px; margin-bottom:8px;
+        border-radius:8px; padding:8px; margin-bottom:6px;
       }
-      .mp4-leg .t1{ font-weight:900; }
-      .mp4-leg .t2{ font-size:12px; color:#cfd6df; margin-top:3px; line-height:1.25; }
+      .mp4-leg .t1{ font-weight:900; font-size: 11px; }
+      .mp4-leg .t2{ font-size:11px; color:#cfd6df; margin-top:2px; }
       .mp4-pill{
-        display:inline-block; padding:2px 8px; border:1px solid rgba(255,255,255,.14);
-        border-radius:999px; font-size:11px; font-weight:900;
+        display:inline-block; padding:1px 6px; border:1px solid rgba(255,255,255,.14);
+        border-radius:999px; font-size:10px; font-weight:900;
         margin-left:6px; color:#e9eef5; background:rgba(0,0,0,.18);
       }
 
       .mp4-foot{
-        padding:8px 10px; /* Samazināts polsterējums */
+        padding:8px; 
         background:#10141a; border-top:1px solid rgba(255,255,255,.08);
         display:flex; gap:6px;
+        flex-shrink: 0;
       }
-      /* SAMAZINĀTAS POGAS */
       .mp4-action{
-        flex:1; border:none; border-radius:8px;
-        padding:5px 4px; /* Samazināts augstums */
+        flex:1; border:none; border-radius:6px;
+        padding:6px 4px;
         font-weight:900; cursor:pointer; color:#fff;
-        font-size:11px; /* Mazāks fonts */
+        font-size:11px;
       }
       .mp4-print{ background:#1565c0; }
-      .mp4-print:hover{ background:#0d47a1; }
       .mp4-export{ background:#455a64; }
-      .mp4-export:hover{ background:#37474f; }
       .mp4-clear{ background:#c62828; }
-      .mp4-clear:hover{ background:#b71c1c; }
 
       .mp4-marker-icon{ background:transparent; }
       .mp4-kp{
@@ -3541,22 +3526,25 @@ map.whenReady(() => {
         white-space:nowrap;
       }
       .mp4-popup{ width:260px; }
-      .mp4-popup h4{ margin:0 0 8px 0; color:#3ddc84; border-bottom:1px solid rgba(255,255,255,.12); padding-bottom:6px; }
-      .mp4-coords{ font-size:11px; color:#aeb8c7; line-height:1.3; margin-bottom:8px; }
-      .mp4-coords code{ color:#fff; font-family: monospace; }
-      .mp4-row{ display:flex; gap:6px; margin:6px 0; }
-      .mp4-row button{
-        flex:1; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
-        color:#fff; border-radius:10px; padding:7px 8px; font-weight:900; cursor:pointer; font-size:11px;
-      }
-      .mp4-row button:hover{ background:rgba(255,255,255,.12); }
+      .mp4-coords{ font-size:11px; color:#aeb8c7; margin-bottom:8px; }
       .mp4-popup textarea{
-        width:100%; height:80px; background:#0c1015; border:1px solid rgba(255,255,255,.18);
-        color:#fff; border-radius:12px; padding:10px; resize:vertical; font-size:12px;
+        width:100%; height:60px; background:#0c1015; border:1px solid rgba(255,255,255,.18);
+        color:#fff; border-radius:8px; padding:6px; resize:vertical; font-size:12px;
       }
-      .mp4-popup select{
-        width:100%; background:#0c1015; border:1px solid rgba(255,255,255,.18);
-        color:#fff; border-radius:12px; padding:9px 10px; font-weight:900; margin-bottom:8px;
+      
+      /* Iestatījumu panelis */
+      .mp4-field label{
+        display:block; font-size:11px; color:#aeb8c7; margin-bottom:2px; font-weight:800;
+      }
+      .mp4-field select{
+        width:100%; background:#0c1015; color:#fff;
+        border:1px solid rgba(255,255,255,.18); border-radius:6px;
+        padding:6px; font-size:12px;
+      }
+      .mp4-side-title {
+        font-size:12px; font-weight:900; color:#fff;
+        border-bottom:1px solid rgba(255,255,255,.1); padding-bottom:4px;
+        margin-bottom: 8px;
       }
     `;
     document.head.appendChild(style);
@@ -3923,10 +3911,13 @@ map.whenReady(() => {
       if (left + pw > window.innerWidth - 10){ left = ar.left; top  = ar.bottom + pad; }
       left = clamp(left, 10, window.innerWidth  - pw - 10);
       let maxH = Math.max(320, Math.floor(bottomLimit - top - 10));
-      const effH = Math.min(ph, maxH);
-      top = clamp(top, 10, bottomLimit - effH);
+      // const effH = Math.min(ph, maxH); // Noņemam, lai panelis nesamazinās
+      top = clamp(top, 10, bottomLimit - 400); // 400px min augstums
       maxH = Math.max(320, Math.floor(bottomLimit - top - 10));
+      
+      // Lai netraucē LRM ievadei
       if (!isFinite(parseInt(panel.style.maxHeight || '')) || Math.abs(parseInt(panel.style.maxHeight)-maxH)>1) panel.style.maxHeight = maxH + 'px';
+      
       panel.style.left = left + 'px'; panel.style.top  = top  + 'px';
 
       if (typeof L !== 'undefined' && L.DomEvent){ L.DomEvent.disableClickPropagation(panel); L.DomEvent.disableScrollPropagation(panel); }
@@ -4193,9 +4184,7 @@ map.whenReady(() => {
     function hideSuggest(){ suggestEl.style.display='none'; suggestEl.innerHTML=''; }
     function showSuggest(items, autoAdd){
         if(!items || !items.length){ hideSuggest(); return; }
-        const r = document.getElementById('mp4QuickRow').getBoundingClientRect();
-        const w = quick.getBoundingClientRect();
-        suggestEl.style.top = (r.bottom - w.top + 6) + 'px';
+        // Pozicionējam absolūti zem ievades rindas
         suggestEl.innerHTML = items.map((it,i)=>`<div class="item" data-i="${i}">${it.name}<span class="sub">${it.raw?.type||''}</span></div>`).join('');
         suggestEl.style.display='block';
         suggestEl.querySelectorAll('.item').forEach(el=>{
@@ -4220,11 +4209,10 @@ map.whenReady(() => {
         if(val.length < 3) return;
         typeDebounce = setTimeout(async ()=>{
             try {
-               // Meklējam, bet nepievienojam automātiski, tikai rādām sarakstu
                const res = await resolveQueryToCandidates(val, 5);
                showSuggest(res, false);
             } catch(err) {}
-        }, 600); // 600ms pauze pirms meklēšanas
+        }, 600);
     });
 
     // POGAS MEKLĒŠANAI
@@ -4249,8 +4237,23 @@ map.whenReady(() => {
     document.getElementById('mp4Print').onclick = openPrintWindow;
     document.getElementById('mp4Clear').onclick = ()=>{ if(confirm('Dzēst visu?')) clearRouteFromMap(); };
     document.getElementById('mp4Export').onclick = ()=>{
-       // ... (tavs esošais eksports) ...
-       alert('Funkcija saglabāta, šeit var ievietot eksporta kodu.');
+       // eksports
+       try{
+        const wps = S.control.getWaypoints().filter(w=>w && w.latLng);
+        const pack = wps.map((wp, idx)=>{
+          ensureWpId(wp);
+          const d = S.wpData.get(wp.__mp4id) || {};
+          const label = (idx===0) ? 'S' : (idx===wps.length-1 ? 'F' : `KP-${idx}`);
+          const { mgrsTxt, wgsTxt, lksTxt } = getCoordStrings(wp.latLng);
+          return { label, lat: wp.latLng.lat, lng: wp.latLng.lng, mgrs: mgrsTxt, wgs: wgsTxt, lks: lksTxt, symbol: d.symbol || DEFAULT_SYMBOL, title: d.title || '', note: d.note || '' };
+        });
+        const blob = new Blob([JSON.stringify({ version:'mp4', createdAt: new Date().toISOString(), profile: S.profile, distanceMode: S.distanceMode, coordMode: S.coordMode, bearingUnit: S.bearingUnit, waypoints: pack }, null, 2)], {type:'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'mission-package.json';
+        a.click();
+        setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
+      }catch(e){ alert('Eksports neizdevās.'); console.error(e); }
     };
 
     _mp4ApplyStoredPanelSize(c);
@@ -4268,10 +4271,12 @@ map.whenReady(() => {
       if(!S.control) init();
       else { S.control.getContainer().style.display='flex'; debounceRefresh(); setTimeout(bindWaypointsDnd,80); }
       setTimeout(dockPanel,80);
+      ensureDockClearBtn(btn); // Nodrošinām slotiņu
     } else {
       if(btn){ btn.style.background=''; btn.innerHTML='🔀'; }
       setMapClickAdd(false);
       if(S.control) S.control.getContainer().style.display='none';
+      if(S.dockClearBtn) S.dockClearBtn.style.display='none';
     }
   }
 
@@ -4282,16 +4287,52 @@ map.whenReady(() => {
       debounceRefresh();
   }
 
+  // Funkcija SLOTIŅAS pogai (Clear Route)
+  function ensureDockClearBtn(toggleBtn){
+    if (!toggleBtn) return;
+    const parent = toggleBtn.parentElement;
+    if (!parent) return;
+
+    let b = document.getElementById('clearRouteBtn');
+    if (!b){
+      b = document.createElement('button');
+      b.id = 'clearRouteBtn';
+      b.type = 'button';
+      b.textContent = '🧹';
+      b.title = 'Notīrīt maršrutu';
+      // Kopējam stilus no toggleBtn vai iestatām savus
+      b.style.marginLeft = '6px';
+      b.style.background = '#444';
+      b.style.color = '#fff';
+      b.style.border = '1px solid #666';
+      b.style.borderRadius = '4px';
+      b.style.cursor = 'pointer';
+      b.style.width = '30px';
+      
+      parent.insertBefore(b, toggleBtn.nextSibling);
+
+      b.addEventListener('click', (e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        if(confirm('Notīrīt visu maršrutu?')) clearRouteFromMap();
+      });
+    }
+    S.dockClearBtn = b;
+    // Rādīt tikai tad, ja ir maršruts (vai ja panelis atvērts - pēc izvēles)
+    // Šeit rādām vienmēr, kad atvērts
+    b.style.display = S.enabled ? '' : 'none';
+  }
+
   onReady(()=>{
     const btn = document.getElementById('toggleRouteBtn');
     if (btn && !btn.dataset.mp4Bound){
         btn.dataset.mp4Bound='1';
+        ensureDockClearBtn(btn);
         btn.addEventListener('click', (e)=>{ e.preventDefault(); toggle(); });
     }
   });
 
 })();
-
 
 
     // --- 6. SOLIS: PARASTĀ MEKLĒŠANA ---
