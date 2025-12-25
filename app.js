@@ -5027,11 +5027,13 @@ var bearSel = sidePanel.querySelector('#mp4BearingUnit');
 
 var hoverStrokeSel = document.getElementById('mp4HoverStroke');
 var hoverFillSel   = document.getElementById('mp4HoverFill');
-var showSel        = document.getElementById('mp4ShowRouteLine');
+var showLineSel    = document.getElementById('mp4ShowRouteLine'); // <-- ŠIS pietrūka
 
 if (hoverStrokeSel) hoverStrokeSel.value = S.hoverStroke;
 if (hoverFillSel)   hoverFillSel.value   = S.hoverFill;
-if (showSel)        showSel.value        = S.showRouteLine ? '1' : '0';
+if (showLineSel)    showLineSel.value    = S.showRouteLine ? '1' : '0';
+
+// !!! izmet ārā dublikātus (tev bija vēlreiz tie paši if(...) value = ...)
 
 if (hoverStrokeSel){
   hoverStrokeSel.onchange = function(){
@@ -5048,6 +5050,7 @@ if (hoverFillSel){
     mp4ApplyHoverMarkerStyleIfAny();
   };
 }
+
 if (showLineSel){
   showLineSel.onchange = function(){
     S.showRouteLine = (showLineSel.value === '1');
