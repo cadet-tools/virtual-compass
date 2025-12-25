@@ -3816,7 +3816,7 @@ function mp4ApplyRouteLineVisibility(){
 		  font-size:18px;
 		}
 
-		.mp4-lbl {font-size: 16px;}
+		.mp4-lbl {font-size: 16px;white-space: nowrap;}
 
     `;
     document.head.appendChild(style);
