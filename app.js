@@ -3816,6 +3816,68 @@ function mp4ApplyRouteLineVisibility(){
 		  font-size:18px;
 		}
 
+/* ===== MP4 KP marķieri (S / KP-1 / F) ===== */
+.mp4-marker-icon.leaflet-div-icon{
+  background: transparent !important;   /* noņem Leaflet balto kvadrātu */
+  border: none !important;
+}
+
+.mp4-marker-icon .mp4-kp{
+  width: 34px;
+  height: 34px;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+/* “halo” lai nesaplūst ar karti */
+.mp4-marker-icon .mp4-kp::before{
+  content:"";
+  position:absolute;
+  inset:-4px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.35);
+  box-shadow: 0 4px 10px rgba(0,0,0,.55);
+}
+
+/* SVG simbols */
+.mp4-marker-icon .mp4-kp svg{
+  width: 34px;
+  height: 34px;
+  display:block;
+  position: relative;
+  z-index: 2;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.85));
+}
+
+/* Uzraksts “S / KP-1 / F” */
+.mp4-marker-icon .mp4-lbl{
+  position:absolute;
+  left:50%;
+  top: 50%;
+  transform: translate(-50%,-50%);
+  z-index: 3;
+
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.70);
+  border: 1px solid rgba(255,255,255,.22);
+
+  color:#fff;
+  font-weight: 1000;
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: .3px;
+  text-shadow: 0 2px 4px rgba(0,0,0,.95);
+  pointer-events: none; /* lai vilkšana netraucējas */
+}
+
+/* Mazs “focus” efekts uz hover – redzams, bet netraucējošs */
+.mp4-marker-icon:hover .mp4-lbl{
+  transform: translate(-50%,-50%) scale(1.08);
+  background: rgba(0,0,0,.82);
+}
+
     `;
     document.head.appendChild(style);
   })();
