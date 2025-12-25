@@ -2,7 +2,7 @@ console.info('[modern] app.js start');
 
 
 // ===== Boot guard =====
-const BUILD = '25-12-2025-V1';            // palielini, kad maini kodu
+const BUILD = '25-12-2025-V1.5';            // palielini, kad maini kodu
 if (window.__CADET_APP_BOOTED__ === BUILD) {
   console.warn('[boot] jau palaists, ignorēju otro startu');
 } else {
@@ -3531,6 +3531,20 @@ function mp4ApplyRouteLineVisibility(){
         overflow:hidden;
       }
       .mp4-nav-panel.open{ display:flex; }
+.mp4-nav-bottom{
+  padding:10px;
+  background:rgba(255,255,255,0.04);
+  border-top:1px solid rgba(255,255,255,0.10);
+  flex-shrink:0;
+}
+.mp4-nav-bottom-title{
+  font-size:11px;
+  font-weight:1000;
+  color:#cfd6df;
+  letter-spacing:.2px;
+  margin:0 0 10px 0;
+  opacity:.9;
+}
 
       .mp4-side-header{
         padding:10px;
@@ -3562,27 +3576,35 @@ function mp4ApplyRouteLineVisibility(){
       }
 
       /* FIX #2: iestatījumu select/nav label tumši */
-      .mp4-side-panel .mp4-field{ margin:0 0 10px 0; }
-      .mp4-side-panel .mp4-field label{
-        display:block;
-        font-size:12px;
-        font-weight:900;
-        color:#cfd6df;
-        margin:0 0 6px 0;
-      }
-      .mp4-side-panel select{
-        width:100%;
-        box-sizing:border-box;
-        height:34px;
-        background:#0c1015 !important;
-        color:#fff !important;
-        border:1px solid rgba(255,255,255,.18) !important;
-        border-radius:8px !important;
-        padding:6px 10px !important;
-        outline:none !important;
-        -webkit-appearance:none;
-        appearance:none;
-      }
+     .mp4-side-panel .mp4-field,
+.mp4-nav-panel .mp4-field{ margin:0 0 10px 0; }
+
+.mp4-side-panel .mp4-field label,
+.mp4-nav-panel .mp4-field label{
+  display:block;
+  font-size:12px;
+  font-weight:900;
+  color:#cfd6df;
+  margin:0 0 6px 0;
+}
+
+.mp4-side-panel select,
+.mp4-nav-panel select{
+  width:100%;
+  box-sizing:border-box;
+  height:34px;
+  background:#0c1015 !important;
+  color:#fff !important;
+  border:1px solid rgba(255,255,255,.18) !important;
+  border-radius:8px !important;
+  padding:6px 10px !important;
+  outline:none !important;
+  -webkit-appearance:none;
+  appearance:none;
+}
+
+   
+     
 
       @media print { .mp4-panel, .mp4-right-wrap{ display:none !important; } }
       body.print-mode .mp4-panel{ display:none !important; }
@@ -4898,28 +4920,7 @@ function _mp4RenderNavPanel(){
     sidePanel.innerHTML =
       '<div class="mp4-side-header">IESTATĪJUMI</div>' +
       '<div class="mp4-side-content">' +
-        '<div class="mp4-field">' +
-          '<label>Metri pēc</label>' +
-          '<select id="mp4DistanceMode">' +
-            '<option value="route">CEĻŠ (OSRM)</option>' +
-            '<option value="air">GAISS (TAISNE)</option>' +
-          '</select>' +
-        '</div>' +
-        '<div class="mp4-field">' +
-          '<label>Koordinātes</label>' +
-          '<select id="mp4CoordMode">' +
-            '<option value="MGRS">MGRS</option>' +
-            '<option value="WGS">Lat/Lng</option>' +
-            '<option value="LKS">LKS-92</option>' +
-          '</select>' +
-        '</div>' +
-        '<div class="mp4-field">' +
-          '<label>Azimuta vienības</label>' +
-          '<select id="mp4BearingUnit">' +
-            '<option value="deg">Grādi (°)</option>' +
-            '<option value="mil">Mil (6400)</option>' +
-          '</select>' +
-        '</div>' +
+
 		        '<div class="mp4-field">' +
           '<label>Hover marķieris — apmale</label>' +
           '<select id="mp4HoverStroke">' + mp4ColorOptionsHtml(S.hoverStroke) + '</select>' +
@@ -4943,13 +4944,33 @@ function _mp4RenderNavPanel(){
     var navPanel = document.createElement('div');
     navPanel.className = 'mp4-nav-panel';
     navPanel.id = 'mp4NavPanel';
-    navPanel.innerHTML =
+     navPanel.innerHTML =
       '<div class="mp4-side-header">' +
         '<span>MARŠRUTA VADĪTĀJS</span>' +
         '<button class="mp4-xbtn" id="mp4NavClose" type="button" title="Aizvērt">✕</button>' +
       '</div>' +
       '<div class="mp4-side-content" id="mp4NavContent" style="background:rgba(0,0,0,0.18);">' +
         _mp4NavPlaceholder() +
+      '</div>' +
+      '<div class="mp4-nav-bottom" id="mp4NavBottom">' +
+        '<div class="mp4-nav-bottom-title">ATTĒLOŠANA</div>' +
+
+        '<div class="mp4-field">' +
+          '<label>Hover marķieris — apmale</label>' +
+          '<select id="mp4HoverStroke">' + mp4ColorOptionsHtml(S.hoverStroke) + '</select>' +
+        '</div>' +
+        '<div class="mp4-field">' +
+          '<label>Hover marķieris — pildījums</label>' +
+          '<select id="mp4HoverFill">' + mp4ColorOptionsHtml(S.hoverFill) + '</select>' +
+        '</div>' +
+        '<div class="mp4-field">' +
+          '<label>Maršruta līnija</label>' +
+          '<select id="mp4ShowRouteLine">' +
+            '<option value="1">Rādīt līniju + KP</option>' +
+            '<option value="0">Rādīt tikai kontrolpunktus</option>' +
+          '</select>' +
+        '</div>' +
+
       '</div>';
 
     var rightWrap = document.createElement('div');
@@ -5000,17 +5021,17 @@ function _mp4RenderNavPanel(){
       S.btnNav.classList.remove('active');
     };
 
-    var distSel = sidePanel.querySelector('#mp4DistanceMode');
-    var coordSel = sidePanel.querySelector('#mp4CoordMode');
-    var bearSel = sidePanel.querySelector('#mp4BearingUnit');
+  var distSel = sidePanel.querySelector('#mp4DistanceMode');
+var coordSel = sidePanel.querySelector('#mp4CoordMode');
+var bearSel = sidePanel.querySelector('#mp4BearingUnit');
 
-	  var hoverStrokeSel = sidePanel.querySelector('#mp4HoverStroke');
-var hoverFillSel   = sidePanel.querySelector('#mp4HoverFill');
-var showLineSel    = sidePanel.querySelector('#mp4ShowRouteLine');
+var hoverStrokeSel = document.getElementById('mp4HoverStroke');
+var hoverFillSel   = document.getElementById('mp4HoverFill');
+var showSel        = document.getElementById('mp4ShowRouteLine');
 
 if (hoverStrokeSel) hoverStrokeSel.value = S.hoverStroke;
 if (hoverFillSel)   hoverFillSel.value   = S.hoverFill;
-if (showLineSel)    showLineSel.value    = S.showRouteLine ? '1' : '0';
+if (showSel)        showSel.value        = S.showRouteLine ? '1' : '0';
 
 if (hoverStrokeSel){
   hoverStrokeSel.onchange = function(){
@@ -5019,6 +5040,7 @@ if (hoverStrokeSel){
     mp4ApplyHoverMarkerStyleIfAny();
   };
 }
+
 if (hoverFillSel){
   hoverFillSel.onchange = function(){
     S.hoverFill = hoverFillSel.value;
