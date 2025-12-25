@@ -3606,7 +3606,7 @@ map.whenReady(() => {
       .mp4-suggest .item:hover{ background:rgba(255,255,255,.15); color:#fff; }
       .mp4-suggest .sub{ display:block; margin-top:2px; font-size:10px; font-weight:500; color:#aaa; }
 
-     .mp4-legs{ padding:10px; overflow-y:auto; flex:1; min-height:0; max-height:300px background:rgba(0,0,0,0.1);}
+     .mp4-legs{ padding:10px; overflow-y:auto; flex:1; min-height:0; max-height:300px; background:rgba(0,0,0,0.1);}
 
       .mp4-legs h4{ margin:0 0 8px 0; font-size:12px; color:#aeb8c7; letter-spacing:.25px; }
       .mp4-leg{ border:1px solid rgba(255,255,255,.10); background:rgba(255,255,255,.05); border-radius:8px; padding:8px; margin-bottom:6px; }
