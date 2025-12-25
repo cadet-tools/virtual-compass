@@ -3296,6 +3296,8 @@ map.whenReady(() => {
     settingsOpen: false,
     navOpen: false,
     navAutoOpened: false,
+	navNeedsRender: false,
+
 
     activeInput: null,
 
@@ -3345,7 +3347,7 @@ map.whenReady(() => {
         box-sizing:border-box;
         display:flex;
         flex-direction:column;
-        overflow:visible !important;
+        overflow:hidden !important;
         z-index:200000;
         position: relative;
       }
@@ -3604,7 +3606,8 @@ map.whenReady(() => {
       .mp4-suggest .item:hover{ background:rgba(255,255,255,.15); color:#fff; }
       .mp4-suggest .sub{ display:block; margin-top:2px; font-size:10px; font-weight:500; color:#aaa; }
 
-      .mp4-legs{ padding:10px; overflow-y:auto; flex:1; background:rgba(0,0,0,0.1); min-height:100px; }
+     .mp4-legs{ padding:10px; overflow-y:auto; flex:1; min-height:0; background:rgba(0,0,0,0.1);}
+
       .mp4-legs h4{ margin:0 0 8px 0; font-size:12px; color:#aeb8c7; letter-spacing:.25px; }
       .mp4-leg{ border:1px solid rgba(255,255,255,.10); background:rgba(255,255,255,.05); border-radius:8px; padding:8px; margin-bottom:6px; }
       .mp4-leg .t1{ font-weight:900; font-size:11px; }
@@ -4416,17 +4419,24 @@ map.whenReady(() => {
 
       // mēģinām atrast LRM itinerary DOM
       var alt =
-        c.querySelector('.leaflet-routing-alternatives-container') ||
-        c.querySelector('.leaflet-routing-alt');
+     var alt = null;
+var nodes = c.querySelectorAll('.leaflet-routing-alternatives-container, .leaflet-routing-alt');
+for (var i=0; i<nodes.length; i++){
+  var n = nodes[i];
+  if (!n) continue;
+  if (n.closest && n.closest('.mp4-nav-panel')) continue; // <-- neņem klonu no NAV paneļa
+  alt = n;
+  break;
+}
 
-      if (alt){
-        // klonējam un ieliekam
-        sideContent.innerHTML = '';
-        var clone = alt.cloneNode(true);
-        clone.style.display = 'block';
-        sideContent.appendChild(clone);
-        return;
-      }
+if (alt){
+  sideContent.innerHTML = '';
+  var clone = alt.cloneNode(true);
+  clone.style.display = 'block';
+  sideContent.appendChild(clone);
+  return;
+}
+
 
       // fallback no pēdējā routesfound
       sideContent.innerHTML = _mp4RenderNavFromRoute(S.lastRoute);
@@ -4645,6 +4655,13 @@ map.whenReady(() => {
         var r = e && e.routes && e.routes[0] ? e.routes[0] : null;
         S.lastRoute = r || null;
         S.hasRoute = !!(r && r.summary && isFinite(r.summary.totalDistance) && r.summary.totalDistance > 0);
+		  S.navNeedsRender = true;
+
+// Ja UI jau ir uzbūvēts, renderē uzreiz
+if (document.getElementById('mp4NavContent')) {
+  _mp4RenderNavPanel();
+  S.navNeedsRender = false;
+}
       }catch(_){
         S.lastRoute = null;
         S.hasRoute = false;
@@ -4662,6 +4679,19 @@ map.whenReady(() => {
       }
 
       _mp4UpdateAuxButtons();
+		// Ja routesfound atnāca pirms UI uzbūves - tagad ie-renderējam
+if (S.navNeedsRender) {
+  _mp4RenderNavPanel();
+  S.navNeedsRender = false;
+
+  // ja maršruts ir, atveram NAV 1x automātiski (ja vēl nav atvērts)
+  if (S.lastRoute && !S.navAutoOpened) {
+    S.navAutoOpened = true;
+    S.navOpen = true;
+    navPanel.classList.add('open');
+    S.btnNav.classList.add('active');
+  }
+}
     });
 
     S.control.on('waypointschanged', function(){
