@@ -3252,7 +3252,7 @@ map.whenReady(() => {
     const searchControl = new Control({ position: 'topleft' });
     map.addControl(searchControl);
 // =====================================================================
-// MISSION PLANNER v4.3 (ONLY FIXES REQUESTED)
+// 5. SOLIS MISSION PLANNER v4.3 (ONLY FIXES REQUESTED)
 // 1) Nav panel not empty (DOM clone + fallback from routesfound)
 // 2) Settings selects dark (no white dropdowns)
 // 3) Waypoint list scroll kicks in ~5 points (lower max-height)
@@ -3347,7 +3347,7 @@ map.whenReady(() => {
         box-sizing:border-box;
         display:flex;
         flex-direction:column;
-        overflow:hidden !important;
+        overflow:visible !important;
         z-index:200000;
         position: relative;
       }
@@ -4684,12 +4684,11 @@ if (S.navNeedsRender) {
   _mp4RenderNavPanel();
   S.navNeedsRender = false;
 
-  // ja maršruts ir, atveram NAV 1x automātiski (ja vēl nav atvērts)
   if (S.lastRoute && !S.navAutoOpened) {
     S.navAutoOpened = true;
     S.navOpen = true;
-    navPanel.classList.add('open');
-    S.btnNav.classList.add('active');
+    if (S.navPanel) S.navPanel.classList.add('open'); // <--- LABOTS: S.navPanel
+    if (S.btnNav) S.btnNav.classList.add('active');
   }
 }
     });
@@ -5032,6 +5031,10 @@ if (S.navNeedsRender) {
     // nodrošina clear pogu (slēpta pēc noklusējuma)
     _mp4EnsureClearBtnNearSmartSearch();
     _mp4UpdateAuxButtons();
+	  // JAUNS: Ja maršruts jau eksistē, piespiedu kārtā atjauno Nav Paneli
+    if (S.hasRoute || S.lastRoute) {
+       _mp4RenderNavPanel();
+    }
   }
 
   // ------------------------------
