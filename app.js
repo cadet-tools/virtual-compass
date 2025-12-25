@@ -3651,8 +3651,8 @@ map.whenReady(() => {
         color: #e9eef5;
       }
 
-/* Hover efekts rindai, lai redz, ka var uziet */
-      .mp4-nav-table tr:hover td { background:rgba(255,255,255,0.05); cursor:crosshair; }
+/* Hover efekts rindai - rādīt pirkstu (pointer) nevis krustiņu */
+.mp4-nav-table tr:hover td { background:rgba(255,255,255,0.05); cursor:pointer; }
 
 	  
       .mp4-nav-table td:last-child {
@@ -4463,15 +4463,17 @@ function _mp4RenderNavFromRoute(route){
     });
   }
 
-  function _mp4RenderNavPanel(){
+function _mp4RenderNavPanel(){
     try{
       if (!S.control || !S.navPanel) return;
       var sideContent = document.getElementById('mp4NavContent');
       if (!sideContent) return;
 
+      // 1. Ģenerējam saturu
       sideContent.innerHTML = _mp4RenderNavFromRoute(S.lastRoute);
       
-      // Svarīgi: Piesaistām hover notikumus tikko izveidotajām rindām
+      // 2. SVARĪGI: Piesaistām hover notikumus (lai rādītu punktu)
+      // Šī rindiņa trūka tavā otrajā funkcijas versijā
       _mp4BindNavHover();
 
     }catch(e){
