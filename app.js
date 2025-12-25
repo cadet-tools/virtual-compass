@@ -3803,6 +3803,19 @@ function mp4ApplyRouteLineVisibility(){
         width:100%; background:#0c1015; border:1px solid rgba(255,255,255,.18);
         color:#fff; border-radius:8px; padding:6px; margin-bottom:8px;
       }
+	 	 .mp4-nav-foot{
+		  padding:10px;
+		  background:rgba(0,0,0,0.22);
+		  border-top:1px solid rgba(255,255,255,0.10);
+		  flex-shrink:0;          /* svarīgi: paliek apakšā */
+		}
+		.mp4-summary{
+		  font-weight:900;
+		  color:#e9eef5;
+		  line-height:1.4;
+		  font-size:18px;
+		}
+
     `;
     document.head.appendChild(style);
   })();
@@ -4935,9 +4948,6 @@ function _mp4RenderNavPanel(){
             '<option value="0">Rādīt tikai kontrolpunktus</option>' +
           '</select>' +
         '</div>' +
-        '<div class="mp4-field">' +
-          '<div id="mp4SummaryLine" style="font-weight:900;color:#e9eef5;line-height:1.4;font-size:20px;">-</div>' +
-        '</div>' +
       '</div>';
 
     var navPanel = document.createElement('div');
@@ -4950,7 +4960,10 @@ function _mp4RenderNavPanel(){
       '</div>' +
       '<div class="mp4-side-content" id="mp4NavContent" style="background:rgba(0,0,0,0.18);">' +
         _mp4NavPlaceholder() +
-      '</div>';
+      '</div>'+
+		        '<div class="mp4-field">' +
+          '<div id="mp4SummaryLine" style="font-weight:900;color:#e9eef5;line-height:1.4;font-size:20px;">-</div>' +
+        '</div>' ;
 
     var rightWrap = document.createElement('div');
     rightWrap.className = 'mp4-right-wrap';
