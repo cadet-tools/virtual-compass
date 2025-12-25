@@ -4139,9 +4139,9 @@ function mp4ApplyRouteLineVisibility(){
     var tStr = (S.distanceMode === 'route' && S.profile !== 'direct') ? fmtTime(totals.sec) : '-';
 
     sumEl.innerHTML =
-      'Kopējais maršruta garums: <b>' + totalShown + '</b><br>' +
-      'distane pa taisnu līniju: ' + totalAir + '<br>' +
-      ((S.distanceMode==='route' && S.profile!=='direct') ? ('Aprēķinātais laiks: ' + tStr) : 'Taisne');
+      'Distance pa ceļiem: <b>' + totalShown + '</b><br>' +
+      'Distance pa taisni: ' + totalAir + '<br>' +
+      ((S.distanceMode==='route' && S.profile!=='direct') ? ('Laiks: ' + tStr) : 'Taisne');
 
     var unitLabel = (S.bearingUnit === 'mil') ? 'mil' : '°';
 
@@ -4156,7 +4156,7 @@ function mp4ApplyRouteLineVisibility(){
       html +=
         '<div class="mp4-leg">' +
           '<div class="t1">' + aName + ' → ' + bName + '<span class="mp4-pill">' + br + unitLabel + '</span></div>' +
-          '<div class="t2">Distance pa ceļiem: <b>' + route + '</b> · Distane pa taisnu līniju: ' + air +
+          '<div class="t2">Distance pa ceļiem: <b>' + route + '</b> · Distance pa taisni: ' + air +
             (Number.isFinite(legs[i].sec) ? (' · ' + fmtTime(legs[i].sec)) : '') +
           '</div>' +
         '</div>';
