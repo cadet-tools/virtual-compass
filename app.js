@@ -4449,9 +4449,9 @@ function _mp4RenderNavFromRoute(route){
           // Izveidojam jaunu spilgtu apli
           S.hoverMarker = L.circleMarker([lat, lng], {
             radius: 6,
-            color: '#fff',
+            color: '#000000',
             weight: 2,
-            fillColor: '#00ffff', // Cyan krāsa, lai labi redz
+            fillColor: '#0003FF', // Cyan krāsa, lai labi redz
             fillOpacity: 1,
             interactive: false
           }).addTo(map);
