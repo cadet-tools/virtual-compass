@@ -3253,7 +3253,7 @@ map.whenReady(() => {
     map.addControl(searchControl);
 
 // =====================================================================
-// 5. SOLIS: MISSION PLANNER v4.1 (FIX: Layout, Z-index, Broom)
+// 5. SOLIS: MISSION PLANNER v4.2 (FIX: Side Itinerary, Input Search, Layout)
 // =====================================================================
 (function MissionPlannerV4(){
   if (window.__MP4_INSTALLED__) return;
@@ -3288,8 +3288,9 @@ map.whenReady(() => {
     mapClickAdd: false,
     lastDistNonDirect: localStorage.getItem('mp4.lastDistNonDirect') || (localStorage.getItem('mp4.distanceMode') || 'route'),
     dragFromIdx: null,
-    settingsOpen: false,
-    dockClearBtn: null
+    settingsOpen: false, // Sānu panelis ciet/vaļā
+    dockClearBtn: null,
+    activeInput: null // Kurš ievades lauks pašlaik tiek rediģēts
   };
 
   const SYMBOLS = [
@@ -3307,6 +3308,7 @@ map.whenReady(() => {
     const style = document.createElement('style');
     style.id = 'mp4-css';
     style.textContent = `
+      /* Galvenais panelis */
       .mp4-panel{
         background:#14181e !important;
         color:#e9eef5 !important;
@@ -3317,234 +3319,219 @@ map.whenReady(() => {
         width:420px;
         min-width:380px;
         max-width:92vw;
-        height:600px; /* Nedaudz augstāks */
-        min-height:450px;
-        max-height:calc(100vh - 100px);
+        height:auto !important;
+        min-height:500px;
+        max-height:85vh !important; /* Lai neiet ārpus ekrāna */
         resize:both;
         box-sizing:border-box;
         display:flex;
         flex-direction:column;
-        overflow:visible !important; /* Lai sānu panelis būtu redzams */
+        overflow:visible !important;
         z-index:200000;
         position: relative;
       }
 
-      /* Sānu panelis iestatījumiem */
+      /* Sānu panelis (Iestatījumi + Maršruta teksts) */
       .mp4-side-panel {
         position: absolute;
-        left: 100%;
+        left: 100%; /* Pa labi no galvenā paneļa */
         top: 0;
-        width: 260px;
+        width: 300px;
+        max-height: 85vh;
         background: #10141a;
         border: 1px solid rgba(255,255,255,.14);
         border-radius: 0 10px 10px 0;
         box-shadow: 4px 0 10px rgba(0,0,0,0.4);
-        padding: 10px;
-        display: none;
+        padding: 0;
+        display: none; /* Slēpts pēc noklusējuma */
         flex-direction: column;
-        gap: 10px;
-        margin-left: 2px;
-        z-index: 199999; /* Zem galvenā paneļa suggest */
+        z-index: 199999;
+        margin-left: 4px;
+        overflow: hidden;
       }
       .mp4-side-panel.open { display: flex; }
+      
+      .mp4-side-header {
+        padding: 10px;
+        background: rgba(255,255,255,0.05);
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        font-weight: bold;
+        font-size: 12px;
+        color: #fff;
+        display: flex; justify-content: space-between; align-items: center;
+      }
+      .mp4-side-content {
+        padding: 10px;
+        overflow-y: auto;
+        flex: 1;
+      }
 
-      @media print { .mp4-panel{ display:none !important; } }
+      @media print { .mp4-panel, .mp4-side-panel{ display:none !important; } }
       body.print-mode .mp4-panel{ display:none !important; }
 
-      /* Ierobežojam LRM ievades lauku augstumu, lai tie neapēd visu vietu */
-      .mp4-panel .leaflet-routing-container{
+      /* --- LRM Ievades lauku stils --- */
+      /* Svarīgi: Paslēpjam oriģinālo LRM maršruta tabulu galvenajā panelī, lai taupītu vietu! */
+      .mp4-panel .leaflet-routing-container .leaflet-routing-alt {
+         display: none !important; 
+      }
+
+      .mp4-panel .leaflet-routing-container {
         margin:0 !important; padding:0 !important;
-        background:transparent !important;
-        border:none !important;
-        box-shadow:none !important;
-        width:100% !important;
-        color:#cfd6df !important;
-        flex-shrink: 0; 
-        max-height: 35vh; /* Maksimums 35% no augstuma */
-        overflow-y: auto; /* Ritjosla, ja daudz punktu */
-        border-bottom: 1px solid rgba(255,255,255,.1);
+        background:transparent !important; border:none !important; box-shadow:none !important;
+        width:100% !important; color:#cfd6df !important;
+        flex-shrink: 0; /* Neļaujam samazināties */
       }
 
-      .mp4-panel .leaflet-routing-geocoders{
-        padding:8px !important;
+      .mp4-panel .leaflet-routing-geocoders {
+        padding:10px !important;
         background:#1c222a !important;
+        border-bottom:1px solid rgba(255,255,255,.08);
+        max-height: 40vh;
+        overflow-y: auto;
       }
 
-      .mp4-panel .leaflet-routing-geocoder{
+      /* Katra ievades rinda */
+      .mp4-panel .leaflet-routing-geocoder {
         position:relative;
         padding-left:26px !important;
-        padding-bottom: 4px !important;
+        margin-bottom: 6px !important;
+        display: flex;
+        align-items: center;
       }
 
-      .mp4-panel .leaflet-routing-geocoders input{
+      .mp4-panel .leaflet-routing-geocoders input {
         background:#0c1015 !important;
         border:1px solid rgba(255,255,255,.18) !important;
         color:#fff !important;
         border-radius:8px !important;
-        padding:6px 8px !important;
+        padding:8px 10px !important;
         width:100% !important;
-        margin-bottom:4px !important;
         box-sizing:border-box !important;
-        height: 32px !important; /* Fiksēts augstums */
+        font-size: 12px !important;
+        height: 34px !important; /* Fiksēts augstums, lai nesaspiežas */
       }
-
+      
+      /* Pogas + un x */
       .mp4-panel .leaflet-routing-add-waypoint,
-      .mp4-panel .leaflet-routing-remove-waypoint{
-        background:transparent !important;
-        border:none !important;
-        opacity:.9;
+      .mp4-panel .leaflet-routing-remove-waypoint {
+        background:transparent !important; border:none !important; opacity:.9; cursor: pointer;
       }
-      .mp4-panel .leaflet-routing-add-waypoint:after{ content:'+'; color:#3ddc84; font-weight:900; font-size:18px; }
-      .mp4-panel .leaflet-routing-remove-waypoint:after{ content:'×'; color:#ff5b5b; font-weight:900; font-size:18px; }
+      .mp4-panel .leaflet-routing-add-waypoint:after { content:'+'; color:#3ddc84; font-weight:900; font-size:18px; }
+      .mp4-panel .leaflet-routing-remove-waypoint:after { content:'×'; color:#ff5b5b; font-weight:900; font-size:18px; }
 
-      .mp4-drag-handle{
-        position:absolute; left:6px; top:8px; width:14px; height:20px;
+      /* Drag handle */
+      .mp4-drag-handle {
+        position:absolute; left:6px; top:50%; transform: translateY(-50%);
+        width:14px; height:20px;
         display:flex; align-items:center; justify-content:center;
         cursor:grab; user-select:none; opacity:.85; font-weight:1000; color:#aeb8c7;
       }
-      
-      .mp4-top{
-        padding:8px;
-        display:grid;
-        grid-template-columns: 1fr 1fr 1fr 36px;
-        gap:6px;
-        background:#10141a;
-        border-bottom:1px solid rgba(255,255,255,.08);
+
+      /* Augšējā josla */
+      .mp4-top {
+        padding:10px; display:grid; grid-template-columns: 1fr 1fr 1fr 40px; gap:6px;
+        background:#10141a; border-bottom:1px solid rgba(255,255,255,.08);
         flex-shrink: 0;
       }
-      .mp4-btn{
-        background:rgba(255,255,255,.08);
-        border:1px solid rgba(255,255,255,.14);
-        color:#dbe3ee; border-radius:8px;
-        padding:6px 4px;
-        font-weight:900; font-size:11px;
-        text-align:center; cursor:pointer;
+      .mp4-btn {
+        background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
+        color:#dbe3ee; border-radius:8px; padding:8px 4px;
+        font-weight:900; font-size:11px; text-align:center; cursor:pointer;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       }
-      .mp4-btn.active{
-        background:#1b5e20; border-color:#2e7d32;
-      }
+      .mp4-btn.active { background:#1b5e20; border-color:#2e7d32; }
+      .mp4-btn-set { font-size: 16px; display: flex; align-items: center; justify-content: center; }
 
-      .mp4-quick{
-        padding:8px; background:#14181e;
+      /* Ātrā ievade */
+      .mp4-quick {
+        padding:10px; background:#14181e;
         border-bottom:1px solid rgba(255,255,255,.08);
-        display:grid; grid-template-columns: 1fr 1fr; gap:6px;
-        position:relative; /* Svarīgi priekš absolute suggest */
-        flex-shrink: 0;
-        z-index: 20; /* Lai būtu virs saraksta */
+        display:grid; grid-template-columns: 1fr 1fr; gap:8px;
+        position:relative; flex-shrink: 0;
+        z-index: 20;
       }
-      .mp4-qbtn{
+      .mp4-qbtn {
         background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
-        color:#fff; border-radius:8px; padding:6px;
-        font-weight:900; cursor:pointer; text-align:center; font-size:10px;
+        color:#fff; border-radius:8px; padding:8px;
+        font-weight:900; cursor:pointer; text-align:center; font-size:11px;
       }
-      .mp4-qbtn.active{ background:#c77712; border-color:#f0a43a; color:#111; }
+      .mp4-qbtn.active { background:#c77712; border-color:#f0a43a; color:#111; }
       
-      .mp4-qrow{ grid-column:1 / -1; display:grid; grid-template-columns: 1fr 36px 36px; gap:4px; align-items:center; }
-      .mp4-qrow input{
+      .mp4-qrow { grid-column:1 / -1; display:grid; grid-template-columns: 1fr 40px 40px; gap:6px; align-items:center; }
+      .mp4-qrow input {
         width:100%; background:#0c1015; border:1px solid rgba(255,255,255,.18);
-        color:#fff; border-radius:8px; padding:6px 8px;
+        color:#fff; border-radius:8px; padding:8px 10px;
         font-weight:900; font-size:12px; outline:none; box-sizing:border-box;
       }
-      .mp4-qicon{
+      .mp4-qicon {
         background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
-        color:#fff; border-radius:8px; width:36px; height:30px; padding:0;
+        color:#fff; border-radius:8px; width:40px; height:34px; padding:0;
         display:inline-flex; align-items:center; justify-content:center;
         font-weight:1000; cursor:pointer; font-size:12px;
       }
 
-      /* Ieteikumu saraksts - UZLABOTS */
-      .mp4-suggest{
-        position:absolute; 
-        top: 100%; /* Tieši zem input */
-        left: 8px; right: 8px;
-        background:#0c1015; 
-        border:1px solid rgba(255,255,255,.25);
-        border-radius:0 0 8px 8px; 
-        overflow-y:auto; 
-        max-height:200px;
-        display:none; 
-        z-index: 9999; /* Ļoti augsts, lai ietu pāri visam */
+      /* Ieteikumi (Auto-complete) */
+      .mp4-suggest {
+        position:fixed; /* Lai būtu virs visa */
+        background:#0c1015; border:1px solid rgba(255,255,255,.3);
+        border-radius:8px; overflow:auto; max-height:220px;
+        display:none; z-index: 210000;
         box-shadow:0 10px 30px rgba(0,0,0,.9);
+        width: 300px;
       }
-      .mp4-suggest .item{
+      .mp4-suggest .item {
         padding:8px 10px; cursor:pointer; font-weight:700;
-        font-size:12px; border-bottom:1px solid rgba(255,255,255,.08);
-        color: #ddd;
+        font-size:12px; border-bottom:1px solid rgba(255,255,255,.08); color: #ddd;
       }
-      .mp4-suggest .item:hover{ background:rgba(255,255,255,.15); color:#fff; }
-      .mp4-suggest .sub{ display:block; margin-top:2px; font-size:10px; font-weight:400; color:#aaa; }
+      .mp4-suggest .item:hover { background:rgba(255,255,255,.15); color:#fff; }
+      .mp4-suggest .sub { display:block; margin-top:2px; font-size:10px; font-weight:400; color:#aaa; }
 
-      /* Posmu saraksts - tagad aizņem visu atlikušo vietu */
-      .mp4-legs{ 
-        padding:10px; 
-        overflow-y:auto; /* Ritjosla posmiem */
-        flex: 1;         /* Aizņem visu brīvo vietu */
-        min-height: 100px; 
-        background: rgba(0,0,0,0.1);
+      /* Satura zona (Posmi) */
+      .mp4-legs { 
+        padding:10px; overflow-y:auto; flex:1; 
+        background: rgba(0,0,0,0.1); min-height: 100px;
       }
-      .mp4-legs h4{ margin:0 0 8px 0; font-size:12px; color:#aeb8c7; letter-spacing:.25px; }
-      .mp4-leg{
+      .mp4-legs h4 { margin:0 0 8px 0; font-size:12px; color:#aeb8c7; letter-spacing:.25px; }
+      .mp4-leg {
         border:1px solid rgba(255,255,255,.10); background:rgba(255,255,255,.05);
         border-radius:8px; padding:8px; margin-bottom:6px;
       }
-      .mp4-leg .t1{ font-weight:900; font-size: 11px; }
-      .mp4-leg .t2{ font-size:11px; color:#cfd6df; margin-top:2px; }
-      .mp4-pill{
+      .mp4-leg .t1 { font-weight:900; font-size:11px; }
+      .mp4-leg .t2 { font-size:11px; color:#cfd6df; margin-top:2px; }
+      .mp4-pill {
         display:inline-block; padding:1px 6px; border:1px solid rgba(255,255,255,.14);
         border-radius:999px; font-size:10px; font-weight:900;
         margin-left:6px; color:#e9eef5; background:rgba(0,0,0,.18);
       }
 
-      .mp4-foot{
-        padding:8px; 
-        background:#10141a; border-top:1px solid rgba(255,255,255,.08);
-        display:flex; gap:6px;
-        flex-shrink: 0;
+      .mp4-foot {
+        padding:10px; background:#10141a; border-top:1px solid rgba(255,255,255,.08);
+        display:flex; gap:6px; flex-shrink: 0;
       }
-      .mp4-action{
-        flex:1; border:none; border-radius:6px;
-        padding:6px 4px;
-        font-weight:900; cursor:pointer; color:#fff;
-        font-size:11px;
+      .mp4-action {
+        flex:1; border:none; border-radius:8px; padding:8px 4px;
+        font-weight:900; cursor:pointer; color:#fff; font-size:11px;
       }
       .mp4-print{ background:#1565c0; }
       .mp4-export{ background:#455a64; }
       .mp4-clear{ background:#c62828; }
 
-      .mp4-marker-icon{ background:transparent; }
-      .mp4-kp{
-        width:34px; height:34px; display:flex; align-items:center; justify-content:center;
-        position:relative; filter: drop-shadow(0 2px 3px rgba(0,0,0,.7));
-      }
-      .mp4-kp svg{ width:34px; height:34px; }
-      .mp4-kp .mp4-lbl{
-        position:absolute; top:-18px; left:50%; transform:translateX(-50%);
-        padding:1px 6px; border-radius:999px; font-size:12px; font-weight:1000;
-        color:#ff3b3b; text-shadow: 0 2px 0 #000;
-        background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.12);
-        white-space:nowrap;
-      }
+      /* Maršruta apraksts sānu panelī */
+      .mp4-itinerary-table { width: 100%; border-collapse: collapse; font-size: 11px; color: #ddd; }
+      .mp4-itinerary-table td { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+      .mp4-itinerary-table tr:last-child td { border-bottom: none; }
+      .mp4-itinerary-icon { font-size: 14px; padding-right: 6px; color: #aaa; }
+      .mp4-itinerary-dist { text-align: right; color: #888; white-space: nowrap; }
+
       .mp4-popup{ width:260px; }
-      .mp4-coords{ font-size:11px; color:#aeb8c7; margin-bottom:8px; }
+      .mp4-coords{ font-size:11px; color:#aeb8c7; line-height:1.3; margin-bottom:8px; }
       .mp4-popup textarea{
         width:100%; height:60px; background:#0c1015; border:1px solid rgba(255,255,255,.18);
-        color:#fff; border-radius:8px; padding:6px; resize:vertical; font-size:12px;
+        color:#fff; border-radius:8px; padding:8px; resize:vertical; font-size:12px;
       }
-      
-      /* Iestatījumu panelis */
-      .mp4-field label{
-        display:block; font-size:11px; color:#aeb8c7; margin-bottom:2px; font-weight:800;
-      }
-      .mp4-field select{
-        width:100%; background:#0c1015; color:#fff;
-        border:1px solid rgba(255,255,255,.18); border-radius:6px;
-        padding:6px; font-size:12px;
-      }
-      .mp4-side-title {
-        font-size:12px; font-weight:900; color:#fff;
-        border-bottom:1px solid rgba(255,255,255,.1); padding-bottom:4px;
-        margin-bottom: 8px;
+      .mp4-popup select{
+        width:100%; background:#0c1015; border:1px solid rgba(255,255,255,.18);
+        color:#fff; border-radius:8px; padding:6px; margin-bottom:8px;
       }
     `;
     document.head.appendChild(style);
@@ -3561,7 +3548,7 @@ map.whenReady(() => {
       const w = parseInt(localStorage.getItem(_MP4_PANEL_W_KEY) || '', 10);
       const h = parseInt(localStorage.getItem(_MP4_PANEL_H_KEY) || '', 10);
       if (isFinite(w) && w >= 320 && w <= 900) panel.style.width  = w + 'px';
-      if (isFinite(h) && h >= 320 && h <= 900) panel.style.height = h + 'px';
+      if (isFinite(h) && h >= 400 && h <= 1200) panel.style.height = h + 'px';
     }catch(_){}
   }
   function _mp4BindPanelResizePersist(panel){
@@ -3583,6 +3570,7 @@ map.whenReady(() => {
     }
   }
 
+  // --- Ģeometrijas palīgi ---
   function bearingDeg(a, b){
     const toRad = (x)=>x*Math.PI/180;
     const y = Math.sin(toRad(b.lng - a.lng)) * Math.cos(toRad(b.lat));
@@ -3592,7 +3580,6 @@ map.whenReady(() => {
     return (brng + 360) % 360;
   }
   function degToMil(deg){ return (deg * 6400) / 360; }
-
   function fmtDist(m){
     if (!Number.isFinite(m)) return '-';
     if (m >= 1000) return (m/1000).toFixed(2) + ' km';
@@ -3606,6 +3593,7 @@ map.whenReady(() => {
     return h ? `${h}h ${mm}min` : `${mm}min`;
   }
 
+  // --- Koordinātu formāti ---
   function getCoordStrings(latlng){
     const lat = latlng.lat, lng = latlng.lng;
     let mgrsTxt = '-';
@@ -3626,7 +3614,6 @@ map.whenReady(() => {
     }catch(_){}
     return { mgrsTxt, wgsTxt, lksTxt };
   }
-
   function coordByMode(latlng){
     const { mgrsTxt, wgsTxt, lksTxt } = getCoordStrings(latlng);
     if (S.coordMode === 'MGRS') return mgrsTxt;
@@ -3642,6 +3629,7 @@ map.whenReady(() => {
     return wp.__mp4id;
   }
 
+  // --- Ikona ---
   function symbolSvg(symbolId){
     const stroke = '#ff3b3b';
     const fill   = 'rgba(255, 59, 59, 0.12)';
@@ -3660,6 +3648,7 @@ map.whenReady(() => {
     return Promise.resolve();
   }
 
+  // --- Adrešu meklēšanas loģika ---
   function _mp4ParseAnyCoords(q){
     q = String(q||'').trim();
     if (!q) return null;
@@ -3721,8 +3710,9 @@ map.whenReady(() => {
     return out;
   }
 
+  // --- LRM Geocoder ---
   function createHybridGeocoder(){
-    const fallback = {
+    return {
       geocode: function(query, cb, context){
         resolveQueryToCandidates(query, 7).then((arr)=>{
           cb.call(context || this, (arr||[]).map(it => ({ name: it.name, center: it.center })));
@@ -3733,9 +3723,9 @@ map.whenReady(() => {
         cb.call(context || this, name ? [{ name, center: latlng }] : []);
       }
     };
-    return fallback;
   }
 
+  // --- OSRM ielāde ---
   async function fetchOsrmLegs(profileKey, latLngs){
     const prof = (profileKey === 'walking') ? ROUTER.profiles.walking : ROUTER.profiles.driving;
     const coords = latLngs.map(ll => `${ll.lng},${ll.lat}`).join(';');
@@ -3842,9 +3832,11 @@ map.whenReady(() => {
       refreshLegs().catch(()=>{});
       dockPanel();
       bindWaypointsDnd();
+      bindAutocompleteToInputs(); // Pārbūvējam ievades listenerus
     }, 250);
   }
 
+  // --- LRM ievades lauku apstrāde (Drag & Drop + Autocomplete) ---
   function bindWaypointsDnd(){
     try{
       if (!S.control) return;
@@ -3886,6 +3878,36 @@ map.whenReady(() => {
     }catch(_){}
   }
 
+  // --- Autocomplete priekš LRM laukiem ---
+  function bindAutocompleteToInputs() {
+    const inputs = document.querySelectorAll('.leaflet-routing-geocoders input');
+    inputs.forEach((input, index) => {
+        if (input.dataset.mp4Auto) return;
+        input.dataset.mp4Auto = "1";
+        
+        // Pievienojam notikumu uz rakstīšanu
+        input.addEventListener('input', (e) => {
+            const val = e.target.value.trim();
+            S.activeInput = e.target; // Atceramies, kurš lauks
+            
+            // Paslēpjam sarakstu, ja tukšs vai īss
+            if (val.length < 3) { hideSuggest(); return; }
+
+            // Neliela aizture, lai nemeklē par katru burtu
+            clearTimeout(input._debounce);
+            input._debounce = setTimeout(async () => {
+                try {
+                    const res = await resolveQueryToCandidates(val, 5);
+                    showSuggest(res, true, e.target);
+                } catch(err) {}
+            }, 500);
+        });
+
+        // Aizver sarakstu, ja zaudē fokusu (ar nelielu aizturi klikšķim)
+        input.addEventListener('blur', () => setTimeout(hideSuggest, 200));
+    });
+  }
+
   function dockPanel(){
     try{
       if (!S.enabled) { if (S.control) { const c = S.control.getContainer(); if(c) c.style.display='none'; } return; }
@@ -3911,11 +3933,8 @@ map.whenReady(() => {
       if (left + pw > window.innerWidth - 10){ left = ar.left; top  = ar.bottom + pad; }
       left = clamp(left, 10, window.innerWidth  - pw - 10);
       let maxH = Math.max(320, Math.floor(bottomLimit - top - 10));
-      // const effH = Math.min(ph, maxH); // Noņemam, lai panelis nesamazinās
-      top = clamp(top, 10, bottomLimit - 400); // 400px min augstums
-      maxH = Math.max(320, Math.floor(bottomLimit - top - 10));
       
-      // Lai netraucē LRM ievadei
+      // Ierobežojam paneļa augstumu, lai netraucē
       if (!isFinite(parseInt(panel.style.maxHeight || '')) || Math.abs(parseInt(panel.style.maxHeight)-maxH)>1) panel.style.maxHeight = maxH + 'px';
       
       panel.style.left = left + 'px'; panel.style.top  = top  + 'px';
@@ -4036,7 +4055,31 @@ map.whenReady(() => {
     }).addTo(map);
 
     setTimeout(()=>mountPanelUi(map, DirectRouter), 80);
-    S.control.on('routesfound', ()=>debounceRefresh());
+    
+    // --- MARŠRUTA PĀRVIETOŠANA UZ SĀNU PANELI ---
+    S.control.on('routesfound', (e)=>{
+       debounceRefresh();
+       // Pārvietojam maršruta tekstu uz sānu paneli
+       const alt = S.control.getContainer().querySelector('.leaflet-routing-alt');
+       const sideContent = document.getElementById('mp4SideItinerary');
+       if (alt && sideContent) {
+           // Notīram veco
+           sideContent.innerHTML = '';
+           // Klonējam un ieliekam saturu
+           const clone = alt.cloneNode(true);
+           clone.style.display = 'block'; // Svarīgi! Jo CSS to slēpj
+           sideContent.appendChild(clone);
+           
+           // Atveram paneli automātiski, lai lietotājs redz
+           const sidePanel = document.getElementById('mp4SidePanel');
+           if(!S.settingsOpen) {
+               S.settingsOpen = true;
+               sidePanel.classList.add('open');
+               document.getElementById('mp4SettingsToggle').classList.add('active');
+           }
+       }
+    });
+    
     S.control.on('waypointschanged', ()=>{ debounceRefresh(); setTimeout(bindWaypointsDnd, 60); });
     debounceRefresh();
   }
@@ -4052,7 +4095,7 @@ map.whenReady(() => {
       <div class="mp4-btn active" id="mp4Car">🚙 AUTO</div>
       <div class="mp4-btn"        id="mp4Foot">🚶 KĀJĀM</div>
       <div class="mp4-btn"        id="mp4Line">📏 TAISNE</div>
-      <div class="mp4-btn mp4-btn-set" id="mp4SettingsToggle" title="Iestatījumi">⚙️</div>
+      <div class="mp4-btn mp4-btn-set" id="mp4SettingsToggle" title="Iestatījumi un Apraksts">⚙️</div>
     `;
 
     // --- ĀTRĀ IEVADE ---
@@ -4070,38 +4113,42 @@ map.whenReady(() => {
       <div class="mp4-qhint">Raksti adresi, lai redzētu sarakstu</div>
     `;
 
-    // --- SĀNU PANELIS (Settings) ---
-    // Atveras pa labi no galvenā
+    // --- SĀNU PANELIS (Settings + Itinerary) ---
     const sidePanel = document.createElement('div');
     sidePanel.className = 'mp4-side-panel';
     sidePanel.id = 'mp4SidePanel';
     sidePanel.innerHTML = `
-      <div class="mp4-side-title">IESTATĪJUMI</div>
-      <div class="mp4-field">
-        <label>Metri pēc</label>
-        <select id="mp4DistanceMode">
-          <option value="route">CEĻŠ (OSRM)</option>
-          <option value="air">GAISS (TAISNE)</option>
-        </select>
+      <div class="mp4-side-header">IESTATĪJUMI</div>
+      <div class="mp4-side-content">
+          <div class="mp4-field">
+            <label>Metri pēc</label>
+            <select id="mp4DistanceMode">
+              <option value="route">CEĻŠ (OSRM)</option>
+              <option value="air">GAISS (TAISNE)</option>
+            </select>
+          </div>
+          <div class="mp4-field">
+            <label>Koordinātes</label>
+            <select id="mp4CoordMode">
+              <option value="MGRS">MGRS</option>
+              <option value="WGS">Lat/Lng</option>
+              <option value="LKS">LKS-92</option>
+            </select>
+          </div>
+          <div class="mp4-field">
+            <label>Azimuta vienības</label>
+            <select id="mp4BearingUnit">
+              <option value="deg">Grādi (°)</option>
+              <option value="mil">Mil (6400)</option>
+            </select>
+          </div>
+          <div class="mp4-field">
+            <div id="mp4SummaryLine" style="font-weight:900;color:#e9eef5;line-height:1.4;font-size:11px;">-</div>
+          </div>
       </div>
-      <div class="mp4-field">
-        <label>Koordinātes</label>
-        <select id="mp4CoordMode">
-          <option value="MGRS">MGRS</option>
-          <option value="WGS">Lat/Lng</option>
-          <option value="LKS">LKS-92</option>
-        </select>
-      </div>
-      <div class="mp4-field">
-        <label>Azimuta vienības</label>
-        <select id="mp4BearingUnit">
-          <option value="deg">Grādi (°)</option>
-          <option value="mil">Mil (6400)</option>
-        </select>
-      </div>
-      <div class="mp4-side-title" style="margin-top:10px;">INFO</div>
-      <div class="mp4-field">
-        <div id="mp4SummaryLine" style="font-weight:900;color:#e9eef5;line-height:1.4;font-size:11px;">-</div>
+      <div class="mp4-side-header" style="border-top:1px solid rgba(255,255,255,0.1);">MARŠRUTA APRAKSTS</div>
+      <div class="mp4-side-content" id="mp4SideItinerary" style="background:rgba(0,0,0,0.2);">
+          <div style="padding:10px; color:#aaa; font-style:italic;">Nav aprēķināts maršruts...</div>
       </div>
     `;
 
@@ -4117,15 +4164,14 @@ map.whenReady(() => {
       <button class="mp4-action mp4-clear"  id="mp4Clear">DZĒST</button>
     `;
 
-    // Secība: Footer apakšā, tad saraksts, tad ievade, tad augša. SidePanel vienkārši pieliekam konteinerim.
+    // Secība
     c.insertBefore(foot, c.firstChild);
     c.insertBefore(legs, c.firstChild);
     c.insertBefore(quick,c.firstChild);
     c.insertBefore(top,  c.firstChild);
-    c.appendChild(sidePanel); // Side panel is absolute, so append works
+    c.appendChild(sidePanel); 
 
     // --- EVENTI ---
-    // 1. Iestatījumu poga atver/aizver sānu paneli
     document.getElementById('mp4SettingsToggle').onclick = ()=>{
         S.settingsOpen = !S.settingsOpen;
         sidePanel.classList.toggle('open', S.settingsOpen);
@@ -4175,32 +4221,54 @@ map.whenReady(() => {
     btnAddFromMap.onclick = ()=>{ const next = !S.mapClickAdd; setMapClickAdd(next); btnAddFromMap.classList.toggle('active', next); dockPanel(); };
     document.getElementById('mp4AddCenter').onclick = ()=>{ addWaypointLatLng(map.getCenter()); dockPanel(); };
 
-    // --- IEVADE & MEKLĒŠANA ---
+    // --- IEVADE & MEKLĒŠANA (Live Search) ---
     const addInp = document.getElementById('mp4AddInput');
     const btnGo  = document.getElementById('mp4AddGo');
     const btnAdd = document.getElementById('mp4AddApply');
     const suggestEl = document.getElementById('mp4AddSuggest');
 
     function hideSuggest(){ suggestEl.style.display='none'; suggestEl.innerHTML=''; }
-    function showSuggest(items, autoAdd){
+    
+    // UZLABOTA showSuggest: atbalsta "Target Input" pozicionēšanu
+    function showSuggest(items, autoAdd, targetInput = null){
         if(!items || !items.length){ hideSuggest(); return; }
-        // Pozicionējam absolūti zem ievades rindas
+        
+        let targetEl = targetInput || document.getElementById('mp4AddInput');
+        
+        // Pozicionējam tieši zem aktīvā lauka
+        const rect = targetEl.getBoundingClientRect();
+        suggestEl.style.top = (rect.bottom + 2) + 'px';
+        suggestEl.style.left = rect.left + 'px';
+        suggestEl.style.width = rect.width + 'px';
+        
         suggestEl.innerHTML = items.map((it,i)=>`<div class="item" data-i="${i}">${it.name}<span class="sub">${it.raw?.type||''}</span></div>`).join('');
         suggestEl.style.display='block';
+        
         suggestEl.querySelectorAll('.item').forEach(el=>{
-            el.addEventListener('click', ()=>{
+            el.addEventListener('click', (e)=>{
+                e.stopPropagation(); // Lai neaizveras uzreiz
                 const pick = items[el.dataset.i];
                 if(pick){
-                    map.setView(pick.center, 14);
-                    if(autoAdd){ addWaypointLatLng(pick.center); addInp.value=''; }
-                    else { addInp.value = pick.name; }
-                    hideSuggest(); dockPanel();
+                    // Ja meklējam priekš LRM lauka (Start/End)
+                    if (targetInput && targetInput !== addInp) {
+                        targetInput.value = pick.name;
+                        // Simulējam Enter, lai LRM saprot
+                        targetInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+                        // Vai nu arī manuāli iestatām waypoint (drošāk)
+                        // Bet pagaidām vienkāršākais - ļaut LRM geocoderim darboties ar jauno tekstu
+                    } else {
+                        // Ātrā ievade (centrē karti vai pievieno)
+                        map.setView(pick.center, 14);
+                        if(autoAdd){ addWaypointLatLng(pick.center); addInp.value=''; }
+                        else { addInp.value = pick.name; }
+                    }
+                    hideSuggest(); 
                 }
             });
         });
     }
 
-    // MEKLĒŠANA RAKSTOT (Debounce)
+    // Ātrās ievades listeneri
     let typeDebounce;
     addInp.addEventListener('input', (e)=>{
         hideSuggest();
@@ -4208,14 +4276,10 @@ map.whenReady(() => {
         const val = e.target.value.trim();
         if(val.length < 3) return;
         typeDebounce = setTimeout(async ()=>{
-            try {
-               const res = await resolveQueryToCandidates(val, 5);
-               showSuggest(res, false);
-            } catch(err) {}
+            try { const res = await resolveQueryToCandidates(val, 5); showSuggest(res, false, addInp); } catch(err) {}
         }, 600);
     });
 
-    // POGAS MEKLĒŠANAI
     async function doResolve(addIt){
         const q = addInp.value.trim(); if(!q)return;
         hideSuggest();
@@ -4226,7 +4290,7 @@ map.whenReady(() => {
                 map.setView(arr[0].center, 14);
                 if(addIt){ addWaypointLatLng(arr[0].center); addInp.value=''; }
             } else {
-                showSuggest(arr, addIt);
+                showSuggest(arr, addIt, addInp);
             }
         }catch(e){ alert('Kļūda meklējot.'); }
     }
@@ -4237,7 +4301,6 @@ map.whenReady(() => {
     document.getElementById('mp4Print').onclick = openPrintWindow;
     document.getElementById('mp4Clear').onclick = ()=>{ if(confirm('Dzēst visu?')) clearRouteFromMap(); };
     document.getElementById('mp4Export').onclick = ()=>{
-       // eksports
        try{
         const wps = S.control.getWaypoints().filter(w=>w && w.latLng);
         const pack = wps.map((wp, idx)=>{
@@ -4271,7 +4334,7 @@ map.whenReady(() => {
       if(!S.control) init();
       else { S.control.getContainer().style.display='flex'; debounceRefresh(); setTimeout(bindWaypointsDnd,80); }
       setTimeout(dockPanel,80);
-      ensureDockClearBtn(btn); // Nodrošinām slotiņu
+      ensureDockClearBtn(btn);
     } else {
       if(btn){ btn.style.background=''; btn.innerHTML='🔀'; }
       setMapClickAdd(false);
@@ -4284,10 +4347,12 @@ map.whenReady(() => {
       setMapClickAdd(false);
       document.getElementById('mp4AddFromMap')?.classList.remove('active');
       S.control.setWaypoints([null,null]); S.wpData.clear(); S.legs=null; S.totals=null;
+      // Notīra arī sānu paneli
+      const sc = document.getElementById('mp4SideItinerary');
+      if(sc) sc.innerHTML = '<div style="padding:10px; color:#aaa; font-style:italic;">Nav aprēķināts maršruts...</div>';
       debounceRefresh();
   }
 
-  // Funkcija SLOTIŅAS pogai (Clear Route)
   function ensureDockClearBtn(toggleBtn){
     if (!toggleBtn) return;
     const parent = toggleBtn.parentElement;
@@ -4300,7 +4365,6 @@ map.whenReady(() => {
       b.type = 'button';
       b.textContent = '🧹';
       b.title = 'Notīrīt maršrutu';
-      // Kopējam stilus no toggleBtn vai iestatām savus
       b.style.marginLeft = '6px';
       b.style.background = '#444';
       b.style.color = '#fff';
@@ -4308,18 +4372,10 @@ map.whenReady(() => {
       b.style.borderRadius = '4px';
       b.style.cursor = 'pointer';
       b.style.width = '30px';
-      
+      b.onclick = (e)=>{ e.preventDefault(); e.stopPropagation(); if(confirm('Notīrīt visu maršrutu?')) clearRouteFromMap(); };
       parent.insertBefore(b, toggleBtn.nextSibling);
-
-      b.addEventListener('click', (e)=>{
-        e.preventDefault();
-        e.stopPropagation();
-        if(confirm('Notīrīt visu maršrutu?')) clearRouteFromMap();
-      });
     }
     S.dockClearBtn = b;
-    // Rādīt tikai tad, ja ir maršruts (vai ja panelis atvērts - pēc izvēles)
-    // Šeit rādām vienmēr, kad atvērts
     b.style.display = S.enabled ? '' : 'none';
   }
 
