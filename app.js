@@ -3252,12 +3252,12 @@ map.whenReady(() => {
     const searchControl = new Control({ position: 'topleft' });
     map.addControl(searchControl);
 // =====================================================================
-// 5. SOLIS MISSION PLANNER v4.3 (ONLY FIXES REQUESTED)
-// 1) Nav panel not empty (DOM clone + fallback from routesfound)
+// 5. SOLIS MISSION PLANNER v4.3 (FIXED NAV PANEL)
+// 1) Nav panel not empty (Removed brittle DOM cloning, force data rendering)
 // 2) Settings selects dark (no white dropdowns)
 // 3) Waypoint list scroll kicks in ~5 points (lower max-height)
 // 4) While MP open: hide smartSearchBtn + clearRouteBtn
-// 5) When MP closed AND route exists: show clearRouteBtn next to smartSearchBtn, else hide
+// 5) When MP closed AND route exists: show clearRouteBtn next to smartSearchBtn
 // =====================================================================
 (function MissionPlannerV4_3(){
   if (window.__MP4_3_INSTALLED__) return;
@@ -3296,8 +3296,6 @@ map.whenReady(() => {
     settingsOpen: false,
     navOpen: false,
     navAutoOpened: false,
-	navNeedsRender: false,
-
 
     activeInput: null,
 
@@ -3308,7 +3306,7 @@ map.whenReady(() => {
     btnSettings: null,
     btnNav: null,
 
-    // route state for clear btn + nav fallback
+    // route state
     hasRoute: false,
     lastRoute: null
   };
@@ -3418,6 +3416,7 @@ map.whenReady(() => {
         padding:10px;
         overflow-y:auto;
         flex:1;
+        color: #e9eef5; /* Nodrošina teksta krāsu */
       }
 
       /* FIX #2: iestatījumu select/nav label tumši */
@@ -3631,25 +3630,21 @@ map.whenReady(() => {
       .mp4-export{ background:#455a64; }
       .mp4-clear{ background:#c62828; }
 
-      /* NAV panel cosmetics */
-      .mp4-nav-panel .leaflet-routing-alt{
-        display:block !important;
-        background:transparent !important;
-        border:none !important;
-        box-shadow:none !important;
-        margin:0 !important;
-        padding:0 !important;
-        color:#e9eef5 !important;
+      /* NAV panel table style */
+      .mp4-nav-table { width:100%; border-collapse:collapse; margin-top:10px; }
+      .mp4-nav-table td {
+        padding: 6px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        font-size: 13px;
+        color: #e9eef5;
       }
-      .mp4-nav-panel .leaflet-routing-alt table{ width:100% !important; }
-      .mp4-nav-panel .leaflet-routing-alt td{
-        font-size:13px !important;
-        padding:4px 0 !important;
+      .mp4-nav-table td:last-child {
+        text-align: right;
+        white-space: nowrap;
+        font-weight: 700;
+        color: #fff;
+        padding-left: 8px;
       }
-      /* ja nejauši iekopējas kas cits - paslēp */
-      .mp4-nav-panel .leaflet-routing-geocoders,
-      .mp4-nav-panel .leaflet-routing-add-waypoint,
-      .mp4-nav-panel .leaflet-routing-remove-waypoint{ display:none !important; }
 
       .mp4-popup{ width:260px; }
       .mp4-coords{ font-size:11px; color:#aeb8c7; line-height:1.3; margin-bottom:8px; }
@@ -3930,7 +3925,6 @@ map.whenReady(() => {
       sumEl.textContent = 'Pievieno vismaz 2 punktus.';
       S.legs = null; S.totals = null;
       S.lastLegKey = '';
-      // ja nav pietiekami punktu -> route nav
       S.hasRoute = false;
       _mp4UpdateAuxButtons();
       return;
@@ -4017,8 +4011,8 @@ map.whenReady(() => {
       dockPanel();
       bindWaypointsDnd();
       bindAutocompleteToInputs();
-      _mp4RenderNavPanel(); // FIX #1
-      _mp4UpdateAuxButtons(); // FIX #4/#5
+      _mp4RenderNavPanel(); // FORCE UPDATE
+      _mp4UpdateAuxButtons();
     }, 250);
   }
 
@@ -4364,9 +4358,7 @@ map.whenReady(() => {
   }
 
   // ==========================================================
-  // FIX #1: NAV panel render
-  //  - neiztukšo paneli, ja nav ko rādīt
-  //  - mēģina klonēt LRM DOM, ja nav -> fallback no routesfound datiem
+  // FIX #1: NAV panel render - FORCE DATA-DRIVEN RENDER
   // ==========================================================
   function _mp4NavPlaceholder(){
     return '<div style="padding:10px; color:#aaa; font-style:italic;">Nav aprēķināts maršruts...</div>';
@@ -4393,14 +4385,14 @@ map.whenReady(() => {
     var rows = instr.map(function(it){
       var txt = it && (it.text || it.instruction || it.type) ? String(it.text || it.instruction || '') : '';
       var d = (it && isFinite(it.distance)) ? fmtDist(it.distance) : '';
-      return '<tr><td style="padding:4px 0;">' + (txt || '') + '</td><td style="padding:4px 0;text-align:right;white-space:nowrap;">' + (d || '') + '</td></tr>';
+      return '<tr><td>' + (txt || '') + '</td><td>' + (d || '') + '</td></tr>';
     }).join('');
 
     return (
-      '<div class="leaflet-routing-alt">' +
-        '<h2 style="margin:0 0 8px 0;font-size:18px;font-weight:1000;">' + title + '</h2>' +
+      '<div style="padding:10px;">' +
+        '<h2 style="margin:0 0 8px 0;font-size:18px;font-weight:1000;color:#fff;">' + title + '</h2>' +
         '<div style="color:#b7c2cf;font-weight:800;margin:0 0 10px 0;">' + dist + ', ' + time + '</div>' +
-        '<table>' + rows + '</table>' +
+        '<table class="mp4-nav-table">' + rows + '</table>' +
       '</div>'
     );
   }
@@ -4411,36 +4403,11 @@ map.whenReady(() => {
       var sideContent = document.getElementById('mp4NavContent');
       if (!sideContent) return;
 
-      var c = S.control.getContainer ? S.control.getContainer() : null;
-      if (!c){
-        sideContent.innerHTML = _mp4NavPlaceholder();
-        return;
-      }
-
-      // mēģinām atrast LRM itinerary DOM
-      
-     var alt = null;
-var nodes = c.querySelectorAll('.leaflet-routing-alternatives-container, .leaflet-routing-alt');
-for (var i=0; i<nodes.length; i++){
-  var n = nodes[i];
-  if (!n) continue;
-  if (n.closest && n.closest('.mp4-nav-panel')) continue; // <-- neņem klonu no NAV paneļa
-  alt = n;
-  break;
-}
-
-if (alt){
-  sideContent.innerHTML = '';
-  var clone = alt.cloneNode(true);
-  clone.style.display = 'block';
-  sideContent.appendChild(clone);
-  return;
-}
-
-
-      // fallback no pēdējā routesfound
+      // Vienmēr izmantojam datus, ignorējam DOM klonēšanu
       sideContent.innerHTML = _mp4RenderNavFromRoute(S.lastRoute);
-    }catch(_){
+
+    }catch(e){
+      console.error('Nav render failed', e);
       try{
         var sc = document.getElementById('mp4NavContent');
         if (sc) sc.innerHTML = _mp4NavPlaceholder();
@@ -4488,7 +4455,7 @@ if (alt){
   }
 
   // ------------------------------
-  // Print/Export/Markers (unchanged from previous)
+  // Print/Export/Markers (unchanged)
   // ------------------------------
   function openPrintWindow(){
     if (!S.control) return;
@@ -4655,13 +4622,6 @@ if (alt){
         var r = e && e.routes && e.routes[0] ? e.routes[0] : null;
         S.lastRoute = r || null;
         S.hasRoute = !!(r && r.summary && isFinite(r.summary.totalDistance) && r.summary.totalDistance > 0);
-		  S.navNeedsRender = true;
-
-// Ja UI jau ir uzbūvēts, renderē uzreiz
-if (document.getElementById('mp4NavContent')) {
-  _mp4RenderNavPanel();
-  S.navNeedsRender = false;
-}
       }catch(_){
         S.lastRoute = null;
         S.hasRoute = false;
@@ -4679,18 +4639,6 @@ if (document.getElementById('mp4NavContent')) {
       }
 
       _mp4UpdateAuxButtons();
-		// Ja routesfound atnāca pirms UI uzbūves - tagad ie-renderējam
-if (S.navNeedsRender) {
-  _mp4RenderNavPanel();
-  S.navNeedsRender = false;
-
-  if (S.lastRoute && !S.navAutoOpened) {
-    S.navAutoOpened = true;
-    S.navOpen = true;
-    if (S.navPanel) S.navPanel.classList.add('open'); // <--- LABOTS: S.navPanel
-    if (S.btnNav) S.btnNav.classList.add('active');
-  }
-}
     });
 
     S.control.on('waypointschanged', function(){
@@ -5031,7 +4979,8 @@ if (S.navNeedsRender) {
     // nodrošina clear pogu (slēpta pēc noklusējuma)
     _mp4EnsureClearBtnNearSmartSearch();
     _mp4UpdateAuxButtons();
-	  // JAUNS: Ja maršruts jau eksistē, piespiedu kārtā atjauno Nav Paneli
+    
+    // JAUNS: Ja maršruts jau eksistē, piespiedu kārtā atjauno Nav Paneli
     if (S.hasRoute || S.lastRoute) {
        _mp4RenderNavPanel();
     }
@@ -5129,7 +5078,6 @@ if (S.navNeedsRender) {
   });
 
 })();
-
 
 
     // --- 6. SOLIS: PARASTĀ MEKLĒŠANA ---
