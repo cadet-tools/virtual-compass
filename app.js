@@ -3816,6 +3816,8 @@ function mp4ApplyRouteLineVisibility(){
 		  font-size:18px;
 		}
 
+		.mp4-lbl {font-size: 20px;}
+
     `;
     document.head.appendChild(style);
   })();
