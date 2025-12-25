@@ -2,7 +2,7 @@ console.info('[modern] app.js start');
 
 
 // ===== Boot guard =====
-const BUILD = '2025-09-29-01';            // palielini, kad maini kodu
+const BUILD = '25-12-2025-V1';            // palielini, kad maini kodu
 if (window.__CADET_APP_BOOTED__ === BUILD) {
   console.warn('[boot] jau palaists, ignorēju otro startu');
 } else {
@@ -3309,7 +3309,7 @@ map.whenReady(() => {
     // route state
     hasRoute: false,
     lastRoute: null,
-	hoverMarker: null
+	hoverMarker: null,
 	// NEW: hover marķiera krāsas (nav panel hover)
     hoverStroke: localStorage.getItem('mp4.hoverStroke') || '#000000',
     hoverFill:   localStorage.getItem('mp4.hoverFill')   || '#0003FF',
