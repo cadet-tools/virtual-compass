@@ -3375,30 +3375,79 @@ map.whenReady(() => {
       : { color:'#ff3b3b', opacity:0,    weight:0 };
   }
 
-  function mp4ApplyRouteLineVisibility(){
-    try{
-      if (!S.control) return;
+function mp4ApplyRouteLineVisibility(){
+  // Uzreiz pielieto maršruta līnijas redzamību (bez gaidīšanas uz nākamo route() / waypoint change)
+  try{
+    if (!S.control) return;
 
-      var st = mp4RouteLineStyle(!!S.showRouteLine);
+    var show = !!S.showRouteLine;
 
-      // saglabājam arī options, lai nākamajos pārrēķinos LRM lieto pareizo
-      S.control.options.lineOptions = S.control.options.lineOptions || {};
-      S.control.options.lineOptions.styles = [st];
+    // Pamata stils galvenajai līnijai
+    var mainStyle = {
+      color: (S.lineColor || '#ff3b3b'),
+      opacity: show ? 0.85 : 0,
+      weight: show ? 4 : 0
+    };
 
-      // uzreiz uzliekam jau uzzīmētajai līnijai (LRM iekšējie privātie lauki dažādos buildos var atšķirties)
-      if (S.control._line && typeof S.control._line.setStyle === 'function') S.control._line.setStyle(st);
+    // Alternatīvajām līnijām (ja tādas ir)
+    var altStyle = {
+      color: (S.lineColor || '#ff3b3b'),
+      opacity: show ? 0.25 : 0,
+      weight: show ? 8 : 0
+    };
 
-      // ja kaut kur parādās alternatīvas līnijas (citos LRM buildos)
-      if (S.control._altLines){
+    // Rekursīvs stila pielietojums (L.Routing.Line parasti ir LayerGroup, polylines ir iekšā)
+    function applyRec(layer, style){
+      if (!layer) return;
+
+      if (typeof layer.setStyle === 'function'){
+        try{ layer.setStyle(style); }catch(_){}
+      }
+
+      if (typeof layer.eachLayer === 'function'){
+        try{ layer.eachLayer(function(ch){ applyRec(ch, style); }); }catch(_){}
+      } else if (layer._layers){
         try{
-          Object.keys(S.control._altLines).forEach(function(k){
-            var ln = S.control._altLines[k];
-            if (ln && typeof ln.setStyle === 'function') ln.setStyle(st);
-          });
+          for (var k in layer._layers){
+            if (Object.prototype.hasOwnProperty.call(layer._layers, k)){
+              applyRec(layer._layers[k], style);
+            }
+          }
         }catch(_){}
       }
+    }
+
+    // 1) Esošās līnijas uz kartes
+    applyRec(S.control._line, mainStyle);
+
+    // Dažās LRM versijās līnijas ir glabātas _lines masīvā
+    var linesArr = S.control._lines;
+    if (linesArr && linesArr.length){
+      for (var j=0; j<linesArr.length; j++){
+        applyRec(linesArr[j], (j === 0) ? mainStyle : altStyle);
+      }
+    }
+
+    var alts = S.control._alternatives || S.control._altLines || [];
+    if (alts && alts.length){
+      for (var i=0; i<alts.length; i++){
+        applyRec(alts[i], altStyle);
+      }
+    }
+
+    // 2) Nākotnes maršrutu zīmējums (lineOptions) — lai pēc route() saglabājas izvēle
+    try{
+      var lo = S.control.options && S.control.options.lineOptions;
+      if (lo && lo.styles && lo.styles[0]){
+        lo.styles[0].color   = mainStyle.color;
+        lo.styles[0].opacity = mainStyle.opacity;
+        lo.styles[0].weight  = mainStyle.weight;
+      }
     }catch(_){}
-  }
+
+  }catch(_){}
+}
+
 
 	
 
