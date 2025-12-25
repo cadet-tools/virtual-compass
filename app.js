@@ -4440,7 +4440,11 @@ function _mp4RenderNavFromRoute(route){
 
         if (isFinite(lat) && isFinite(lng)){
           // Ja jau ir marķieris, noņemam
-          if (S.hoverMarker) S.hoverMarker.remove();
+          if (S.hoverMarker){
+  map.removeLayer(S.hoverMarker);
+  S.hoverMarker = null;
+}
+
           
           // Izveidojam jaunu spilgtu apli
           S.hoverMarker = L.circleMarker([lat, lng], {
@@ -4456,52 +4460,36 @@ function _mp4RenderNavFromRoute(route){
 
       tr.addEventListener('mouseleave', function(){
         if (S.hoverMarker){
-          S.hoverMarker.remove();
-          S.hoverMarker = null;
-        }
+  map.removeLayer(S.hoverMarker);
+  S.hoverMarker = null;
+}
       });
     });
   }
 
 function _mp4RenderNavPanel(){
+  try{
+    if (!S.control || !S.navPanel) return;
+    var sideContent = document.getElementById('mp4NavContent');
+    if (!sideContent) return;
+
+    // 1) ieliekam HTML
+    sideContent.innerHTML = _mp4RenderNavFromRoute(S.lastRoute);
+
+    // 2) uzreiz piesienam hover uz jaunajām rindām
+    _mp4BindNavHover();
+
+  }catch(e){
+    console.error('Nav render failed', e);
     try{
-      if (!S.control || !S.navPanel) return;
-      var sideContent = document.getElementById('mp4NavContent');
-      if (!sideContent) return;
-
-      // 1. Ģenerējam saturu
-      sideContent.innerHTML = _mp4RenderNavFromRoute(S.lastRoute);
-      
-      // 2. SVARĪGI: Piesaistām hover notikumus (lai rādītu punktu)
-      // Šī rindiņa trūka tavā otrajā funkcijas versijā
-      _mp4BindNavHover();
-
-    }catch(e){
-      console.error('Nav render failed', e);
-      try{
-        var sc = document.getElementById('mp4NavContent');
-        if (sc) sc.innerHTML = _mp4NavPlaceholder();
-      }catch(__){}
-    }
+      var sc = document.getElementById('mp4NavContent');
+      if (sc) sc.innerHTML = _mp4NavPlaceholder();
+    }catch(__){}
   }
+}
 
-  function _mp4RenderNavPanel(){
-    try{
-      if (!S.control || !S.navPanel) return;
-      var sideContent = document.getElementById('mp4NavContent');
-      if (!sideContent) return;
 
-      // Vienmēr izmantojam datus, ignorējam DOM klonēšanu
-      sideContent.innerHTML = _mp4RenderNavFromRoute(S.lastRoute);
-
-    }catch(e){
-      console.error('Nav render failed', e);
-      try{
-        var sc = document.getElementById('mp4NavContent');
-        if (sc) sc.innerHTML = _mp4NavPlaceholder();
-      }catch(__){}
-    }
-  }
+  
 
   // ------------------------------
   // Route add helpers
