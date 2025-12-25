@@ -4418,7 +4418,7 @@ map.whenReady(() => {
       }
 
       // mēģinām atrast LRM itinerary DOM
-      var alt =
+      
      var alt = null;
 var nodes = c.querySelectorAll('.leaflet-routing-alternatives-container, .leaflet-routing-alt');
 for (var i=0; i<nodes.length; i++){
