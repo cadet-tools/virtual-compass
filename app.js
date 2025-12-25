@@ -3308,7 +3308,8 @@ map.whenReady(() => {
 
     // route state
     hasRoute: false,
-    lastRoute: null
+    lastRoute: null,
+	hoverMarker: null
   };
 
   var SYMBOLS = [
@@ -3349,6 +3350,17 @@ map.whenReady(() => {
         z-index:200000;
         position: relative;
       }
+
+
+/* --- JAUNAIS SCROLLBAR DIZAINS --- */
+      .mp4-panel *::-webkit-scrollbar { width: 6px; height: 6px; }
+      .mp4-panel *::-webkit-scrollbar-track { background: rgba(0,0,0,0.15); border-radius: 3px; }
+      .mp4-panel *::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+      .mp4-panel *::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.30); }
+      /* Firefox fallback */
+      .mp4-panel * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) rgba(0,0,0,0.15); }
+
+
 
       .mp4-right-wrap{
         position:absolute;
@@ -3638,6 +3650,11 @@ map.whenReady(() => {
         font-size: 13px;
         color: #e9eef5;
       }
+
+/* Hover efekts rindai, lai redz, ka var uziet */
+      .mp4-nav-table tr:hover td { background:rgba(255,255,255,0.05); cursor:crosshair; }
+
+	  
       .mp4-nav-table td:last-child {
         text-align: right;
         white-space: nowrap;
@@ -4364,7 +4381,7 @@ map.whenReady(() => {
     return '<div style="padding:10px; color:#aaa; font-style:italic;">Nav aprēķināts maršruts...</div>';
   }
 
-  function _mp4RenderNavFromRoute(route){
+function _mp4RenderNavFromRoute(route){
     if (!route) return _mp4NavPlaceholder();
 
     var title = (route.name && String(route.name).trim()) ? route.name : 'Maršruts';
@@ -4382,10 +4399,20 @@ map.whenReady(() => {
       );
     }
 
+    // Ģenerējam rindas ar koordinātēm
     var rows = instr.map(function(it){
       var txt = it && (it.text || it.instruction || it.type) ? String(it.text || it.instruction || '') : '';
       var d = (it && isFinite(it.distance)) ? fmtDist(it.distance) : '';
-      return '<tr><td>' + (txt || '') + '</td><td>' + (d || '') + '</td></tr>';
+      
+      // Mēģinām atrast koordināti pēc indeksa
+      var latAttr = '', lngAttr = '';
+      if (route.coordinates && it.index !== undefined && route.coordinates[it.index]){
+        var c = route.coordinates[it.index];
+        latAttr = ' data-lat="' + c.lat + '"';
+        lngAttr = ' data-lng="' + c.lng + '"';
+      }
+
+      return '<tr' + latAttr + lngAttr + '><td>' + (txt || '') + '</td><td>' + (d || '') + '</td></tr>';
     }).join('');
 
     return (
@@ -4395,6 +4422,65 @@ map.whenReady(() => {
         '<table class="mp4-nav-table">' + rows + '</table>' +
       '</div>'
     );
+  }
+
+
+	// Pievieno notikumus (hover), lai rādītu punktu uz kartes
+  function _mp4BindNavHover(){
+    var rows = document.querySelectorAll('.mp4-nav-table tr');
+    if (!rows.length) return;
+    
+    var map = getMap();
+    if (!map) return;
+
+    Array.prototype.slice.call(rows).forEach(function(tr){
+      tr.addEventListener('mouseenter', function(){
+        var lat = parseFloat(tr.getAttribute('data-lat'));
+        var lng = parseFloat(tr.getAttribute('data-lng'));
+
+        if (isFinite(lat) && isFinite(lng)){
+          // Ja jau ir marķieris, noņemam
+          if (S.hoverMarker) S.hoverMarker.remove();
+          
+          // Izveidojam jaunu spilgtu apli
+          S.hoverMarker = L.circleMarker([lat, lng], {
+            radius: 6,
+            color: '#fff',
+            weight: 2,
+            fillColor: '#00ffff', // Cyan krāsa, lai labi redz
+            fillOpacity: 1,
+            interactive: false
+          }).addTo(map);
+        }
+      });
+
+      tr.addEventListener('mouseleave', function(){
+        if (S.hoverMarker){
+          S.hoverMarker.remove();
+          S.hoverMarker = null;
+        }
+      });
+    });
+  }
+
+  function _mp4RenderNavPanel(){
+    try{
+      if (!S.control || !S.navPanel) return;
+      var sideContent = document.getElementById('mp4NavContent');
+      if (!sideContent) return;
+
+      sideContent.innerHTML = _mp4RenderNavFromRoute(S.lastRoute);
+      
+      // Svarīgi: Piesaistām hover notikumus tikko izveidotajām rindām
+      _mp4BindNavHover();
+
+    }catch(e){
+      console.error('Nav render failed', e);
+      try{
+        var sc = document.getElementById('mp4NavContent');
+        if (sc) sc.innerHTML = _mp4NavPlaceholder();
+      }catch(__){}
+    }
   }
 
   function _mp4RenderNavPanel(){
