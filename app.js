@@ -3252,12 +3252,16 @@ map.whenReady(() => {
     const searchControl = new Control({ position: 'topleft' });
     map.addControl(searchControl);
 // =====================================================================
-// 5. SOLIS: MISSION PLANNER v4.2 (FIX: Separate NAV panel, hide itinerary in main/settings,
-//                                safe shared suggest, smartSearchInput auto-hide on open)
+// MISSION PLANNER v4.3 (ONLY FIXES REQUESTED)
+// 1) Nav panel not empty (DOM clone + fallback from routesfound)
+// 2) Settings selects dark (no white dropdowns)
+// 3) Waypoint list scroll kicks in ~5 points (lower max-height)
+// 4) While MP open: hide smartSearchBtn + clearRouteBtn
+// 5) When MP closed AND route exists: show clearRouteBtn next to smartSearchBtn, else hide
 // =====================================================================
-(function MissionPlannerV4(){
-  if (window.__MP4_INSTALLED__) return;
-  window.__MP4_INSTALLED__ = true;
+(function MissionPlannerV4_3(){
+  if (window.__MP4_3_INSTALLED__) return;
+  window.__MP4_3_INSTALLED__ = true;
 
   var onReady = window.onDomReady || function(fn){
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once:true });
@@ -3289,11 +3293,10 @@ map.whenReady(() => {
     lastDistNonDirect: localStorage.getItem('mp4.lastDistNonDirect') || (localStorage.getItem('mp4.distanceMode') || 'route'),
     dragFromIdx: null,
 
-    settingsOpen: false,     // ⚙️ panelis
-    navOpen: false,          // 📋 “Maršruta vadītājs” panelis
-    navAutoOpened: false,    // atvērt automātiski tikai 1x
+    settingsOpen: false,
+    navOpen: false,
+    navAutoOpened: false,
 
-    dockClearBtn: null,
     activeInput: null,
 
     // UI refs
@@ -3301,7 +3304,11 @@ map.whenReady(() => {
     sidePanel: null,
     navPanel: null,
     btnSettings: null,
-    btnNav: null
+    btnNav: null,
+
+    // route state for clear btn + nav fallback
+    hasRoute: false,
+    lastRoute: null
   };
 
   var SYMBOLS = [
@@ -3314,14 +3321,13 @@ map.whenReady(() => {
   var DEFAULT_SYMBOL = localStorage.getItem('mp4.defaultSymbol') || 'circle';
 
   // ------------------------------
-  // CSS (IMPORTANT: hides LRM itinerary in main panel correctly)
+  // CSS
   // ------------------------------
   (function injectCss(){
     if (document.getElementById('mp4-css')) return;
     var style = document.createElement('style');
     style.id = 'mp4-css';
     style.textContent = `
-      /* Galvenais panelis */
       .mp4-panel{
         background:#14181e !important;
         color:#e9eef5 !important;
@@ -3344,7 +3350,6 @@ map.whenReady(() => {
         position: relative;
       }
 
-      /* RIGHT WRAP: satur iestatījumus + maršruta vadītāju kā 2 atsevišķus paneļus */
       .mp4-right-wrap{
         position:absolute;
         left:100%;
@@ -3357,7 +3362,6 @@ map.whenReady(() => {
         pointer-events:auto;
       }
 
-      /* Sānu panelis (TIKAI iestatījumi) */
       .mp4-side-panel{
         width:320px;
         max-height:85vh;
@@ -3372,7 +3376,6 @@ map.whenReady(() => {
       }
       .mp4-side-panel.open{ display:flex; }
 
-      /* Maršruta vadītājs (atsevišķs panelis) */
       .mp4-nav-panel{
         width:360px;
         max-height:85vh;
@@ -3415,12 +3418,35 @@ map.whenReady(() => {
         flex:1;
       }
 
+      /* FIX #2: iestatījumu select/nav label tumši */
+      .mp4-side-panel .mp4-field{ margin:0 0 10px 0; }
+      .mp4-side-panel .mp4-field label{
+        display:block;
+        font-size:12px;
+        font-weight:900;
+        color:#cfd6df;
+        margin:0 0 6px 0;
+      }
+      .mp4-side-panel select{
+        width:100%;
+        box-sizing:border-box;
+        height:34px;
+        background:#0c1015 !important;
+        color:#fff !important;
+        border:1px solid rgba(255,255,255,.18) !important;
+        border-radius:8px !important;
+        padding:6px 10px !important;
+        outline:none !important;
+        -webkit-appearance:none;
+        appearance:none;
+      }
+
       @media print { .mp4-panel, .mp4-right-wrap{ display:none !important; } }
       body.print-mode .mp4-panel{ display:none !important; }
 
-      /* ====== GALVENAIS FIX: paslēp LRM “leaflet-routing-alt” galvenajā panelī ====== */
+      /* FIX: paslēp LRM “leaflet-routing-alt” galvenajā panelī */
       .mp4-panel.leaflet-routing-container .leaflet-routing-alt{ display:none !important; }
-      .mp4-panel .leaflet-routing-alt{ display:none !important; } /* drošības variants */
+      .mp4-panel .leaflet-routing-alt{ display:none !important; }
 
       .mp4-panel .leaflet-routing-container{
         margin:0 !important; padding:0 !important;
@@ -3429,12 +3455,16 @@ map.whenReady(() => {
         flex-shrink:0;
       }
 
+      /* FIX #3: waypoint input list scroll jau pie ~5 KP */
       .mp4-panel .leaflet-routing-geocoders{
         padding:10px !important;
         background:#1c222a !important;
         border-bottom:1px solid rgba(255,255,255,.08);
-        max-height:40vh;
+        max-height:240px;      /* ~5 inputs */
         overflow-y:auto;
+      }
+      @media (max-height: 760px){
+        .mp4-panel .leaflet-routing-geocoders{ max-height: 32vh; }
       }
 
       .mp4-panel .leaflet-routing-geocoder{
@@ -3471,7 +3501,6 @@ map.whenReady(() => {
         cursor:grab; user-select:none; opacity:.85; font-weight:1000; color:#aeb8c7;
       }
 
-      /* Augšējā josla (pievienots NAV poga) */
       .mp4-top{
         padding:10px;
         display:grid;
@@ -3550,8 +3579,8 @@ map.whenReady(() => {
         cursor:pointer;
         font-size:12px;
       }
+      .mp4-qhint{ grid-column:1 / -1; font-size:11px; color:#8ea0b3; padding:0 2px; }
 
-      /* Shared suggest (viena kaste visiem laukiem) */
       .mp4-suggest{
         position:fixed;
         background:#0c1015;
@@ -3599,7 +3628,7 @@ map.whenReady(() => {
       .mp4-export{ background:#455a64; }
       .mp4-clear{ background:#c62828; }
 
-      /* NAV panelis: LRM tabulas kosmētika */
+      /* NAV panel cosmetics */
       .mp4-nav-panel .leaflet-routing-alt{
         display:block !important;
         background:transparent !important;
@@ -3609,19 +3638,15 @@ map.whenReady(() => {
         padding:0 !important;
         color:#e9eef5 !important;
       }
-      .mp4-nav-panel .leaflet-routing-alt h2,
-      .mp4-nav-panel .leaflet-routing-alt h3{
-        margin:0 0 10px 0 !important;
-        font-size:16px !important;
-        font-weight:1000 !important;
-      }
-      .mp4-nav-panel .leaflet-routing-alt table{
-        width:100% !important;
-      }
+      .mp4-nav-panel .leaflet-routing-alt table{ width:100% !important; }
       .mp4-nav-panel .leaflet-routing-alt td{
         font-size:13px !important;
         padding:4px 0 !important;
       }
+      /* ja nejauši iekopējas kas cits - paslēp */
+      .mp4-nav-panel .leaflet-routing-geocoders,
+      .mp4-nav-panel .leaflet-routing-add-waypoint,
+      .mp4-nav-panel .leaflet-routing-remove-waypoint{ display:none !important; }
 
       .mp4-popup{ width:260px; }
       .mp4-coords{ font-size:11px; color:#aeb8c7; line-height:1.3; margin-bottom:8px; }
@@ -3680,7 +3705,7 @@ map.whenReady(() => {
   }
 
   // ------------------------------
-  // Geometry helpers
+  // Helpers
   // ------------------------------
   function bearingDeg(a, b){
     var toRad = function(x){ return x*Math.PI/180; };
@@ -3706,7 +3731,7 @@ map.whenReady(() => {
   }
 
   // ------------------------------
-  // Coordinate formats
+  // Coord formats
   // ------------------------------
   function getCoordStrings(latlng){
     var lat = latlng.lat, lng = latlng.lng;
@@ -3748,9 +3773,6 @@ map.whenReady(() => {
     return wp.__mp4id;
   }
 
-  // ------------------------------
-  // Marker icon
-  // ------------------------------
   function symbolSvg(symbolId){
     var stroke = '#ff3b3b';
     var fill   = 'rgba(255, 59, 59, 0.12)';
@@ -3762,7 +3784,7 @@ map.whenReady(() => {
   }
 
   // ------------------------------
-  // Parse coords/address helpers
+  // Parse coords
   // ------------------------------
   function _mp4ParseAnyCoords(q){
     q = String(q || '').trim();
@@ -3847,9 +3869,6 @@ map.whenReady(() => {
     return out;
   }
 
-  // ------------------------------
-  // LRM Geocoder (stable)
-  // ------------------------------
   function createHybridGeocoder(){
     return {
       geocode: function(query, cb, context){
@@ -3868,7 +3887,7 @@ map.whenReady(() => {
   }
 
   // ------------------------------
-  // OSRM legs
+  // OSRM legs (posmu kopsavilkums)
   // ------------------------------
   async function fetchOsrmLegs(profileKey, latLngs){
     var prof = (profileKey === 'walking') ? ROUTER.profiles.walking : ROUTER.profiles.driving;
@@ -3907,6 +3926,10 @@ map.whenReady(() => {
       listEl.innerHTML = '';
       sumEl.textContent = 'Pievieno vismaz 2 punktus.';
       S.legs = null; S.totals = null;
+      S.lastLegKey = '';
+      // ja nav pietiekami punktu -> route nav
+      S.hasRoute = false;
+      _mp4UpdateAuxButtons();
       return;
     }
 
@@ -3991,7 +4014,8 @@ map.whenReady(() => {
       dockPanel();
       bindWaypointsDnd();
       bindAutocompleteToInputs();
-      _mp4RenderNavPanel(); // atjauno vadītāju, ja vajag
+      _mp4RenderNavPanel(); // FIX #1
+      _mp4UpdateAuxButtons(); // FIX #4/#5
     }, 250);
   }
 
@@ -4013,7 +4037,6 @@ map.whenReady(() => {
 
       rows.forEach(function(row, idx){
         row.dataset.mp4Idx = String(idx);
-        row.classList.add('mp4-wprow');
 
         if (!row.querySelector('.mp4-drag-handle')){
           var h = document.createElement('span');
@@ -4075,11 +4098,9 @@ map.whenReady(() => {
   }
 
   // ==========================================================
-  // SHARED SUGGEST (scope-safe) + click-outside close
+  // SHARED SUGGEST
   // ==========================================================
-  function mp4GetSuggestEl(){
-    return document.getElementById('mp4AddSuggest') || null;
-  }
+  function mp4GetSuggestEl(){ return document.getElementById('mp4AddSuggest') || null; }
 
   function mp4HideSuggest(){
     var el = mp4GetSuggestEl();
@@ -4141,16 +4162,13 @@ map.whenReady(() => {
     }, true);
   })();
 
-  // --- Stabils waypoint uzstādītājs LRM laukiem (NEIZMANTO sintētiskos keydown!) ---
   function mp4SetWaypointFromPick(inputEl, pick){
     if (!S.control || !pick || !pick.center) return;
 
-    // Noskaidro indeksu no rindas
     var row = inputEl ? inputEl.closest('.leaflet-routing-geocoder') : null;
     var idx = row && row.dataset && row.dataset.mp4Idx ? parseInt(row.dataset.mp4Idx, 10) : NaN;
 
     if (!isFinite(idx)){
-      // fallback: pēc input saraksta
       var all = Array.prototype.slice.call(document.querySelectorAll('.leaflet-routing-geocoders input'));
       idx = all.indexOf(inputEl);
     }
@@ -4173,7 +4191,6 @@ map.whenReady(() => {
     }catch(_){}
   }
 
-  // --- Autocomplete priekš LRM laukiem (izmanto shared suggest) ---
   function bindAutocompleteToInputs(){
     var inputs = document.querySelectorAll('.leaflet-routing-geocoders input');
     Array.prototype.slice.call(inputs).forEach(function(input){
@@ -4190,7 +4207,6 @@ map.whenReady(() => {
         input._mp4Deb = setTimeout(async function(){
           try{
             var res = await resolveQueryToCandidates(val, 5);
-            // LRM laukiem: tikai ieliekam waypoint (nevis auto-add)
             mp4ShowSuggest(res, input, function(pick){
               mp4SetWaypointFromPick(input, pick);
             });
@@ -4205,7 +4221,7 @@ map.whenReady(() => {
   }
 
   // ------------------------------
-  // Dock panel (position + height clamp)
+  // Dock panel
   // ------------------------------
   function dockPanel(){
     try{
@@ -4220,9 +4236,7 @@ map.whenReady(() => {
 
       var panel = S.control.getContainer && S.control.getContainer();
       var btn = document.getElementById('toggleRouteBtn');
-      var anchor = (S.dockClearBtn && S.dockClearBtn.style.display !== 'none') ? S.dockClearBtn : btn;
-
-      if (!panel || !btn || !anchor) return;
+      if (!panel || !btn) return;
 
       if (panel.parentNode !== document.body) document.body.appendChild(panel);
       panel.style.display = 'flex';
@@ -4232,7 +4246,7 @@ map.whenReady(() => {
 
       var pr = panel.getBoundingClientRect();
       var pw = pr.width || 420;
-      var ar = anchor.getBoundingClientRect();
+      var ar = btn.getBoundingClientRect();
       var pad = 10;
 
       var bottomLimit = window.innerHeight - 10;
@@ -4271,15 +4285,13 @@ map.whenReady(() => {
   }
 
   // ------------------------------
-  // SmartSearch auto-hide while MP open
+  // SmartSearch hide/show (input/suggest)
   // ------------------------------
   function _mp4SmartSearchHide(on){
-    // 1) ja tev ir funkcija, izmantojam to (ja eksistē)
     try{
       if (on && typeof window.closeSmartSearch === 'function') window.closeSmartSearch();
     }catch(_){}
 
-    // 2) minimālais: paslēp inputu / sarakstu (neķeram vecākus, lai nejauši nenoslēptu X pogu)
     var idsToToggle = ['smartSearchInput','smartSearchSuggest','smartSearchResults'];
     for (var i=0; i<idsToToggle.length; i++){
       var el = document.getElementById(idsToToggle[i]);
@@ -4293,28 +4305,180 @@ map.whenReady(() => {
     }
   }
 
-  // ------------------------------
-  // NAV panel render (clone LRM itinerary into separate panel)
-  // ------------------------------
+  // ==========================================================
+  // FIX #4/#5: smartSearchBtn + clearRouteBtn visibility + placement
+  // ==========================================================
+  function _mp4EnsureClearBtnNearSmartSearch(){
+    var btn = document.getElementById('clearRouteBtn');
+    if (btn) return btn;
+
+    var smartBtn = document.getElementById('smartSearchBtn');
+    if (!smartBtn || !smartBtn.parentElement) return null;
+
+    btn = document.createElement('button');
+    btn.id = 'clearRouteBtn';
+    btn.type = 'button';
+    btn.textContent = '🧹';
+    btn.title = 'Notīrīt maršrutu';
+    btn.style.marginLeft = '6px';
+    btn.style.background = 'rgba(255,255,255,.10)';
+    btn.style.color = '#fff';
+    btn.style.border = '1px solid rgba(255,255,255,.18)';
+    btn.style.borderRadius = '8px';
+    btn.style.cursor = 'pointer';
+    btn.style.width = '36px';
+    btn.style.height = '36px';
+    btn.style.display = 'none';
+
+    btn.onclick = function(e){
+      e.preventDefault(); e.stopPropagation();
+      if (confirm('Notīrīt visu maršrutu?')) clearRouteFromMap();
+    };
+
+    // ieliekam blakus smartSearchBtn
+    smartBtn.parentElement.insertBefore(btn, smartBtn.nextSibling);
+    return btn;
+  }
+
+  function _mp4UpdateAuxButtons(){
+    var smartBtn = document.getElementById('smartSearchBtn');
+    var clearBtn = _mp4EnsureClearBtnNearSmartSearch();
+
+    // kamēr panelis atvērts -> slēpt abus
+    if (S.enabled){
+      if (smartBtn) smartBtn.style.display = 'none';
+      if (clearBtn) clearBtn.style.display = 'none';
+      return;
+    }
+
+    // panelis aizvērts -> smartSearchBtn rādam
+    if (smartBtn) smartBtn.style.display = '';
+
+    // clear poga tikai ja ir sagatavots maršruts
+    if (clearBtn){
+      clearBtn.style.display = S.hasRoute ? '' : 'none';
+    }
+  }
+
+  // ==========================================================
+  // FIX #1: NAV panel render
+  //  - neiztukšo paneli, ja nav ko rādīt
+  //  - mēģina klonēt LRM DOM, ja nav -> fallback no routesfound datiem
+  // ==========================================================
+  function _mp4NavPlaceholder(){
+    return '<div style="padding:10px; color:#aaa; font-style:italic;">Nav aprēķināts maršruts...</div>';
+  }
+
+  function _mp4RenderNavFromRoute(route){
+    if (!route) return _mp4NavPlaceholder();
+
+    var title = (route.name && String(route.name).trim()) ? route.name : 'Maršruts';
+    var dist = route.summary && isFinite(route.summary.totalDistance) ? fmtDist(route.summary.totalDistance) : '-';
+    var time = route.summary && isFinite(route.summary.totalTime) ? fmtTime(route.summary.totalTime) : '-';
+
+    var instr = route.instructions || [];
+    if (!instr || !instr.length){
+      return (
+        '<div style="padding:10px;">' +
+          '<div style="font-weight:1000;font-size:18px;margin-bottom:6px;">' + title + '</div>' +
+          '<div style="color:#b7c2cf;font-weight:800;margin-bottom:10px;">' + dist + ', ' + time + '</div>' +
+          '<div style="color:#aaa;font-style:italic;">Maršruts ir, bet nav soļu.</div>' +
+        '</div>'
+      );
+    }
+
+    var rows = instr.map(function(it){
+      var txt = it && (it.text || it.instruction || it.type) ? String(it.text || it.instruction || '') : '';
+      var d = (it && isFinite(it.distance)) ? fmtDist(it.distance) : '';
+      return '<tr><td style="padding:4px 0;">' + (txt || '') + '</td><td style="padding:4px 0;text-align:right;white-space:nowrap;">' + (d || '') + '</td></tr>';
+    }).join('');
+
+    return (
+      '<div class="leaflet-routing-alt">' +
+        '<h2 style="margin:0 0 8px 0;font-size:18px;font-weight:1000;">' + title + '</h2>' +
+        '<div style="color:#b7c2cf;font-weight:800;margin:0 0 10px 0;">' + dist + ', ' + time + '</div>' +
+        '<table>' + rows + '</table>' +
+      '</div>'
+    );
+  }
+
   function _mp4RenderNavPanel(){
     try{
       if (!S.control || !S.navPanel) return;
-
       var sideContent = document.getElementById('mp4NavContent');
       if (!sideContent) return;
 
-      var alt = S.control.getContainer().querySelector('.leaflet-routing-alt');
-      if (!alt) return;
+      var c = S.control.getContainer ? S.control.getContainer() : null;
+      if (!c){
+        sideContent.innerHTML = _mp4NavPlaceholder();
+        return;
+      }
 
-      sideContent.innerHTML = '';
-      var clone = alt.cloneNode(true);
-      clone.style.display = 'block';
-      sideContent.appendChild(clone);
-    }catch(_){}
+      // mēģinām atrast LRM itinerary DOM
+      var alt =
+        c.querySelector('.leaflet-routing-alternatives-container') ||
+        c.querySelector('.leaflet-routing-alt');
+
+      if (alt){
+        // klonējam un ieliekam
+        sideContent.innerHTML = '';
+        var clone = alt.cloneNode(true);
+        clone.style.display = 'block';
+        sideContent.appendChild(clone);
+        return;
+      }
+
+      // fallback no pēdējā routesfound
+      sideContent.innerHTML = _mp4RenderNavFromRoute(S.lastRoute);
+    }catch(_){
+      try{
+        var sc = document.getElementById('mp4NavContent');
+        if (sc) sc.innerHTML = _mp4NavPlaceholder();
+      }catch(__){}
+    }
   }
 
   // ------------------------------
-  // Print / Export / Markers (unchanged logic)
+  // Route add helpers
+  // ------------------------------
+  function addWaypointLatLng(latlng){
+    if (!S.control) return;
+    var wps = S.control.getWaypoints().slice();
+
+    var idx = -1;
+    for (var i=0; i<wps.length; i++){
+      if (!wps[i] || !wps[i].latLng){ idx = i; break; }
+    }
+    if (idx === -1){
+      idx = Math.max(1, wps.length - 1);
+      wps.splice(idx, 0, L.Routing.waypoint(latlng));
+    } else {
+      wps[idx] = L.Routing.waypoint(latlng);
+    }
+
+    S.control.setWaypoints(wps);
+    debounceRefresh();
+  }
+
+  function setMapClickAdd(on){
+    var map = getMap();
+    if (!map) return;
+
+    S.mapClickAdd = !!on;
+
+    var mc = map.getContainer();
+    if (mc) mc.style.cursor = S.mapClickAdd ? 'crosshair' : '';
+
+    map.off('click', onMapClickAdd);
+    if (S.mapClickAdd) map.on('click', onMapClickAdd);
+  }
+  function onMapClickAdd(e){
+    if (!S.mapClickAdd) return;
+    addWaypointLatLng(e.latlng);
+  }
+
+  // ------------------------------
+  // Print/Export/Markers (unchanged from previous)
   // ------------------------------
   function openPrintWindow(){
     if (!S.control) return;
@@ -4432,42 +4596,6 @@ map.whenReady(() => {
     return marker;
   }
 
-  function addWaypointLatLng(latlng){
-    if (!S.control) return;
-    var wps = S.control.getWaypoints().slice();
-
-    var idx = -1;
-    for (var i=0; i<wps.length; i++){
-      if (!wps[i] || !wps[i].latLng){ idx = i; break; }
-    }
-    if (idx === -1){
-      idx = Math.max(1, wps.length - 1);
-      wps.splice(idx, 0, L.Routing.waypoint(latlng));
-    } else {
-      wps[idx] = L.Routing.waypoint(latlng);
-    }
-
-    S.control.setWaypoints(wps);
-    debounceRefresh();
-  }
-
-  function setMapClickAdd(on){
-    var map = getMap();
-    if (!map) return;
-
-    S.mapClickAdd = !!on;
-
-    var mc = map.getContainer();
-    if (mc) mc.style.cursor = S.mapClickAdd ? 'crosshair' : '';
-
-    map.off('click', onMapClickAdd);
-    if (S.mapClickAdd) map.on('click', onMapClickAdd);
-  }
-  function onMapClickAdd(e){
-    if (!S.mapClickAdd) return;
-    addWaypointLatLng(e.latlng);
-  }
-
   // ------------------------------
   // INIT
   // ------------------------------
@@ -4511,11 +4639,20 @@ map.whenReady(() => {
 
     setTimeout(function(){ mountPanelUi(map, DirectRouter); }, 80);
 
-    // Kad atrod maršrutu: atjauno posmus + atjauno NAV paneli
-    S.control.on('routesfound', function(){
+    // routesfound: saglabājam route datu fallback + maršruts eksistē
+    S.control.on('routesfound', function(e){
+      try{
+        var r = e && e.routes && e.routes[0] ? e.routes[0] : null;
+        S.lastRoute = r || null;
+        S.hasRoute = !!(r && r.summary && isFinite(r.summary.totalDistance) && r.summary.totalDistance > 0);
+      }catch(_){
+        S.lastRoute = null;
+        S.hasRoute = false;
+      }
+
       debounceRefresh();
 
-      // atjauno NAV paneli un (pirmajā reizē) atver automātiski
+      // atjauno NAV paneli un (1x) atver automātiski
       _mp4RenderNavPanel();
       if (!S.navAutoOpened){
         S.navAutoOpened = true;
@@ -4523,14 +4660,26 @@ map.whenReady(() => {
         if (S.navPanel) S.navPanel.classList.add('open');
         if (S.btnNav) S.btnNav.classList.add('active');
       }
+
+      _mp4UpdateAuxButtons();
     });
 
     S.control.on('waypointschanged', function(){
+      // ja izdzēš līdz <2 punktiem -> maršruta nav
+      try{
+        var wps = S.control.getWaypoints().filter(function(w){ return w && w.latLng; });
+        if (!wps || wps.length < 2){
+          S.hasRoute = false;
+          S.lastRoute = null;
+        }
+      }catch(_){}
       debounceRefresh();
       setTimeout(bindWaypointsDnd, 60);
+      _mp4UpdateAuxButtons();
     });
 
     debounceRefresh();
+    _mp4UpdateAuxButtons();
   }
 
   // ------------------------------
@@ -4540,7 +4689,6 @@ map.whenReady(() => {
     var c = S.control && S.control.getContainer ? S.control.getContainer() : null;
     if (!c || c.querySelector('#mp4TopBar')) return;
 
-    // TOP BAR (pievienots 📋 NAV)
     var top = document.createElement('div');
     top.id = 'mp4TopBar';
     top.className = 'mp4-top';
@@ -4551,7 +4699,6 @@ map.whenReady(() => {
       '<div class="mp4-btn mp4-btn-mini" id="mp4SettingsToggle" title="Iestatījumi">⚙️</div>' +
       '<div class="mp4-btn mp4-btn-mini" id="mp4NavToggle" title="Maršruta vadītājs">📋</div>';
 
-    // QUICK
     var quick = document.createElement('div');
     quick.className = 'mp4-quick';
     quick.innerHTML =
@@ -4565,7 +4712,6 @@ map.whenReady(() => {
       '<div id="mp4AddSuggest" class="mp4-suggest"></div>' +
       '<div class="mp4-qhint">Raksti adresi (≥3 burti), lai redzētu sarakstu</div>';
 
-    // SETTINGS panel (TIKAI iestatījumi)
     var sidePanel = document.createElement('div');
     sidePanel.className = 'mp4-side-panel';
     sidePanel.id = 'mp4SidePanel';
@@ -4599,7 +4745,6 @@ map.whenReady(() => {
         '</div>' +
       '</div>';
 
-    // NAV panel (atsevišķs maršruta vadītājs)
     var navPanel = document.createElement('div');
     navPanel.className = 'mp4-nav-panel';
     navPanel.id = 'mp4NavPanel';
@@ -4609,17 +4754,15 @@ map.whenReady(() => {
         '<button class="mp4-xbtn" id="mp4NavClose" type="button" title="Aizvērt">✕</button>' +
       '</div>' +
       '<div class="mp4-side-content" id="mp4NavContent" style="background:rgba(0,0,0,0.18);">' +
-        '<div style="padding:10px; color:#aaa; font-style:italic;">Nav aprēķināts maršruts...</div>' +
+        _mp4NavPlaceholder() +
       '</div>';
 
-    // RIGHT WRAP
     var rightWrap = document.createElement('div');
     rightWrap.className = 'mp4-right-wrap';
     rightWrap.id = 'mp4RightWrap';
     rightWrap.appendChild(sidePanel);
     rightWrap.appendChild(navPanel);
 
-    // LEGS / FOOT
     var legs = document.createElement('div');
     legs.className = 'mp4-legs';
     legs.innerHTML = '<h4>Posmi (KP → KP)</h4><div id="mp4LegList"></div>';
@@ -4631,21 +4774,18 @@ map.whenReady(() => {
       '<button class="mp4-action mp4-export" id="mp4Export">EKSPORTS</button>' +
       '<button class="mp4-action mp4-clear"  id="mp4Clear">DZĒST</button>';
 
-    // secība (NEAIZTIEKAM citas LRM zonas, tikai UI galotni/papildus paneļus)
     c.insertBefore(foot, c.firstChild);
     c.insertBefore(legs, c.firstChild);
     c.insertBefore(quick, c.firstChild);
     c.insertBefore(top,  c.firstChild);
     c.appendChild(rightWrap);
 
-    // store refs
     S.rightWrap = rightWrap;
     S.sidePanel = sidePanel;
     S.navPanel  = navPanel;
     S.btnSettings = document.getElementById('mp4SettingsToggle');
     S.btnNav      = document.getElementById('mp4NavToggle');
 
-    // Toggles
     S.btnSettings.onclick = function(){
       S.settingsOpen = !S.settingsOpen;
       sidePanel.classList.toggle('open', S.settingsOpen);
@@ -4665,7 +4805,6 @@ map.whenReady(() => {
       S.btnNav.classList.remove('active');
     };
 
-    // Selects
     var distSel = sidePanel.querySelector('#mp4DistanceMode');
     var coordSel = sidePanel.querySelector('#mp4CoordMode');
     var bearSel = sidePanel.querySelector('#mp4BearingUnit');
@@ -4736,7 +4875,6 @@ map.whenReady(() => {
       debounceRefresh();
     };
 
-    // Quick actions
     var btnAddFromMap = document.getElementById('mp4AddFromMap');
     btnAddFromMap.onclick = function(){
       var next = !S.mapClickAdd;
@@ -4750,7 +4888,6 @@ map.whenReady(() => {
       dockPanel();
     };
 
-    // Quick input live search (izmanto shared suggest)
     var addInp = document.getElementById('mp4AddInput');
     var btnGo  = document.getElementById('mp4AddGo');
     var btnAdd = document.getElementById('mp4AddApply');
@@ -4767,7 +4904,6 @@ map.whenReady(() => {
         try{
           var res = await resolveQueryToCandidates(val, 5);
           mp4ShowSuggest(res, addInp, function(pick){
-            // tikai ieliek tekstu un pietuvina
             map.setView(pick.center, 14);
             addInp.value = pick.name;
           });
@@ -4809,7 +4945,6 @@ map.whenReady(() => {
       }
     });
 
-    // Buttons
     document.getElementById('mp4Print').onclick = openPrintWindow;
     document.getElementById('mp4Clear').onclick = function(){ if (confirm('Dzēst visu?')) clearRouteFromMap(); };
 
@@ -4856,15 +4991,17 @@ map.whenReady(() => {
       }
     };
 
-    // apply stored size + bind resize persist
     _mp4ApplyStoredPanelSize(c);
     _mp4BindPanelResizePersist(c);
 
-    // initial
     setMode(S.profile);
     dockPanel();
     setTimeout(bindWaypointsDnd, 120);
     setTimeout(bindAutocompleteToInputs, 160);
+
+    // nodrošina clear pogu (slēpta pēc noklusējuma)
+    _mp4EnsureClearBtnNearSmartSearch();
+    _mp4UpdateAuxButtons();
   }
 
   // ------------------------------
@@ -4880,78 +5017,52 @@ map.whenReady(() => {
     S.wpData.clear();
     S.legs = null;
     S.totals = null;
+    S.lastLegKey = '';
+
+    S.hasRoute = false;
+    S.lastRoute = null;
 
     var sc = document.getElementById('mp4NavContent');
-    if (sc) sc.innerHTML = '<div style="padding:10px; color:#aaa; font-style:italic;">Nav aprēķināts maršruts...</div>';
+    if (sc) sc.innerHTML = _mp4NavPlaceholder();
 
     debounceRefresh();
+    _mp4UpdateAuxButtons();
   }
 
   // ------------------------------
-  // Toggle button + 🧹
+  // Toggle
   // ------------------------------
-  function ensureDockClearBtn(toggleBtn){
-    if (!toggleBtn) return;
-    var parent = toggleBtn.parentElement;
-    if (!parent) return;
-
-    var b = document.getElementById('clearRouteBtn');
-    if (!b){
-      b = document.createElement('button');
-      b.id = 'clearRouteBtn';
-      b.type = 'button';
-      b.textContent = '🧹';
-      b.title = 'Notīrīt maršrutu';
-      b.style.marginLeft = '6px';
-      b.style.background = '#444';
-      b.style.color = '#fff';
-      b.style.border = '1px solid #666';
-      b.style.borderRadius = '4px';
-      b.style.cursor = 'pointer';
-      b.style.width = '30px';
-      b.onclick = function(e){
-        e.preventDefault(); e.stopPropagation();
-        if (confirm('Notīrīt visu maršrutu?')) clearRouteFromMap();
-      };
-      parent.insertBefore(b, toggleBtn.nextSibling);
-    }
-    S.dockClearBtn = b;
-    b.style.display = S.enabled ? '' : 'none';
-  }
-
   function toggle(){
     S.enabled = !S.enabled;
 
     var btn = document.getElementById('toggleRouteBtn');
 
     if (S.enabled){
-      // X poga paliek, SmartSearch input paslēpjas
       if (btn){ btn.style.background = '#c62828'; btn.innerHTML = '✕'; }
-      _mp4SmartSearchHide(true);
+
+      _mp4SmartSearchHide(true);     // slēpj input/suggest
+      _mp4UpdateAuxButtons();        // FIX #4: slēpj smartSearchBtn + clearRouteBtn
 
       if (!S.control) init();
       else {
-        var c = S.control.getContainer();
-        if (c) c.style.display = 'flex';
+        var c0 = S.control.getContainer();
+        if (c0) c0.style.display = 'flex';
         debounceRefresh();
         setTimeout(bindWaypointsDnd, 80);
         setTimeout(bindAutocompleteToInputs, 120);
       }
       setTimeout(dockPanel, 80);
-      ensureDockClearBtn(btn);
 
     } else {
       if (btn){ btn.style.background = ''; btn.innerHTML = '🔀'; }
       setMapClickAdd(false);
 
-      // atgriež SmartSearch
-      _mp4SmartSearchHide(false);
+      _mp4SmartSearchHide(false); // atgriež input/suggest
 
       if (S.control){
         var c2 = S.control.getContainer();
         if (c2) c2.style.display = 'none';
       }
-      if (S.dockClearBtn) S.dockClearBtn.style.display = 'none';
 
       // aizver labos paneļus (tikai UI)
       S.settingsOpen = false;
@@ -4960,6 +5071,9 @@ map.whenReady(() => {
       if (S.navPanel)  S.navPanel.classList.remove('open');
       if (S.btnSettings) S.btnSettings.classList.remove('active');
       if (S.btnNav)      S.btnNav.classList.remove('active');
+
+      // FIX #5: panelis aizvērts -> smartSearchBtn redzams, clearRouteBtn tikai ja ir maršruts
+      _mp4UpdateAuxButtons();
     }
   }
 
@@ -4970,12 +5084,15 @@ map.whenReady(() => {
     var btn = document.getElementById('toggleRouteBtn');
     if (btn && !btn.dataset.mp4Bound){
       btn.dataset.mp4Bound = '1';
-      ensureDockClearBtn(btn);
       btn.addEventListener('click', function(e){
         e.preventDefault();
         toggle();
       });
     }
+
+    // sagatavo clear pogu pie smartsearch (slēpta, kamēr nav maršruta)
+    _mp4EnsureClearBtnNearSmartSearch();
+    _mp4UpdateAuxButtons();
   });
 
 })();
