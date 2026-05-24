@@ -332,6 +332,66 @@
     .vc-compass-wrap {
       animation: vc-float 6s ease-in-out infinite;
     }
+
+    /* ===== PROGRESS BAR ===== */
+    .vc-progress-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: rgba(148,163,184,0.08);
+      border-radius: 0 0 31px 31px;
+      overflow: hidden;
+    }
+
+    .vc-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #f97316, #f97373, #f97316);
+      background-size: 200% 100%;
+      border-radius: 0 2px 2px 0;
+      animation:
+        vc-load 18s cubic-bezier(0.4, 0, 0.2, 1) forwards,
+        vc-shimmer 2.4s linear infinite;
+      box-shadow: 0 0 8px rgba(248,113,113,0.7);
+    }
+
+    @keyframes vc-load {
+      0%   { width: 0%; }
+      10%  { width: 18%; }
+      28%  { width: 35%; }
+      45%  { width: 52%; }
+      60%  { width: 63%; }
+      72%  { width: 74%; }
+      85%  { width: 83%; }
+      95%  { width: 93%; }
+      100% { width: 100%; }
+    }
+
+    @keyframes vc-shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ===== PROGRESS LABEL ===== */
+    .vc-progress-label {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: #6b7280;
+      animation: vc-blink 2.4s ease-in-out infinite;
+    }
+
+    @keyframes vc-blink {
+      0%, 100% { opacity: 0.5; }
+      50%       { opacity: 1; }
+    }
   </style>
 </head>
 
@@ -388,7 +448,51 @@
           </div>
         </div>
       </div>
-    </section>
+      <div class="vc-progress-label">Meklē atjauninājumu…</div>
+      <div class="vc-progress-bar">
+        <div class="vc-progress-fill"></div>
+      </div>
+        </section>
   </main>
+
+<script>
+  var MAX_TRIES = 3;
+
+  // Ja lapa ielādēta manuāli (nevis ar mūsu location.reload()),
+  // sessionStorage karogs NAV iestatīts — atiestatam skaitītāju
+  var isAuto = sessionStorage.getItem("vc_auto_reload");
+  if (!isAuto) {
+    localStorage.removeItem("vc_reload_count");
+  }
+  sessionStorage.removeItem("vc_auto_reload");
+
+  var count = parseInt(localStorage.getItem("vc_reload_count") || "0");
+
+  if (count >= MAX_TRIES) {
+    // Parāda "nav atjauninājumu" ziņu un aptur visu
+    var label = document.querySelector(".vc-progress-label");
+    var fill  = document.querySelector(".vc-progress-fill");
+
+    if (label) {
+      label.textContent = "Šobrīd nav atjauninājumu — ienāciet vēlāk.";
+      label.style.animation = "none";
+      label.style.opacity   = "1";
+      label.style.color     = "#f97373";
+      label.style.bottom    = "12px";
+    }
+    if (fill) {
+      fill.style.animation = "none";
+      fill.style.width     = "0%";
+    }
+
+  } else {
+    // Vēl ir mēģinājumi — pēc 18 sek auto-atjauno lapu
+    localStorage.setItem("vc_reload_count", count + 1);
+    setTimeout(function() {
+      sessionStorage.setItem("vc_auto_reload", "1"); // atzīmē kā automātisku
+      location.reload();
+    }, 18000);
+  }
+</script>
 </body>
 </html>
