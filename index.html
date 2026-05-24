@@ -73,11 +73,26 @@
     }
 
     .vc-dot {
-      width: 9px;                        /* 7 → 9 */
+      width: 9px;
       height: 9px;
       border-radius: 50%;
       background: #f97373;
       box-shadow: 0 0 0 5px rgba(248,113,113,0.25);
+      animation: vc-pulse 2s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes vc-pulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0px rgba(248,113,113,0.5),
+                    0 0 0 4px rgba(248,113,113,0.15);
+      }
+      50% {
+        transform: scale(1.2);
+        box-shadow: 0 0 0 5px rgba(248,113,113,0.0),
+                    0 0 12px 4px rgba(248,113,113,0.35);
+      }
     }
 
     /* === VIRSRAKSTS: +30% === */
