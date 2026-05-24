@@ -23,11 +23,13 @@
     }
 
     .vc-coming-main {
+      flex-direction: column;  /* PAPILDINĀTS */
       flex: 1;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 40px 20px 52px; /* 32→40, 16→20, 40→52 */
+      padding: 40px 20px 52px;
     }
 
     /* === KARTE: +30% === */
@@ -85,13 +87,12 @@
     @keyframes vc-pulse {
       0%, 100% {
         transform: scale(1);
-        box-shadow: 0 0 0 0px rgba(248,113,113,0.5),
-                    0 0 0 4px rgba(248,113,113,0.15);
+        box-shadow: 0 0 0 5px rgba(248,113,113,0.25);
       }
       50% {
-        transform: scale(1.2);
-        box-shadow: 0 0 0 5px rgba(248,113,113,0.0),
-                    0 0 12px 4px rgba(248,113,113,0.35);
+        transform: scale(1.25);
+        box-shadow: 0 0 0 8px rgba(248,113,113,0.0),
+                    0 0 14px 4px rgba(248,113,113,0.4);
       }
     }
 
@@ -183,6 +184,24 @@
     }
 
     /* ===== Dekoratīvais "kompass": +30% ===== */
+    /* ===== LOGO ===== */
+    .vc-coming-logo-wrap {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 24px;
+      width: 100%;
+    }
+
+    .vc-coming-logo {
+      height: clamp(72px, 12vw, 110px);
+      width: auto;
+      max-width: 90vw;
+      object-fit: contain;
+      filter: drop-shadow(0 0 18px rgba(248,113,113,0.3));
+      opacity: 0.95;
+    }
+
     .vc-compass-wrap {
       position: relative;
       align-self: center;
@@ -292,6 +311,24 @@
       50%  { transform: translateY(-6px); }
       100% { transform: translateY(0px); }
     }
+    /* ===== LOGO ===== */
+    .vc-coming-logo-wrap {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 24px;
+      width: 100%;
+    }
+
+    .vc-coming-logo {
+      height: clamp(72px, 12vw, 110px);
+      width: auto;
+      max-width: 90vw;
+      object-fit: contain;
+      filter: drop-shadow(0 0 18px rgba(248,113,113,0.3));
+      opacity: 0.95;
+    }
+
     .vc-compass-wrap {
       animation: vc-float 6s ease-in-out infinite;
     }
@@ -301,6 +338,13 @@
 <body class="vc-coming-body">
 
   <main class="vc-coming-main">
+    <div class="vc-coming-logo-wrap">
+      <img
+        src="https://raw.githubusercontent.com/cadet-tools/virtual-compass/refs/heads/main/img/CADET_TRANSP_.png"
+        alt="CADET logo"
+        class="vc-coming-logo"
+      />
+    </div>
     <section class="vc-coming-card">
       <div>
         <div class="vc-coming-badge">
